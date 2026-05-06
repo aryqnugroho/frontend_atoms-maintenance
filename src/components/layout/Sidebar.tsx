@@ -47,23 +47,16 @@ const navSections: NavSection[] = [
       { name: 'CNSD Readiness', path: '/cnsd', icon: CheckSquare, roles: ['Manager Teknik', 'Supervisor CNSD', 'Teknisi CNSD'] },
       { name: 'TFP Readiness', path: '/tfp', icon: Activity, roles: ['Manager Teknik', 'Supervisor TFP', 'Teknisi TFP'] },
       { name: 'Ground Check', path: '/ground-check', icon: Plane, roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-      { name: 'Grounding System', path: '/grounding', icon: Zap, roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-      { name: 'Reporting', path: '/reports', icon: ClipboardList, roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP'] },
-      { name: 'Logbook', path: '/logbooks', icon: BookOpen, roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
+      { name: 'Grounding Report', path: '/grounding', icon: Zap, roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
     ],
   },
   {
     title: 'Admin',
     items: [
       { name: 'User Management', path: '/admin/users', icon: Users, roles: ['Admin'] },
-      { name: 'Shift Schedule', path: '/admin/schedules', icon: Calendar, roles: ['Admin', 'Manager Teknik'] },
     ],
   },
-  {
-    items: [
-      { name: 'Profile Settings', path: '/profile', icon: Settings, roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-    ],
-  },
+
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {

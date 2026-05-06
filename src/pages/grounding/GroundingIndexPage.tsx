@@ -1,177 +1,207 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, Zap, CheckCircle2 } from 'lucide-react';
+import {
+  Plus, Search, Eye, Pencil, Trash2,
+  ArrowUpDown, ArrowUp, ArrowDown, Zap,
+} from 'lucide-react';
 import { Button } from '@/components/common/Button';
-import { ComingSoonCard } from '@/components/common/ComingSoonCard';
+import { mockGroundingReports } from '@/data/mockData';
+
+type SortField = 'lokasiKerja' | 'tanggal' | null;
+type SortDirection = 'asc' | 'desc';
 
 export const GroundingIndexPage: React.FC = () => {
   const navigate = useNavigate();
 
-  // Placeholder untuk kategori Grounding yang akan datang
-  const groundingCategories = [
-    {
-      id: 'lightning-protection',
-      code: 'GRD-01',
-      title: 'Lightning Protection System',
-      description: 'Pemeriksaan sistem penangkal petir',
-      icon: '⚡',
-    },
-    {
-      id: 'grounding-measurement',
-      code: 'GRD-02',
-      title: 'Grounding Measurement',
-      description: 'Pengukuran nilai tahanan grounding',
-      icon: '📏',
-    },
-    {
-      id: 'earth-pit-inspection',
-      code: 'GRD-03',
-      title: 'Earth Pit Inspection',
-      description: 'Pemeriksaan kondisi sumur grounding',
-      icon: '🔍',
-    },
-    {
-      id: 'grounding-report',
-      code: 'GRD-04',
-      title: 'Grounding Report',
-      description: 'Laporan hasil pemeriksaan grounding',
-      icon: '📋',
-    },
-  ];
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterLokasi, setFilterLokasi] = useState('');
+  const [sortField, setSortField] = useState<SortField>('tanggal');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Unique locations for filter
+  const uniqueLocations = useMemo(() => {
+    const locs = [...new Set(mockGroundingReports.map(r => r.lokasiKerja))];
+    return locs.sort();
+  }, []);
+
+  // Filtered + sorted data
+  const filteredReports = useMemo(() => {
+    let data = [...mockGroundingReports];
+
+    if (filterLokasi) {
+      data = data.filter(r => r.lokasiKerja === filterLokasi);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      data = data.filter(r =>
+        r.namaPeralatan.toLowerCase().includes(q) ||
+        r.lokasiPeralatan.toLowerCase().includes(q) ||
+        r.lokasiKerja.toLowerCase().includes(q) ||
+        r.dibuatOleh.toLowerCase().includes(q)
+      );
+    }
+
+    if (sortField) {
+      data.sort((a, b) => {
+        const valA = sortField === 'tanggal' ? a.tanggal : a.lokasiKerja;
+        const valB = sortField === 'tanggal' ? b.tanggal : b.lokasiKerja;
+        const cmp = valA.localeCompare(valB);
+        return sortDirection === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    return data;
+  }, [searchQuery, filterLokasi, sortField, sortDirection]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('id-ID', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown size={14} className="text-slate-400" />;
+    return sortDirection === 'asc'
+      ? <ArrowUp size={14} className="text-brand-primary" />
+      : <ArrowDown size={14} className="text-brand-primary" />;
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/dashboard')}
-              className="gap-2"
-            >
-              <ArrowLeft size={16} />
-              Kembali
-            </Button>
+    <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
+      {/* Header — matching WorkOrder pattern */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-100">
+            <Zap size={20} className="text-yellow-700" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">
-            Grounding System
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Modul pemeriksaan dan pelaporan sistem grounding penangkal petir
-          </p>
+          <div>
+            <h1 className="text-xl md:text-2xl text-slate-900">Pembuatan Laporan Grounding & Penangkal Petir</h1>
+            <p className="text-sm text-slate-500">Laporan Grounding & Penangkal Petir Cluster Surabaya</p>
+          </div>
+        </div>
+        <Button onClick={() => navigate('/grounding/create')} className="gap-2">
+          <Plus size={16} />
+          Tambah Laporan
+        </Button>
+      </div>
+
+      {/* Filter Bar — matching WO inline filter */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari nama peralatan, lokasi, atau pembuat..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-3 h-10 rounded-xl border border-gray-300 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+            />
+          </div>
+          <select
+            value={filterLokasi}
+            onChange={(e) => setFilterLokasi(e.target.value)}
+            className="h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+          >
+            <option value="">Semua Lokasi</option>
+            {uniqueLocations.map(loc => (
+              <option key={loc} value={loc}>{loc}</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Coming Soon Notice */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-            <Clock size={20} className="text-amber-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-bold text-amber-900">
-              Fitur Dalam Pengembangan
-            </h3>
-            <p className="text-sm text-amber-700 mt-1">
-              Modul Grounding System sedang dalam tahap pengembangan dan akan tersedia pada update berikutnya. 
-              Fitur ini akan mencakup pemeriksaan sistem penangkal petir, pengukuran tahanan grounding, dan pembuatan laporan.
-            </p>
-          </div>
+      {/* Data Table — matching WO table style */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[700px]">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th
+                  onClick={() => handleSort('lokasiKerja')}
+                  className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80 cursor-pointer hover:bg-gray-100 select-none"
+                >
+                  <div className="flex items-center gap-1.5">
+                    Lokasi Kerja
+                    <SortIcon field="lokasiKerja" />
+                  </div>
+                </th>
+                <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">
+                  Nama Peralatan
+                </th>
+                <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">
+                  Lokasi Peralatan
+                </th>
+                <th
+                  onClick={() => handleSort('tanggal')}
+                  className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80 cursor-pointer hover:bg-gray-100 select-none"
+                >
+                  <div className="flex items-center gap-1.5">
+                    Tanggal Laporan
+                    <SortIcon field="tanggal" />
+                  </div>
+                </th>
+                <th className="text-center text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">
+                  Aksi
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredReports.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-slate-400 text-sm">
+                    Tidak ada data yang sesuai filter.
+                  </td>
+                </tr>
+              ) : (
+                filteredReports.map((report) => (
+                  <tr
+                    key={report.id}
+                    className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
+                  >
+                    <td className="px-6 py-4 text-slate-700">{report.lokasiKerja}</td>
+                    <td className="px-6 py-4 text-slate-700 font-medium">{report.namaPeralatan}</td>
+                    <td className="px-6 py-4 text-slate-500">{report.lokasiPeralatan}</td>
+                    <td className="px-6 py-4 text-slate-500">{formatDate(report.tanggal)}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
+                          title="Lihat"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                          title="Hapus"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-      </div>
-
-      {/* Categories Grid */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        {groundingCategories.map((category) => (
-          <ComingSoonCard
-            key={category.id}
-            title={category.title}
-            description={category.description}
-            icon={category.icon}
-          />
-        ))}
-      </div>
-
-      {/* Info Section */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Zap size={20} className="text-yellow-600" />
-          <h3 className="text-base font-bold text-gray-800">
-            Fitur yang Akan Tersedia
-          </h3>
-        </div>
-        <div className="space-y-3">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 size={18} className="text-blue-600 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-gray-800">
-                Pemeriksaan Sistem Penangkal Petir
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Inspeksi visual kondisi air terminal, down conductor, dan grounding electrode
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <CheckCircle2 size={18} className="text-blue-600 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-gray-800">
-                Pengukuran Tahanan Grounding
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Pengukuran nilai tahanan grounding dengan earth tester dan pencatatan hasil
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <CheckCircle2 size={18} className="text-blue-600 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-gray-800">
-                Inspeksi Sumur Grounding
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Pemeriksaan kondisi fisik earth pit, elektroda, dan koneksi
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <CheckCircle2 size={18} className="text-blue-600 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-gray-800">
-                Laporan Grounding
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Pembuatan laporan hasil pemeriksaan dengan grafik tren dan rekomendasi
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <CheckCircle2 size={18} className="text-blue-600 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-gray-800">
-                Photo Documentation
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Upload foto kondisi sistem grounding untuk dokumentasi dan analisis
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Standard Reference */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="text-sm font-bold text-blue-900 mb-2">
-          📖 Standar Referensi
-        </h4>
-        <ul className="text-xs text-blue-700 space-y-1">
-          <li>• PUIL 2011 (Persyaratan Umum Instalasi Listrik)</li>
-          <li>• SNI 03-7015-2004 (Sistem Proteksi Petir pada Bangunan Gedung)</li>
-          <li>• IEC 62305 (Protection Against Lightning)</li>
-          <li>• IEEE Std 142 (Grounding of Industrial and Commercial Power Systems)</li>
-        </ul>
       </div>
     </div>
   );

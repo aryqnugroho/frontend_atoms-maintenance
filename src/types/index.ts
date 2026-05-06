@@ -255,6 +255,47 @@ export interface Logbook {
   uploader?: { id: number; name: string };
 }
 
+// ─── Ground Check / Meter Reading ──────────────────────────
+export interface MeterReadingEquipment {
+  id: string;
+  name: string;
+  category: 'Navigation' | 'Communication';
+  frequency?: string;
+  status: 'Normal' | 'Tidak Normal';
+  lastChecked: string;
+  checkedBy: string;
+}
+
+// ─── Grounding Report ──────────────────────────────────────
+export interface GroundingVisualItem {
+  no: number;
+  name: string;
+  ketersediaan: 'Ada' | 'Tidak Ada' | '';
+  kondisi: 'Baik' | 'Tidak Baik' | '';
+  catatan: string;
+}
+
+export interface GroundingMeasurementItem {
+  no: number;
+  name: string;
+  standard: string;
+  kondisi: 'Baik' | 'Tidak Baik' | '';
+  hasilPengukuran: string;
+}
+
+export interface GroundingReport {
+  id: number;
+  kantorUnitKerja: string;
+  namaPeralatan: string;
+  lokasiPeralatan: string;
+  tanggal: string;
+  dibuatOleh: string;
+  disetujuiOleh: string;
+  lokasiKerja: string;
+  visualItems: GroundingVisualItem[];
+  measurementItems: GroundingMeasurementItem[];
+}
+
 // ─── Pagination ────────────────────────────────────────────
 export interface PaginatedResponse<T> {
   data: T[];

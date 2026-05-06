@@ -149,3 +149,114 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
 }
+
+/* ─── Grounding Checklist Form Styles ────────────────────── */
+.grounding-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.grounding-table th {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 0.625rem 0.75rem;
+  text-align: center;
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.grounding-table td {
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem 0.75rem;
+  vertical-align: middle;
+}
+
+.grounding-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.grounding-radio-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+
+.grounding-radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.grounding-radio-group input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #cbd5e1;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.grounding-radio-group input[type="radio"]:checked {
+  border-color: #1B3A6B;
+}
+
+.grounding-radio-group input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1B3A6B;
+}
+
+.grounding-radio-group input[type="radio"]:hover {
+  border-color: #94a3b8;
+}
+
+.grounding-note-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 4px 2px;
+  font-size: 0.8125rem;
+  background: transparent;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.grounding-note-input:focus {
+  border-bottom-color: #1B3A6B;
+}
+
+.grounding-section-header {
+  background: #f1f5f9 !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: #1e293b;
+}
+
+.grounding-standard {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.8125rem;
+  color: #1B3A6B;
+  font-weight: 600;
+  text-align: center;
+}
+
