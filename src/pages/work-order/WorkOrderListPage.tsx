@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search } from 'lucide-react';
+import { FileText, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/common/Button';
+import { PageHeader } from '@/components/common/PageHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { Badge } from '@/components/common/Badge';
@@ -25,16 +26,19 @@ export const WorkOrderListPage: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Work Order</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Kelola perintah kerja dan tugas operasional</p>
-        </div>
-        <Button onClick={() => navigate('/work-orders/create')} className="gap-2">
-          <Plus size={16} />
-          Buat Work Order
-        </Button>
-      </div>
+      <PageHeader
+        icon={FileText}
+        iconBg="bg-indigo-100"
+        iconColor="text-indigo-600"
+        title="Work Order"
+        subtitle="Kelola perintah kerja dan tugas operasional"
+        actions={
+          <Button onClick={() => navigate('/work-orders/create')} className="gap-2">
+            <Plus size={16} />
+            Buat Work Order
+          </Button>
+        }
+      />
 
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">

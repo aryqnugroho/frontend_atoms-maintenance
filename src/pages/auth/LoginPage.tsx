@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { LogIn, Loader2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Input } from '@/components/common/Input';
 import { Button } from '@/components/common/Button';
 import { mockUsers } from '@/data/mockData';
@@ -35,7 +35,7 @@ export const LoginPage: React.FC = () => {
         updateUser(mockUser);
         window.location.href = '/dashboard';
       } else {
-        setError('Email atau password salah. Coba: budi@airnav.co.id');
+        setError('Email atau password salah. Coba: user@airnav.co.id');
       }
     } finally {
       setIsLoading(false);

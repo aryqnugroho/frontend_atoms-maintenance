@@ -43,18 +43,7 @@ const MATRIX_ROWS: MatrixRow[] = [
   { id: 'batC',   label: 'Suhu Battery',     unit: '°C',     panels: ['upsA', 'upsB'] },
 ];
 
-const BOTTOM_ROWS = [
-  {
-    id: 'mode',
-    label: 'Mode',
-    panels: { cos: ['Auto', 'Manual'], ats: ['Auto', 'Manual'], upsA: null, upsB: null },
-  },
-  {
-    id: 'suplai',
-    label: 'Suplai Aktif',
-    panels: { cos: ['PLN', 'UPS'], ats: ['PLN 1', 'PLN 2'], upsA: null, upsB: null },
-  },
-];
+
 
 const FACILITY_ITEMS = [
   { id: 'catu',     label: 'Catu Daya Listrik',          defaultNote: '' },
@@ -149,6 +138,13 @@ const KondisiSelect: React.FC<{ value: string; onChange: (v: string) => void }> 
   </select>
 );
 
+/** Typed signatures state for the TFP form */
+interface TfpSignaturesData {
+  teknisi: string;
+  supervisor: string;
+  manager: string;
+}
+
 // ─── Main Component ───────────────────────────────────────────
 
 export const TfpAobGroundFormPage: React.FC = () => {
@@ -165,7 +161,7 @@ export const TfpAobGroundFormPage: React.FC = () => {
   const [matrix, setMatrix] = useState(initMatrixData);
   const [bottom, setBottom] = useState(initBottomData);
   const [facility, setFacility] = useState(initFacilityData);
-  const [signatures, setSignatures] = useState({ teknisi: '', supervisor: '', manager: '' });
+  const [signatures, setSignatures] = useState<TfpSignaturesData>({ teknisi: '', supervisor: '', manager: '' });
 
   const setMatrixCell = (rowId: string, panelId: string, col: string, val: string) => {
     setMatrix(prev => ({
@@ -464,7 +460,7 @@ export const TfpAobGroundFormPage: React.FC = () => {
             <div key={sig.key} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b pb-2">{sig.label}</h4>
               <input
-                value={(signatures as any)[sig.key]}
+                value={signatures[sig.key as keyof TfpSignaturesData]}
                 onChange={e => setSignatures(p => ({ ...p, [sig.key]: e.target.value }))}
                 placeholder={`Nama ${sig.label}`}
                 className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:ring-1 focus:ring-slate-400 focus:outline-none"

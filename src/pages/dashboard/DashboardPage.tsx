@@ -18,7 +18,7 @@ import {
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import {
   mockShiftSchedule,
   mockChecklist,
@@ -149,30 +149,30 @@ export const DashboardPage: React.FC = () => {
       </Modal>
 
       {/* ─── Page Header ─────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Dashboard Operasional</h1>
-          <div className="flex items-center gap-2 mt-1">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 shrink-0">
+            <span className="text-xl leading-none">{getCurrentShiftInfo().emoji}</span>
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-slate-900">Dashboard Operasional</h1>
             <p className="text-sm text-slate-500">
               Selamat datang, <span className="font-semibold text-slate-700">{user?.name}</span>
+              <span className="mx-1.5 text-slate-300">•</span>
+              <span className="font-medium text-slate-600">{getCurrentShiftInfo().label}</span>
             </p>
-            <span className="text-slate-300">•</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-lg">{getCurrentShiftInfo().emoji}</span>
-              <span className="text-sm font-medium text-slate-600">{getCurrentShiftInfo().label}</span>
-            </div>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-slate-500">Shift Aktif</p>
+        <div className="text-left sm:text-right shrink-0">
+          <p className="text-xs text-slate-500">Jam Shift</p>
           <p className="text-sm font-bold text-blue-700">
-            {shift.shift_start} - {shift.shift_end} WIB
+            {shift.shift_start} – {shift.shift_end} WIB
           </p>
         </div>
       </div>
 
       {/* ─── Quick Navigation (Compact) ─────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
         {quickNavItems.map((item) => (
           <button
             key={item.path}

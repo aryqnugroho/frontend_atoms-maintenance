@@ -6,10 +6,6 @@ import {
   RotateCcw,
   Calendar,
   MapPin,
-  CheckCircle2,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
   Radio as RadioIcon,
   Zap,
   Activity,
@@ -115,6 +111,26 @@ const EQ1_STRUCTURE: EQ1Category[] = [
 
 // ─── Component ───────────────────────────────────────────────
 
+/** Per-item or per-child row data stored in the form */
+interface EQ1ItemData {
+  status?: string;
+  cond1?: string;
+  cond2?: string;
+  note?: string;
+}
+
+/** Typed signatures block */
+interface SignaturesData {
+  teknisi: string;
+  supervisor: string;
+  manager: string;
+}
+
+/** Safely cast a stored value to EQ1ItemData for reading */
+function asEQ1(val: unknown): EQ1ItemData {
+  return (val ?? {}) as EQ1ItemData;
+}
+
 export const CnsdEq1FormPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<number>(1);
@@ -124,12 +140,12 @@ export const CnsdEq1FormPage: React.FC = () => {
     lokasi: 'CABANG SURABAYA',
     tanggal: new Date().toISOString().split('T')[0],
     jam: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-    data: {} as Record<string, any>,
+    data: {} as Record<string, Record<string, unknown>>,
     signatures: {
       teknisi: '',
       supervisor: '',
-      manager: ''
-    }
+      manager: '',
+    } as SignaturesData,
   });
 
   const handleHeaderChange = (field: string, value: string) => {
@@ -160,7 +176,7 @@ export const CnsdEq1FormPage: React.FC = () => {
         ...prev.data,
         [itemId]: {
           ...prev.data[itemId],
-          [child]: { ...prev.data[itemId]?.[child], [field]: value }
+          [child]: { ...asEQ1(prev.data[itemId]?.[child]), [field]: value }
         }
       }
     }));
@@ -286,7 +302,7 @@ export const CnsdEq1FormPage: React.FC = () => {
                           <td className="px-6 py-5 font-semibold text-slate-800">{item.name}</td>
                           <td className="px-6 py-5">
                             <StatusDropdown
-                              value={formData.data[item.id]?.status || 'Normal'}
+                              value={asEQ1(formData.data[item.id]).status || 'Normal'}
                               onChange={(v) => handleSingleItemChange(item.id, 'status', v)}
                             />
                           </td>
@@ -297,7 +313,7 @@ export const CnsdEq1FormPage: React.FC = () => {
                               </span>
                             ) : (
                               <input
-                                value={formData.data[item.id]?.cond1 || ''}
+                                value={asEQ1(formData.data[item.id]).cond1 || ''}
                                 onChange={(e) => handleSingleItemChange(item.id, 'cond1', e.target.value)}
                                 placeholder="..."
                                 className="w-full h-9 rounded-lg border-slate-200 bg-white text-xs focus:ring-slate-200"
@@ -306,7 +322,7 @@ export const CnsdEq1FormPage: React.FC = () => {
                           </td>
                           <td className="px-6 py-5">
                             <input
-                              value={formData.data[item.id]?.cond2 || ''}
+                              value={asEQ1(formData.data[item.id]).cond2 || ''}
                               onChange={(e) => handleSingleItemChange(item.id, 'cond2', e.target.value)}
                               placeholder="..."
                               className="w-full h-9 rounded-lg border-slate-200 bg-white text-xs focus:ring-slate-200"
@@ -314,7 +330,7 @@ export const CnsdEq1FormPage: React.FC = () => {
                           </td>
                           <td className="px-6 py-5">
                             <input
-                              value={formData.data[item.id]?.note || ''}
+                              value={asEQ1(formData.data[item.id]).note || ''}
                               onChange={(e) => handleSingleItemChange(item.id, 'note', e.target.value)}
                               placeholder="Catatan"
                               className="w-full h-9 rounded-lg border-slate-200 bg-white text-xs focus:ring-slate-200"
@@ -336,7 +352,7 @@ export const CnsdEq1FormPage: React.FC = () => {
                               <div className="flex flex-col gap-1.5">
                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{child}</span>
                                 <StatusDropdown
-                                  value={formData.data[item.id]?.[child]?.status || 'Normal'}
+                                  value={asEQ1(formData.data[item.id]?.[child]).status || 'Normal'}
                                   onChange={(v) => handleChildItemChange(item.id, child, 'status', v)}
                                 />
                               </div>
@@ -348,7 +364,7 @@ export const CnsdEq1FormPage: React.FC = () => {
                                 </span>
                               ) : (
                                 <input
-                                  value={formData.data[item.id]?.[child]?.cond1 || ''}
+                                  value={asEQ1(formData.data[item.id]?.[child]).cond1 || ''}
                                   onChange={(e) => handleChildItemChange(item.id, child, 'cond1', e.target.value)}
                                   placeholder="..."
                                   className="w-full h-9 rounded-lg border-slate-200 bg-white text-xs focus:ring-slate-200"
@@ -357,7 +373,7 @@ export const CnsdEq1FormPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-5">
                               <input
-                                value={formData.data[item.id]?.[child]?.cond2 || ''}
+                                value={asEQ1(formData.data[item.id]?.[child]).cond2 || ''}
                                 onChange={(e) => handleChildItemChange(item.id, child, 'cond2', e.target.value)}
                                 placeholder="..."
                                 className="w-full h-9 rounded-lg border-slate-200 bg-white text-xs focus:ring-slate-200"
@@ -365,7 +381,7 @@ export const CnsdEq1FormPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-5">
                               <input
-                                value={formData.data[item.id]?.[child]?.note || ''}
+                                value={asEQ1(formData.data[item.id]?.[child]).note || ''}
                                 onChange={(e) => handleChildItemChange(item.id, child, 'note', e.target.value)}
                                 placeholder="Catatan"
                                 className="w-full h-9 rounded-lg border-slate-200 bg-white text-xs focus:ring-slate-200"
@@ -393,7 +409,7 @@ export const CnsdEq1FormPage: React.FC = () => {
               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b pb-2">{sig.label}</h4>
               <div className="space-y-3">
                 <input
-                  value={(formData.signatures as any)[sig.key]}
+                  value={formData.signatures[sig.key as keyof SignaturesData]}
                   onChange={(e) => handleSignatureChange(sig.key, e.target.value)}
                   placeholder={`Nama ${sig.label}`}
                   className="w-full h-10 rounded-xl border-slate-200 bg-slate-50 text-sm focus:ring-slate-200"

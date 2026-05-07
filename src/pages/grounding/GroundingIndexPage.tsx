@@ -5,10 +5,27 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, Zap,
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
+import { PageHeader } from '@/components/common/PageHeader';
 import { mockGroundingReports } from '@/data/mockData';
 
 type SortField = 'lokasiKerja' | 'tanggal' | null;
 type SortDirection = 'asc' | 'desc';
+
+// ─── SortIcon defined outside component to satisfy react-hooks/static-components ───
+function SortIcon({
+  field,
+  sortField,
+  sortDirection,
+}: {
+  field: SortField;
+  sortField: SortField;
+  sortDirection: SortDirection;
+}) {
+  if (sortField !== field) return <ArrowUpDown size={14} className="text-slate-400" />;
+  return sortDirection === 'asc'
+    ? <ArrowUp size={14} className="text-brand-primary" />
+    : <ArrowDown size={14} className="text-brand-primary" />;
+}
 
 export const GroundingIndexPage: React.FC = () => {
   const navigate = useNavigate();
@@ -70,31 +87,22 @@ export const GroundingIndexPage: React.FC = () => {
     });
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ArrowUpDown size={14} className="text-slate-400" />;
-    return sortDirection === 'asc'
-      ? <ArrowUp size={14} className="text-brand-primary" />
-      : <ArrowDown size={14} className="text-brand-primary" />;
-  };
 
   return (
     <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
-      {/* Header — matching WorkOrder pattern */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-100">
-            <Zap size={20} className="text-yellow-700" />
-          </div>
-          <div>
-            <h1 className="text-xl md:text-2xl text-slate-900">Pembuatan Laporan Grounding & Penangkal Petir</h1>
-            <p className="text-sm text-slate-500">Laporan Grounding & Penangkal Petir Cluster Surabaya</p>
-          </div>
-        </div>
-        <Button onClick={() => navigate('/grounding/create')} className="gap-2">
-          <Plus size={16} />
-          Tambah Laporan
-        </Button>
-      </div>
+      <PageHeader
+        icon={Zap}
+        iconBg="bg-yellow-100"
+        iconColor="text-yellow-700"
+        title="Laporan Grounding & Penangkal Petir"
+        subtitle="Laporan Grounding & Penangkal Petir Cluster Surabaya"
+        actions={
+          <Button onClick={() => navigate('/grounding/create')} className="gap-2">
+            <Plus size={16} />
+            Tambah Laporan
+          </Button>
+        }
+      />
 
       {/* Filter Bar — matching WO inline filter */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
@@ -134,7 +142,7 @@ export const GroundingIndexPage: React.FC = () => {
                 >
                   <div className="flex items-center gap-1.5">
                     Lokasi Kerja
-                    <SortIcon field="lokasiKerja" />
+                    <SortIcon field="lokasiKerja" sortField={sortField} sortDirection={sortDirection} />
                   </div>
                 </th>
                 <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">
@@ -149,7 +157,7 @@ export const GroundingIndexPage: React.FC = () => {
                 >
                   <div className="flex items-center gap-1.5">
                     Tanggal Laporan
-                    <SortIcon field="tanggal" />
+                    <SortIcon field="tanggal" sortField={sortField} sortDirection={sortDirection} />
                   </div>
                 </th>
                 <th className="text-center text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">

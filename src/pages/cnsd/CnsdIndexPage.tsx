@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckSquare, ChevronRight, MapPin } from 'lucide-react';
+import { PageHeader } from '@/components/common/PageHeader';
 import { ComingSoonCard } from '@/components/common/ComingSoonCard';
 import { mockCnsdCategories } from '@/data/mockData';
 
@@ -8,16 +9,14 @@ export const CnsdIndexPage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100">
-          <CheckSquare size={20} className="text-maintenance-cnsd" />
-        </div>
-        <div>
-          <h1 className="text-xl md:text-2xl text-slate-900">CNSD Equipment Readiness</h1>
-          <p className="text-sm text-slate-500">Kesiapan Peralatan Komunikasi, Navigasi, Surveilans & Data</p>
-        </div>
-      </div>
+    <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
+      <PageHeader
+        icon={CheckSquare}
+        iconBg="bg-sky-100"
+        iconColor="text-maintenance-cnsd"
+        title="CNSD Equipment Readiness"
+        subtitle="Kesiapan Peralatan Komunikasi, Navigasi, Surveilans & Data"
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {mockCnsdCategories.map((cat) =>

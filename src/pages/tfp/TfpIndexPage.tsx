@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, ChevronRight, MapPin } from 'lucide-react';
+import { PageHeader } from '@/components/common/PageHeader';
 import { ComingSoonCard } from '@/components/common/ComingSoonCard';
 import { mockTfpCategories } from '@/data/mockData';
 
@@ -8,16 +9,14 @@ export const TfpIndexPage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
-          <Activity size={20} className="text-maintenance-tfp" />
-        </div>
-        <div>
-          <h1 className="text-xl md:text-2xl text-slate-900">TFP Performance Check</h1>
-          <p className="text-sm text-slate-500">Pemeriksaan Kinerja Fasilitas Teknik & Tenaga Listrik</p>
-        </div>
-      </div>
+    <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
+      <PageHeader
+        icon={Activity}
+        iconBg="bg-emerald-100"
+        iconColor="text-maintenance-tfp"
+        title="TFP Performance Check"
+        subtitle="Pemeriksaan Kinerja Fasilitas Teknik & Tenaga Listrik"
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {mockTfpCategories.map((cat) =>

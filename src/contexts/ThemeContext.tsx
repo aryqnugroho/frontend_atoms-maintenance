@@ -1,14 +1,5 @@
-import { createContext, useContext, type ReactNode } from 'react';
-
-type Theme = 'light';
-
-interface ThemeContextType {
-  theme: Theme;
-  toggleTheme: () => void;
-  isDark: boolean;
-}
-
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+import type { ReactNode } from 'react';
+import { ThemeContext } from '@/contexts/contextInstances';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   // Light-mode only — no-op provider
@@ -17,12 +8,4 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       {children}
     </ThemeContext.Provider>
   );
-}
-
-export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
 }

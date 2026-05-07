@@ -8,7 +8,7 @@ import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { Badge } from '@/components/common/Badge';
 import { Textarea } from '@/components/common/Textarea';
 import { mockWorkOrders } from '@/data/mockData';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import type { CompletionStatus } from '@/types';
 
 const outputLabels: Record<string, string> = {

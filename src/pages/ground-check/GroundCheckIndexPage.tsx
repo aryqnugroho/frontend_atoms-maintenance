@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Radar, Radio, Clock, User, Search, ChevronRight } from 'lucide-react';
+import { PageHeader } from '@/components/common/PageHeader';
 import { mockMeterReadingEquipment } from '@/data/mockData';
 import type { MeterReadingEquipment } from '@/types';
 
@@ -85,17 +86,13 @@ export const GroundCheckIndexPage: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100">
-            <Radar size={20} className="text-indigo-700" />
-          </div>
-          <div>
-            <h1 className="text-xl md:text-2xl text-slate-900">Ground Check</h1>
-            <p className="text-sm text-slate-500">Meter Reading & Ground Check — Status peralatan navigasi dan komunikasi</p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon={Radar}
+        iconBg="bg-indigo-100"
+        iconColor="text-indigo-700"
+        title="Ground Check"
+        subtitle="Meter Reading & Ground Check — Status peralatan navigasi dan komunikasi"
+      />
 
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">

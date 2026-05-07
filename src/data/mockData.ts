@@ -23,6 +23,7 @@ export const mockUsers: User[] = [
   { id: 6, name: 'Argo Pragolo', email: 'argo@airnav.co.id', role: 'Teknisi CNSD', is_active: true, signature_url: '/mock-sig.png' },
   { id: 7, name: 'Admin System', email: 'admin@airnav.co.id', role: 'Admin', is_active: true },
   { id: 8, name: 'Andi Wibowo', email: 'andi@airnav.co.id', role: 'Manager Teknik', is_active: true, signature_url: '/mock-sig.png' },
+  { id: 9, name: 'User Manager', email: 'user@airnav.co.id', role: 'Manager Teknik', is_active: true, signature_url: '/mock-sig.png' },
 ];
 
 // ─── Shift Schedule ────────────────────────────────────────
