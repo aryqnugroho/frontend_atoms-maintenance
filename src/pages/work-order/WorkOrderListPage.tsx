@@ -50,13 +50,13 @@ export const WorkOrderListPage: React.FC = () => {
               placeholder="Cari WO number atau deskripsi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-3 h-10 rounded-xl border border-gray-300 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+              className="w-full pl-10 pr-3 h-10 rounded-lg border border-gray-300 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
           >
             <option value="all">Semua Status</option>
             <option value="open">Open</option>
@@ -67,7 +67,7 @@ export const WorkOrderListPage: React.FC = () => {
           <select
             value={divisionFilter}
             onChange={(e) => setDivisionFilter(e.target.value)}
-            className="h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
           >
             <option value="all">Semua Divisi</option>
             <option value="CNSD">CNSD</option>
@@ -95,7 +95,15 @@ export const WorkOrderListPage: React.FC = () => {
                 <tr
                   key={wo.id}
                   onClick={() => navigate(`/work-orders/${wo.id}`)}
-                  className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(`/work-orders/${wo.id}`);
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary"
                 >
                   <td className="px-6 py-4 font-mono text-slate-700 text-xs">{wo.wo_number}</td>
                   <td className="px-6 py-4">

@@ -24,14 +24,20 @@ export const CnsdIndexPage: React.FC = () => {
             <button
               key={cat.id}
               onClick={() => navigate('/cnsd/eq-1')}
-              className="text-left rounded-xl border-2 border-maintenance-cnsd/30 bg-white p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate('/cnsd/eq-1');
+                }
+              }}
+              className="text-left rounded-2xl border-2 border-maintenance-cnsd/30 bg-white p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maintenance-cnsd focus-visible:ring-offset-2"
             >
               <div className="flex items-start justify-between">
                 <div className="space-y-1.5 flex-1">
                   <span className="text-[10px] font-mono text-maintenance-cnsd/70">{cat.code}</span>
                   <h3 className="text-sm font-semibold text-slate-800 group-hover:text-maintenance-cnsd transition-colors">{cat.name}</h3>
                   <p className="flex items-center gap-1 text-xs text-slate-500">
-                    <MapPin size={12} />
+                    <MapPin size={14} aria-hidden="true" />
                     {cat.location}
                   </p>
                 </div>
@@ -39,7 +45,7 @@ export const CnsdIndexPage: React.FC = () => {
                   <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
                     Aktif
                   </span>
-                  <ChevronRight size={16} className="text-slate-400 group-hover:text-maintenance-cnsd transition-colors" />
+                  <ChevronRight size={18} className="text-slate-400 group-hover:text-maintenance-cnsd transition-colors" aria-hidden="true" />
                 </div>
               </div>
             </button>

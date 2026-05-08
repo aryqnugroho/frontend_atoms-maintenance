@@ -14,14 +14,14 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', isLoading, children, disabled, ...props }, ref) => {
     
-    const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary disabled:pointer-events-none disabled:opacity-50';
+    const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50';
     
     const variants = {
-      primary: 'bg-brand-primary text-white hover:bg-brand-primary/90',
-      secondary: 'bg-brand-secondary text-white hover:bg-brand-secondary/90',
-      outline: 'border border-gray-200 bg-white hover:bg-gray-50 text-slate-900',
-      ghost: 'hover:bg-gray-100 hover:text-slate-900 text-slate-700',
-      danger: 'bg-maintenance-abnormal text-white hover:bg-maintenance-abnormal/90',
+      primary: 'bg-brand-primary text-white hover:bg-brand-primary/90 focus-visible:ring-brand-primary',
+      secondary: 'bg-brand-secondary text-white hover:bg-brand-secondary/90 focus-visible:ring-brand-secondary',
+      outline: 'border border-gray-200 bg-white hover:bg-gray-50 text-slate-900 focus-visible:ring-brand-primary',
+      ghost: 'hover:bg-gray-100 hover:text-slate-900 text-slate-700 focus-visible:ring-brand-primary',
+      danger: 'bg-maintenance-abnormal text-white hover:bg-maintenance-abnormal/90 focus-visible:ring-maintenance-abnormal',
     };
     
     const sizes = {
@@ -37,7 +37,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || isLoading}
         {...props}
       >
-        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
         {children}
       </button>
     );

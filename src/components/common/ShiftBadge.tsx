@@ -3,9 +3,9 @@ import { cn } from '@/lib/utils';
 import type { ShiftType } from '@/types';
 
 const shiftStyles: Record<ShiftType, { bg: string; label: string }> = {
-  pagi:   { bg: 'bg-amber-100 text-amber-800 ring-amber-600/20',     label: 'Pagi' },
-  siang:  { bg: 'bg-blue-100 text-blue-800 ring-blue-600/20',       label: 'Siang' },
-  malam:  { bg: 'bg-indigo-100 text-indigo-800 ring-indigo-600/20', label: 'Malam' },
+  pagi:   { bg: 'bg-status-amber-bg text-status-amber-text ring-status-amber-ring',     label: 'Pagi' },
+  siang:  { bg: 'bg-status-blue-bg text-status-blue-text ring-status-blue-ring',       label: 'Siang' },
+  malam:  { bg: 'bg-status-indigo-bg text-status-indigo-text ring-status-indigo-ring', label: 'Malam' },
 };
 
 interface ShiftBadgeProps {

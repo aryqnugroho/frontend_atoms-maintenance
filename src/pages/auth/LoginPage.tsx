@@ -50,7 +50,7 @@ export const LoginPage: React.FC = () => {
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
             <div className="flex items-center gap-3 mb-3">
-              <img src="/assets/icon/logoairnav.svg" alt="AirNav" className="h-12 w-auto" data-no-transition />
+              <img src="/assets/icon/logoairnav.svg" alt="AirNav" className="h-12 w-auto" />
               <span className="text-2xl font-bold text-sidebar tracking-tight">ATOMS</span>
             </div>
             <h1 className="text-xl font-bold text-slate-800">Welcome Back!</h1>
@@ -59,7 +59,7 @@ export const LoginPage: React.FC = () => {
 
           {/* Error */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 animate-fade-scale-up">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 animate-fade-scale-up">
               {error}
             </div>
           )}
@@ -84,7 +84,7 @@ export const LoginPage: React.FC = () => {
 
             <Button
               type="submit"
-              className="w-full mt-2 h-11 text-base font-semibold rounded-xl"
+              className="w-full mt-2 h-11 text-base font-semibold rounded-lg"
               disabled={isLoading}
             >
               {isLoading ? (

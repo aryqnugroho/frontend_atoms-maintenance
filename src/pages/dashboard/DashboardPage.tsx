@@ -14,10 +14,12 @@ import {
   ChevronRight,
   Plane,
   Zap,
+  LayoutDashboard,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
+import { PageHeader } from '@/components/common/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
 import {
   mockShiftSchedule,
@@ -149,27 +151,21 @@ export const DashboardPage: React.FC = () => {
       </Modal>
 
       {/* ─── Page Header ─────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 shrink-0">
-            <span className="text-xl leading-none">{getCurrentShiftInfo().emoji}</span>
-          </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-900">Dashboard Operasional</h1>
-            <p className="text-sm text-slate-500">
-              Selamat datang, <span className="font-semibold text-slate-700">{user?.name}</span>
-              <span className="mx-1.5 text-slate-300">•</span>
-              <span className="font-medium text-slate-600">{getCurrentShiftInfo().label}</span>
+      <PageHeader
+        icon={LayoutDashboard}
+        iconBg="bg-blue-100"
+        iconColor="text-blue-700"
+        title="Dashboard Operasional"
+        subtitle={`Selamat datang, ${user?.name} • ${getCurrentShiftInfo().label}`}
+        actions={
+          <div className="text-left sm:text-right shrink-0">
+            <p className="text-xs text-slate-500">Jam Shift</p>
+            <p className="text-sm font-bold text-blue-700">
+              {shift.shift_start} – {shift.shift_end} WIB
             </p>
           </div>
-        </div>
-        <div className="text-left sm:text-right shrink-0">
-          <p className="text-xs text-slate-500">Jam Shift</p>
-          <p className="text-sm font-bold text-blue-700">
-            {shift.shift_start} – {shift.shift_end} WIB
-          </p>
-        </div>
-      </div>
+        }
+      />
 
       {/* ─── Quick Navigation (Compact) ─────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
@@ -177,10 +173,10 @@ export const DashboardPage: React.FC = () => {
           <button
             key={item.path}
             onClick={() => navigate(item.path)}
-            className={`flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 ${item.hoverColor} transition-all duration-200 shadow-sm hover:shadow group`}
+            className={`flex flex-col sm:flex-row items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-4 sm:px-4 sm:py-3 ${item.hoverColor} transition-all duration-200 shadow-sm hover:shadow group min-h-[80px] sm:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2`}
           >
-            <item.icon size={18} className={item.color} />
-            <span className="text-sm font-semibold text-slate-700">{item.label}</span>
+            <item.icon size={20} className={item.color} aria-hidden="true" />
+            <span className="text-xs sm:text-sm font-semibold text-slate-700 text-center sm:text-left">{item.label}</span>
           </button>
         ))}
       </div>

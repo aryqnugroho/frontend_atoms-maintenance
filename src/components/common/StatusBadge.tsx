@@ -15,18 +15,18 @@ interface StatusConfig {
 }
 
 const statusConfig: Record<StatusKey, StatusConfig> = {
-  open:             { dot: 'bg-blue-500',   text: 'text-blue-700',   pill: 'bg-blue-100 text-blue-700 ring-blue-600/20',     label: 'Open' },
-  in_progress:      { dot: 'bg-amber-500',  text: 'text-amber-700',  pill: 'bg-amber-100 text-amber-700 ring-amber-600/20',   label: 'In Progress' },
-  pending:          { dot: 'bg-orange-500', text: 'text-orange-700', pill: 'bg-orange-100 text-orange-700 ring-orange-600/20', label: 'Pending' },
-  closed:           { dot: 'bg-green-500',  text: 'text-green-700',  pill: 'bg-green-100 text-green-700 ring-green-600/20',   label: 'Closed' },
-  normal:           { dot: 'bg-green-500',  text: 'text-green-700',  pill: 'bg-green-100 text-green-700 ring-green-600/20',   label: 'Normal' },
-  abnormal:         { dot: 'bg-red-500',    text: 'text-red-700',    pill: 'bg-red-100 text-red-700 ring-red-600/20',         label: 'Abnormal' },
-  draft:            { dot: 'bg-slate-400',   text: 'text-slate-600',   pill: 'bg-slate-100 text-slate-600 ring-slate-500/20',     label: 'Draft' },
-  pending_manager:  { dot: 'bg-amber-500',  text: 'text-amber-700',  pill: 'bg-amber-100 text-amber-700 ring-amber-600/20',   label: 'Menunggu Persetujuan' },
-  final:            { dot: 'bg-green-500',  text: 'text-green-700',  pill: 'bg-green-100 text-green-700 ring-green-600/20',   label: 'Final' },
-  rejected:         { dot: 'bg-red-500',    text: 'text-red-700',    pill: 'bg-red-100 text-red-700 ring-red-600/20',         label: 'Ditolak' },
-  baik:             { dot: 'bg-green-500',  text: 'text-green-700',  pill: 'bg-green-100 text-green-700 ring-green-600/20',   label: 'Baik' },
-  tidak_baik:       { dot: 'bg-red-500',    text: 'text-red-700',    pill: 'bg-red-100 text-red-700 ring-red-600/20',         label: 'Tidak Baik' },
+  open:             { dot: 'bg-status-blue-dot',   text: 'text-status-blue-text',   pill: 'bg-status-blue-bg text-status-blue-text ring-status-blue-ring',     label: 'Open' },
+  in_progress:      { dot: 'bg-status-amber-dot',  text: 'text-status-amber-text',  pill: 'bg-status-amber-bg text-status-amber-text ring-status-amber-ring',   label: 'In Progress' },
+  pending:          { dot: 'bg-status-orange-dot', text: 'text-status-orange-text', pill: 'bg-status-orange-bg text-status-orange-text ring-status-orange-ring', label: 'Pending' },
+  closed:           { dot: 'bg-status-green-dot',  text: 'text-status-green-text',  pill: 'bg-status-green-bg text-status-green-text ring-status-green-ring',   label: 'Closed' },
+  normal:           { dot: 'bg-status-green-dot',  text: 'text-status-green-text',  pill: 'bg-status-green-bg text-status-green-text ring-status-green-ring',   label: 'Normal' },
+  abnormal:         { dot: 'bg-status-red-dot',    text: 'text-status-red-text',    pill: 'bg-status-red-bg text-status-red-text ring-status-red-ring',         label: 'Abnormal' },
+  draft:            { dot: 'bg-status-slate-dot',   text: 'text-status-slate-text',   pill: 'bg-status-slate-bg text-status-slate-text ring-status-slate-ring',     label: 'Draft' },
+  pending_manager:  { dot: 'bg-status-amber-dot',  text: 'text-status-amber-text',  pill: 'bg-status-amber-bg text-status-amber-text ring-status-amber-ring',   label: 'Menunggu Persetujuan' },
+  final:            { dot: 'bg-status-green-dot',  text: 'text-status-green-text',  pill: 'bg-status-green-bg text-status-green-text ring-status-green-ring',   label: 'Final' },
+  rejected:         { dot: 'bg-status-red-dot',    text: 'text-status-red-text',    pill: 'bg-status-red-bg text-status-red-text ring-status-red-ring',         label: 'Ditolak' },
+  baik:             { dot: 'bg-status-green-dot',  text: 'text-status-green-text',  pill: 'bg-status-green-bg text-status-green-text ring-status-green-ring',   label: 'Baik' },
+  tidak_baik:       { dot: 'bg-status-red-dot',    text: 'text-status-red-text',    pill: 'bg-status-red-bg text-status-red-text ring-status-red-ring',         label: 'Tidak Baik' },
 };
 
 interface StatusBadgeProps {

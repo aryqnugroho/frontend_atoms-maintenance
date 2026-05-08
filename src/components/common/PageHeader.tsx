@@ -33,10 +33,10 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   actions,
   className,
 }) => (
-  <div className={cn('flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3', className)}>
+  <div className={cn('flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3', className)}>
     <div className="flex items-center gap-3">
       {/* Icon badge */}
-      <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', iconBg)}>
+      <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', iconBg)}>
         <Icon size={20} className={iconColor} />
       </div>
       {/* Text */}
