@@ -179,23 +179,23 @@ export const WorkOrderCreatePage: React.FC = () => {
                   onClick={() => setWoType('personal')}
                   className={`flex-1 flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
                     woType === 'personal'
-                      ? 'bg-purple-50 border-purple-500'
+                      ? 'bg-blue-50 border-brand-primary'
                       : 'bg-white border-gray-200 hover:border-gray-300'
                   }`}
                 >
                   <div className={`w-4 h-4 rounded-full border-2 flex shrink-0 items-center justify-center ${
-                    woType === 'personal' 
-                      ? 'border-purple-500' 
+                    woType === 'personal'
+                      ? 'border-brand-primary'
                       : 'border-gray-300'
                   }`}>
                     {woType === 'personal' && (
-                      <div className="w-2 h-2 rounded-full bg-purple-500" />
+                      <div className="w-2 h-2 rounded-full bg-brand-primary" />
                     )}
                   </div>
                   <div className="text-left">
                     <span className={`text-sm font-semibold block leading-tight ${
-                      woType === 'personal' 
-                        ? 'text-purple-600' 
+                      woType === 'personal'
+                        ? 'text-brand-primary'
                         : 'text-slate-700'
                     }`}>
                       WO Personal
@@ -207,8 +207,8 @@ export const WorkOrderCreatePage: React.FC = () => {
                 </button>
               </div>
               {woType === 'personal' && (
-                <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                  <p className="text-xs text-purple-700 flex items-start gap-2">
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-700 flex items-start gap-2">
                     <span className="text-base">💡</span>
                     <span>WO Personal akan dikirim ke notifikasi teknisi yang dipilih dan hanya teknisi tersebut yang dapat memberikan feedback.</span>
                   </p>
@@ -239,7 +239,7 @@ export const WorkOrderCreatePage: React.FC = () => {
                 <select
                   value={selectedTechnician}
                   onChange={(e) => setSelectedTechnician(e.target.value)}
-                  className="flex h-10 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="flex h-10 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
                   required
                 >
                   <option value="">-- Pilih Teknisi --</option>
@@ -250,7 +250,7 @@ export const WorkOrderCreatePage: React.FC = () => {
                   ))}
                 </select>
                 {selectedTechnician && (
-                  <p className="mt-1.5 text-xs text-purple-600">
+                  <p className="mt-1.5 text-xs text-blue-600">
                     ✓ Notifikasi akan dikirim ke: {technicians.find(t => t.id === Number(selectedTechnician))?.name}
                   </p>
                 )}
@@ -344,8 +344,8 @@ export const WorkOrderCreatePage: React.FC = () => {
                   ))
                 ) : (
                   selectedTechnician && technicians.find(t => t.id === Number(selectedTechnician)) && (
-                    <div className="flex items-center gap-2 bg-purple-50 rounded-lg px-3 py-2 border border-purple-200">
-                      <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-sm font-bold text-purple-700">{technicians.find(t => t.id === Number(selectedTechnician))!.name.charAt(0)}</div>
+                    <div className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2 border border-blue-200">
+                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">{technicians.find(t => t.id === Number(selectedTechnician))!.name.charAt(0)}</div>
                       <div>
                         <p className="text-sm font-semibold text-slate-800">{technicians.find(t => t.id === Number(selectedTechnician))!.name}</p>
                         <p className="text-xs text-slate-500">Teknisi {technicians.find(t => t.id === Number(selectedTechnician))!.division}</p>
