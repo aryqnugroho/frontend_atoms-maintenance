@@ -43,6 +43,15 @@ Always follow these rules when working on the ATOMS-Maintenance frontend.
 
 ---
 
+## Form & Modal Architecture Rules
+
+1. **Forms**: Use uncontrolled components for simple forms to maximize performance, but use controlled state (`useState`) with lazy initialization (`useEffect` logic) for complex modals that require dynamic switching between Create and Edit modes.
+2. **Pre-population**: When developing "Create" modals, automatically pre-fill relevant fields (e.g. Current Shift, Logged-in User, Current Date) based on contextual data (like `mockShiftSchedule`) rather than forcing the user to manually select them.
+3. **Dual-Purpose Modals**: Reuse the exact same modal component for both Creating and Editing entities. Use a `null` ID prop to infer Create mode, and an actual ID to infer Edit mode. Adapt the Title, Action Buttons, and Initial State dynamically.
+4. **Validation Rules**: Validate minimum lengths and handle loading states using the `<Button isLoading />` property during submission.
+
+---
+
 ## Mock Auth Rules
 
 1. **`VITE_DEV_MOCK_AUTH=true`** — Frontend shows role selector on login, injects mock user, no API call.

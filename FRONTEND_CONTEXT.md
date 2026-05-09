@@ -74,9 +74,9 @@ The ATOMS-Maintenance frontend is a React-based operational web application for 
 - `contextInstances.ts` separates context creation from providers (satisfies react-refresh lint)
 
 ### Status
-- **Current State:** UI Mockups complete. Dark mode completely removed. Modals refined. **Integration with `backend_atoms-maintenance` mock authentication is successfully completed.** Work Order List UI improved with standardized statuses, action icons, and a dedicated Print-friendly PDF layout.
+- **Current State:** UI Mockups complete. Dark mode completely removed. Modals refined. **Integration with `backend_atoms-maintenance` mock authentication is successfully completed.** Work Order List UI improved with standardized statuses, action icons, and a dedicated Print-friendly PDF layout. Unified Work Order form implemented as a Modal without navigating away from the list page, supporting both "Create" (with auto-prefilling based on shift) and "Edit" modes.
 - **Authentication:** Currently fetching login and profile data from the local Laravel backend (`DEV_MOCK_AUTH=true`) successfully bypassing static local storage.
-- **Routing:** Role-based routing is established. New print route (`/work-orders/:id/print`) added.
+- **Routing:** Role-based routing is established. New print route (`/work-orders/:id/print`) added. The old `/work-orders/create` and `/work-orders/:id/edit` routes have been removed in favor of Modals.
 - **Next:** Integrate full APIs for Work Orders, Dashboard Data, and real SSO login via atoms-rostering.
 
 ### API Layer

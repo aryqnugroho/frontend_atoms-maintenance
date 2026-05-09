@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Search, Eye, Edit2, Trash2, Printer } from 'lucide-react';
+import { FileText, Plus, Search, Edit2, Trash2, Printer } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { Badge } from '@/components/common/Badge';
+import { WorkOrderFormModal } from '@/pages/work-order/components/WorkOrderFormModal';
 import { mockWorkOrders } from '@/data/mockData';
 
 export const WorkOrderListPage: React.FC = () => {
@@ -13,6 +14,18 @@ export const WorkOrderListPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [divisionFilter, setDivisionFilter] = useState<string>('all');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingWoId, setEditingWoId] = useState<number | null>(null);
+
+  const handleOpenCreate = () => {
+    setEditingWoId(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (id: number) => {
+    setEditingWoId(id);
+    setIsModalOpen(true);
+  };
 
   const filtered = mockWorkOrders.filter((wo) => {
     const matchSearch =
@@ -33,7 +46,7 @@ export const WorkOrderListPage: React.FC = () => {
         title="Work Order"
         subtitle="Kelola perintah kerja dan tugas operasional"
         actions={
-          <Button onClick={() => navigate('/work-orders/create')} className="gap-2">
+          <Button onClick={handleOpenCreate} className="gap-2">
             <Plus size={16} />
             Buat Work Order
           </Button>
@@ -123,10 +136,7 @@ export const WorkOrderListPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => navigate(`/work-orders/${wo.id}`)} className="p-1.5 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-colors" title="View Detail">
-                        <Eye size={16} />
-                      </button>
-                      <button className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
+                      <button onClick={() => handleOpenEdit(wo.id)} className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
                         <Edit2 size={16} />
                       </button>
                       <button onClick={() => navigate(`/work-orders/${wo.id}/print`)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Print PDF">
@@ -150,6 +160,12 @@ export const WorkOrderListPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      <WorkOrderFormModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        workOrderId={editingWoId} 
+      />
     </div>
   );
 };

@@ -6,7 +6,6 @@ import { LoginPage } from '@/pages/auth/LoginPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { WorkOrderListPage } from '@/pages/work-order/WorkOrderListPage';
 import { WorkOrderDetailPage } from '@/pages/work-order/WorkOrderDetailPage';
-import { WorkOrderCreatePage } from '@/pages/work-order/WorkOrderCreatePage';
 import { WorkOrderPrintView } from '@/pages/work-order/WorkOrderPrintView';
 import { CnsdIndexPage } from '@/pages/cnsd/CnsdIndexPage';
 import { CnsdEq1FormPage } from '@/pages/cnsd/CnsdEq1FormPage';
@@ -35,7 +34,6 @@ export const router = createBrowserRouter([
 
           // Work Order
           { path: '/work-orders', element: <WorkOrderListPage /> },
-          { path: '/work-orders/create', element: <WorkOrderCreatePage /> },
           { path: '/work-orders/:id', element: <WorkOrderDetailPage /> },
 
           // CNSD

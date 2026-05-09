@@ -66,7 +66,7 @@ export const mockTroubleEquipment: TroubleEquipment[] = [
 ];
 
 // ─── Work Orders ───────────────────────────────────────────
-export const mockWorkOrders: WorkOrder[] = [
+export let mockWorkOrders: WorkOrder[] = [
   {
     id: 1,
     wo_number: 'WO-CNSD-12-04-2026-001',
@@ -459,4 +459,27 @@ export const mockGroundingReports: GroundingReport[] = [
     ],
   },
 ];
+
+export const updateMockWorkOrder = (updatedWO: WorkOrder) => {
+  mockWorkOrders = mockWorkOrders.map((wo) =>
+    wo.id === updatedWO.id ? updatedWO : wo
+  );
+};
+
+export const createMockWorkOrder = (newWO: Omit<WorkOrder, 'id' | 'wo_number' | 'status'>) => {
+  const newId = Math.max(0, ...mockWorkOrders.map(w => w.id)) + 1;
+  const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+  const woNumber = `WO-${newWO.division}-${dateStr}-${newId.toString().padStart(3, '0')}`;
+  
+  const createdWO: WorkOrder = {
+    ...newWO,
+    id: newId,
+    wo_number: woNumber,
+    status: 'ongoing', // Default new WO status
+  };
+  
+  mockWorkOrders = [createdWO, ...mockWorkOrders];
+  return createdWO;
+};
+
 
