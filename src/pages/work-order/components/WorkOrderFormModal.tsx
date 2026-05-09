@@ -7,6 +7,7 @@ import { Textarea } from '@/components/common/Textarea';
 import { Select } from '@/components/common/Select';
 import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { mockShiftSchedule, mockWorkOrders, updateMockWorkOrder, createMockWorkOrder } from '@/data/mockData';
+import { workOrderService } from '@/services/workOrderService';
 import type { OutputType, WorkOrder } from '@/types';
 
 const outputOptions: { label: string; value: OutputType }[] = [
@@ -90,12 +91,12 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
     // Determine personnel array
-    let updatedPersonnel = workOrder?.personnel || [];
+    let updatedPersonnel: { user_id: number; name: string; role_label: string }[] = workOrder?.personnel || [];
     
     const technicians = shift.personnel.filter((p) => {
       if (division === 'CNSD') return p.role === 'Teknisi CNSD';
@@ -113,53 +114,85 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
     }
 
     const isEdit = workOrderId !== null;
+    const superv = shift.personnel.find((p) => p.role === `Supervisor ${division}`);
+    const mgr = shift.personnel.find((p) => p.role === 'Manager Teknik');
 
-    if (isEdit && workOrder) {
-      const updatedWO: WorkOrder = {
-        ...workOrder,
-        division: division as 'CNSD' | 'TFP',
-        description,
-        output_types: outputs,
-        output_other: outputs.includes('other') ? outputOther : undefined,
-        notes_kendala: notesKendala,
-        notes_usulan: notesUsulan,
-        notes_pemberi_tugas: notesPemberiTugas,
-        personnel: updatedPersonnel,
-      };
-      updateMockWorkOrder(updatedWO);
-    } else {
-      // Find supervisor and manager for snapshot
-      const superv = shift.personnel.find((p) => p.role === `Supervisor ${division}`);
-      const mgr = shift.personnel.find((p) => p.role === 'Manager Teknik');
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-
-      createMockWorkOrder({
-        wo_type: woType,
-        shift_date: now.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-'),
-        shift_type: shift.current_shift,
-        division: division as 'CNSD' | 'TFP',
-        description,
-        output_types: outputs,
-        output_other: outputs.includes('other') ? outputOther : undefined,
-        notes_kendala: notesKendala,
-        notes_usulan: notesUsulan,
-        notes_pemberi_tugas: notesPemberiTugas,
-        personnel: updatedPersonnel,
-        start_time: timeStr,
-        supervisor_id: superv?.id,
-        supervisor_name_snapshot: superv?.name,
-        manager_name_snapshot: mgr?.name,
-        created_by: 1,
-        created_at: now.toISOString(),
-        updated_at: now.toISOString(),
-      });
+    try {
+      if (isEdit && workOrder) {
+        // Try API first
+        await workOrderService.updateWorkOrder(workOrder.id, {
+          wo_type: woType,
+          division: division as 'CNSD' | 'TFP',
+          description,
+          output_types: outputs,
+          output_other: outputs.includes('other') ? outputOther : undefined,
+          notes_kendala: notesKendala || undefined,
+          notes_usulan: notesUsulan || undefined,
+          notes_pemberi_tugas: notesPemberiTugas || undefined,
+          personnel: updatedPersonnel.map(p => ({ user_id: p.user_id, role_label: p.role_label })),
+        });
+      } else {
+        // Try API first
+        await workOrderService.createWorkOrder({
+          wo_type: woType,
+          shift_date: new Date().toISOString().split('T')[0],
+          shift_type: shift.current_shift,
+          division: division as 'CNSD' | 'TFP',
+          description,
+          output_types: outputs,
+          output_other: outputs.includes('other') ? outputOther : undefined,
+          notes_kendala: notesKendala || undefined,
+          notes_usulan: notesUsulan || undefined,
+          notes_pemberi_tugas: notesPemberiTugas || undefined,
+          manager_id: mgr?.id,
+          supervisor_id: superv?.id,
+          assigned_technician_id: woType === 'personal' ? Number(selectedTechnician) : undefined,
+          personnel: updatedPersonnel.map(p => ({ user_id: p.user_id, role_label: p.role_label })),
+        });
+      }
+    } catch {
+      // Fallback to mock data if API unavailable
+      if (isEdit && workOrder) {
+        const updatedWO: WorkOrder = {
+          ...workOrder,
+          division: division as 'CNSD' | 'TFP',
+          description,
+          output_types: outputs,
+          output_other: outputs.includes('other') ? outputOther : undefined,
+          notes_kendala: notesKendala,
+          notes_usulan: notesUsulan,
+          notes_pemberi_tugas: notesPemberiTugas,
+          personnel: updatedPersonnel,
+        };
+        updateMockWorkOrder(updatedWO);
+      } else {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        createMockWorkOrder({
+          wo_type: woType,
+          shift_date: now.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-'),
+          shift_type: shift.current_shift,
+          division: division as 'CNSD' | 'TFP',
+          description,
+          output_types: outputs,
+          output_other: outputs.includes('other') ? outputOther : undefined,
+          notes_kendala: notesKendala,
+          notes_usulan: notesUsulan,
+          notes_pemberi_tugas: notesPemberiTugas,
+          personnel: updatedPersonnel,
+          start_time: timeStr,
+          supervisor_id: superv?.id,
+          supervisor_name_snapshot: superv?.name,
+          manager_name_snapshot: mgr?.name,
+          created_by: 1,
+          created_at: now.toISOString(),
+          updated_at: now.toISOString(),
+        });
+      }
     }
     
-    setTimeout(() => {
-      setIsSubmitting(false);
-      onClose();
-    }, 800);
+    setIsSubmitting(false);
+    onClose();
   };
 
   const availableTechnicians = shift.personnel.filter((p) => {

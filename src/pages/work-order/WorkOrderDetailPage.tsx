@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, Clock, Calendar, Users as UsersIcon, Save } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Card';
@@ -8,8 +8,9 @@ import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { Badge } from '@/components/common/Badge';
 import { Textarea } from '@/components/common/Textarea';
 import { mockWorkOrders } from '@/data/mockData';
+import { workOrderService } from '@/services/workOrderService';
 import { useAuth } from '@/hooks/useAuth';
-import type { CompletionStatus } from '@/types';
+import type { WorkOrder, CompletionStatus } from '@/types';
 
 const outputLabels: Record<string, string> = {
   meter_reading: 'Meter Reading / Pengukuran',
@@ -22,7 +23,27 @@ export const WorkOrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const wo = mockWorkOrders.find((w) => w.id === Number(id));
+
+  // API state
+  const [wo, setWo] = useState<WorkOrder | undefined>(
+    mockWorkOrders.find((w) => w.id === Number(id))
+  );
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchWorkOrder = async () => {
+      try {
+        const data = await workOrderService.getWorkOrder(Number(id));
+        setWo(data);
+      } catch {
+        // Fallback to mock data
+        setWo(mockWorkOrders.find((w) => w.id === Number(id)));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchWorkOrder();
+  }, [id]);
 
   // Check if user is a technician
   const isTechnician = user?.role === 'Teknisi CNSD' || user?.role === 'Teknisi TFP';
@@ -31,16 +52,40 @@ export const WorkOrderDetailPage: React.FC = () => {
   const [completionStatus, setCompletionStatus] = useState<CompletionStatus | ''>('');
   const [notesKendala, setNotesKendala] = useState('');
   const [notesUsulan, setNotesUsulan] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSubmitFeedback = () => {
-    // TODO: Submit feedback to backend
-    console.log('Feedback submitted:', {
-      completion_status: completionStatus,
-      notes_kendala: notesKendala,
-      notes_usulan: notesUsulan,
-    });
-    alert('Feedback berhasil disimpan!');
+  const handleSubmitFeedback = async () => {
+    if (!wo) return;
+    setIsSaving(true);
+    try {
+      const updateData: Record<string, string> = {};
+      if (completionStatus) updateData.completion_status = completionStatus;
+      if (notesKendala) updateData.notes_kendala = notesKendala;
+      if (notesUsulan) updateData.notes_usulan = notesUsulan;
+      if (completionStatus === 'selesai') updateData.status = 'completed';
+      if (completionStatus === 'belum_selesai_dilanjut') updateData.status = 'on_hold';
+
+      const updated = await workOrderService.updateWorkOrder(wo.id, updateData);
+      setWo(updated);
+      alert('Feedback berhasil disimpan!');
+    } catch {
+      alert('Gagal menyimpan feedback.');
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading && !wo) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3" />
+          <div className="h-40 bg-gray-100 rounded-2xl" />
+          <div className="h-32 bg-gray-100 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
 
   if (!wo) {
     return (
@@ -245,7 +290,8 @@ export const WorkOrderDetailPage: React.FC = () => {
             <div className="flex gap-2 pt-2">
               <Button 
                 onClick={handleSubmitFeedback}
-                disabled={!completionStatus}
+                disabled={!completionStatus || isSaving}
+                isLoading={isSaving}
                 className="gap-2"
               >
                 <Save size={16} />
