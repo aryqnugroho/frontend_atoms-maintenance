@@ -155,7 +155,7 @@ export const WorkOrderDetailPage: React.FC = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">Hasil Pelaksanaan</p>
                   <StatusBadge
-                    status={wo.completion_status === 'selesai' ? 'closed' : wo.completion_status === 'belum_selesai_dilanjut' ? 'pending' : 'abnormal'}
+                    status={wo.completion_status === 'selesai' ? 'completed' : wo.completion_status === 'belum_selesai_dilanjut' ? 'on_hold' : 'abnormal'}
                     variant="pill"
                   />
                 </div>
@@ -191,7 +191,7 @@ export const WorkOrderDetailPage: React.FC = () => {
       )}
 
       {/* Section 2.5: Technician Feedback Form (only for technicians) */}
-      {isTechnician && wo.status !== 'closed' && (
+      {isTechnician && wo.status !== 'completed' && (
         <Card className="border-2 border-blue-200">
           <CardHeader>
             <CardTitle className="text-base text-blue-600">Form Feedback Teknisi</CardTitle>

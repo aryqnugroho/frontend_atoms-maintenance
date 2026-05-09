@@ -30,7 +30,7 @@ npm run preview
 
 - **What:** Frontend web app for airport equipment maintenance and operations management (AirNav Indonesia).
 - **Stack:** React 19 + TypeScript 6 + Vite 8 + Tailwind CSS 3.4.
-- **Backend:** None yet. All data is mock (`src/data/mockData.ts`).
+- **Backend:** Integrated with local mock backend. Work Order UI revamped (Fasilitas, standardized statuses, Print PDF layout).
 - **State:** React Context (`AuthContext`, `NotificationContext`, `ThemeContext`).
 - **Routing:** React Router DOM 7 with `createBrowserRouter`.
 - **Theme:** Light-mode only.

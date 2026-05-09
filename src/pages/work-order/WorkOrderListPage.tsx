@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Search } from 'lucide-react';
+import { FileText, Plus, Search, Eye, Edit2, Trash2, Printer } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -59,10 +59,9 @@ export const WorkOrderListPage: React.FC = () => {
             className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
           >
             <option value="all">Semua Status</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In Progress</option>
-            <option value="pending">Pending</option>
-            <option value="closed">Closed</option>
+            <option value="ongoing">Ongoing</option>
+            <option value="on_hold">On Hold</option>
+            <option value="completed">Completed</option>
           </select>
           <select
             value={divisionFilter}
@@ -84,10 +83,11 @@ export const WorkOrderListPage: React.FC = () => {
               <tr className="border-b border-gray-100">
                 <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">No. WO</th>
                 <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Tipe</th>
-                <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Divisi</th>
+                <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Fasilitas</th>
                 <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Deskripsi</th>
                 <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Shift</th>
                 <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Status</th>
+                <th className="text-center text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80 w-32">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -120,6 +120,22 @@ export const WorkOrderListPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <StatusBadge status={wo.status} variant="pill" />
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => navigate(`/work-orders/${wo.id}`)} className="p-1.5 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-colors" title="View Detail">
+                        <Eye size={16} />
+                      </button>
+                      <button className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
+                        <Edit2 size={16} />
+                      </button>
+                      <button onClick={() => navigate(`/work-orders/${wo.id}/print`)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Print PDF">
+                        <Printer size={16} />
+                      </button>
+                      <button className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

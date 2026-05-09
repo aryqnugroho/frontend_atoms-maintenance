@@ -76,7 +76,7 @@ export interface TroubleEquipment {
 }
 
 // ─── Work Order ────────────────────────────────────────────
-export type WOStatus = 'open' | 'in_progress' | 'pending' | 'closed';
+export type WOStatus = 'completed' | 'on_hold' | 'ongoing';
 export type WOType = 'shift' | 'personal'; // shift = all personnel, personal = specific technician
 export type OutputType = 'meter_reading' | 'status_peralatan' | 'logbook' | 'other';
 export type CompletionStatus = 'selesai' | 'belum_selesai_dilanjut' | 'tidak_bisa';

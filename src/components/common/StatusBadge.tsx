@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 
 type StatusKey =
-  | 'open' | 'in_progress' | 'pending' | 'closed'
+  | 'completed' | 'on_hold' | 'ongoing'
   | 'normal' | 'abnormal'
   | 'draft' | 'pending_manager' | 'final' | 'rejected'
   | 'baik' | 'tidak_baik';
@@ -15,10 +15,9 @@ interface StatusConfig {
 }
 
 const statusConfig: Record<StatusKey, StatusConfig> = {
-  open:             { dot: 'bg-status-blue-dot',   text: 'text-status-blue-text',   pill: 'bg-status-blue-bg text-status-blue-text ring-status-blue-ring',     label: 'Open' },
-  in_progress:      { dot: 'bg-status-amber-dot',  text: 'text-status-amber-text',  pill: 'bg-status-amber-bg text-status-amber-text ring-status-amber-ring',   label: 'In Progress' },
-  pending:          { dot: 'bg-status-orange-dot', text: 'text-status-orange-text', pill: 'bg-status-orange-bg text-status-orange-text ring-status-orange-ring', label: 'Pending' },
-  closed:           { dot: 'bg-status-green-dot',  text: 'text-status-green-text',  pill: 'bg-status-green-bg text-status-green-text ring-status-green-ring',   label: 'Closed' },
+  completed:        { dot: 'bg-status-green-dot',  text: 'text-status-green-text',  pill: 'bg-status-green-bg text-status-green-text ring-status-green-ring',   label: 'Completed' },
+  on_hold:          { dot: 'bg-status-red-dot',    text: 'text-status-red-text',    pill: 'bg-status-red-bg text-status-red-text ring-status-red-ring',         label: 'On Hold' },
+  ongoing:          { dot: 'bg-status-amber-dot',  text: 'text-status-amber-text',  pill: 'bg-status-amber-bg text-status-amber-text ring-status-amber-ring',   label: 'Ongoing' },
   normal:           { dot: 'bg-status-green-dot',  text: 'text-status-green-text',  pill: 'bg-status-green-bg text-status-green-text ring-status-green-ring',   label: 'Normal' },
   abnormal:         { dot: 'bg-status-red-dot',    text: 'text-status-red-text',    pill: 'bg-status-red-bg text-status-red-text ring-status-red-ring',         label: 'Abnormal' },
   draft:            { dot: 'bg-status-slate-dot',   text: 'text-status-slate-text',   pill: 'bg-status-slate-bg text-status-slate-text ring-status-slate-ring',     label: 'Draft' },

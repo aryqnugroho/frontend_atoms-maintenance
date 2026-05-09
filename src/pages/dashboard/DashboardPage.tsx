@@ -63,7 +63,7 @@ export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const shift = mockShiftSchedule;
-  const activeWOs = mockWorkOrders.filter((wo) => wo.status !== 'closed');
+  const activeWOs = mockWorkOrders.filter((wo) => wo.status !== 'completed');
   const completedActive = mockChecklist.filter((c) => c.is_active && c.is_completed).length;
   const totalActive = mockChecklist.filter((c) => c.is_active).length;
   const progressPercent = totalActive > 0 ? Math.round((completedActive / totalActive) * 100) : 0;

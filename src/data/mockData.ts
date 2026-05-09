@@ -80,7 +80,7 @@ export const mockWorkOrders: WorkOrder[] = [
       { user_id: 4, name: 'Khoirul M.A', role_label: 'Teknisi 1', signature_url: '/mock-sig.png' },
       { user_id: 6, name: 'Argo Pragolo', role_label: 'Teknisi 2', signature_url: '/mock-sig.png' },
     ],
-    status: 'open',
+    status: 'ongoing',
     manager_name_snapshot: 'Dudik Fahrudin',
     supervisor_name_snapshot: 'Moch. Ichsan',
     supervisor_id: 2,
@@ -103,7 +103,7 @@ export const mockWorkOrders: WorkOrder[] = [
     personnel: [
       { user_id: 5, name: 'Iqbal Mustika', role_label: 'Teknisi 1', signature_url: '/mock-sig.png' },
     ],
-    status: 'in_progress',
+    status: 'ongoing',
     start_time: '07:30',
     manager_name_snapshot: 'Dudik Fahrudin',
     supervisor_name_snapshot: 'Fajar Kusuma W',
@@ -127,7 +127,7 @@ export const mockWorkOrders: WorkOrder[] = [
     personnel: [
       { user_id: 4, name: 'Khoirul M.A', role_label: 'Teknisi 1', signature_url: '/mock-sig.png' },
     ],
-    status: 'pending',
+    status: 'on_hold',
     start_time: '19:45',
     end_time: '23:30',
     completion_status: 'belum_selesai_dilanjut',
@@ -156,7 +156,7 @@ export const mockWorkOrders: WorkOrder[] = [
     personnel: [
       { user_id: 4, name: 'Khoirul M.A', role_label: 'Teknisi', signature_url: '/mock-sig.png' },
     ],
-    status: 'open',
+    status: 'ongoing',
     manager_name_snapshot: 'Dudik Fahrudin',
     supervisor_name_snapshot: 'Moch. Ichsan',
     supervisor_id: 2,
@@ -180,7 +180,7 @@ export const mockWorkOrders: WorkOrder[] = [
     personnel: [
       { user_id: 5, name: 'Iqbal Mustika', role_label: 'Teknisi 1', signature_url: '/mock-sig.png' },
     ],
-    status: 'closed',
+    status: 'completed',
     start_time: '13:15',
     end_time: '16:00',
     completion_status: 'selesai',

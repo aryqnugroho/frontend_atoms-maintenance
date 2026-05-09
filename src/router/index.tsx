@@ -7,6 +7,7 @@ import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { WorkOrderListPage } from '@/pages/work-order/WorkOrderListPage';
 import { WorkOrderDetailPage } from '@/pages/work-order/WorkOrderDetailPage';
 import { WorkOrderCreatePage } from '@/pages/work-order/WorkOrderCreatePage';
+import { WorkOrderPrintView } from '@/pages/work-order/WorkOrderPrintView';
 import { CnsdIndexPage } from '@/pages/cnsd/CnsdIndexPage';
 import { CnsdEq1FormPage } from '@/pages/cnsd/CnsdEq1FormPage';
 import { TfpIndexPage } from '@/pages/tfp/TfpIndexPage';
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute />,
     children: [
+      { path: '/work-orders/:id/print', element: <WorkOrderPrintView /> },
       {
         element: <AppShell />,
         children: [
