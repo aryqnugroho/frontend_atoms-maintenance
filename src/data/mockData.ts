@@ -482,4 +482,6 @@ export const createMockWorkOrder = (newWO: Omit<WorkOrder, 'id' | 'wo_number' | 
   return createdWO;
 };
 
-
+export const deleteMockWorkOrder = (id: number) => {
+  mockWorkOrders = mockWorkOrders.filter((wo) => wo.id !== id);
+};

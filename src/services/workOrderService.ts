@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { WorkOrder, PaginatedResponse, WOType, ShiftType } from '@/types';
+import type { WorkOrder, PaginatedResponse, WOType, ShiftType, WorkOrderSignatureRole, ShiftContextResponse } from '@/types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -67,14 +67,7 @@ export interface CreateWorkOrderPayload {
 export interface UpdateWorkOrderPayload {
   wo_type?: WOType;
   division?: 'CNSD' | 'TFP';
-  shift_type?: ShiftType;
-  shift_date?: string;
   description?: string;
-  status?: string;
-  manager_id?: number;
-  supervisor_id?: number;
-  assigned_technician_id?: number;
-  personnel?: { user_id: number; role_label: string }[];
   output_types?: string[];
   output_other?: string;
   start_time?: string;
@@ -83,6 +76,20 @@ export interface UpdateWorkOrderPayload {
   notes_kendala?: string;
   notes_usulan?: string;
   notes_pemberi_tugas?: string;
+  personnel?: { user_id: number; role_label: string }[];
+}
+
+export interface SignWorkOrderResponse {
+  signed_role: WorkOrderSignatureRole;
+  pending_roles: WorkOrderSignatureRole[];
+  current_status: string;
+  record: WorkOrder;
+}
+
+export interface WorkOrderPrintData {
+  work_order: WorkOrder;
+  required_signatures: WorkOrderSignatureRole[];
+  pending_signatures: WorkOrderSignatureRole[];
 }
 
 /**
@@ -131,6 +138,29 @@ export const workOrderService = {
   },
 
   /**
+   * Submit an immutable base64 PNG signature for a work order role.
+   */
+  async signWorkOrder(id: number, role: WorkOrderSignatureRole, signature: string): Promise<SignWorkOrderResponse> {
+    const response = await axios.post(`${API_URL}/v1/work-orders/${id}/sign`, {
+      role,
+      signature,
+    }, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Get the full print payload for a work order.
+   */
+  async getWorkOrderPrintData(id: number): Promise<WorkOrderPrintData> {
+    const response = await axios.get(`${API_URL}/v1/work-orders/${id}/print`, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  /**
    * Delete a work order (soft-delete).
    */
   async deleteWorkOrder(id: number): Promise<void> {
@@ -146,6 +176,25 @@ export const workOrderService = {
     const response = await axios.get(`${API_URL}/v1/personnel`, {
       headers: getAuthHeaders(),
       params,
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Get real shift context from atoms-rostering (read-only).
+   * Returns manager, supervisor, personnel list, shift times, and roster_available flag.
+   * When roster_available = false, fall back to manual selection from local_users.
+   *
+   * @param shiftType 'pagi' | 'siang' | 'malam'
+   * @param date      'YYYY-MM-DD' (defaults to today on backend if omitted)
+   */
+  async getShiftContext(shiftType?: ShiftType, date?: string): Promise<ShiftContextResponse> {
+    const response = await axios.get(`${API_URL}/v1/personnel/shift-today`, {
+      headers: getAuthHeaders(),
+      params: {
+        ...(shiftType && { shift_type: shiftType }),
+        ...(date && { date }),
+      },
     });
     return response.data.data;
   },

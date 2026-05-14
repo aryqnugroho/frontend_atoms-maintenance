@@ -56,6 +56,55 @@ export interface ShiftScheduleResponse {
   personnel: ShiftPersonnel[];
 }
 
+/**
+ * Response from GET /api/v1/personnel/shift-today
+ * Real shift context sourced from atoms-rostering (read-only DB).
+ * Used by Work Order creation to auto-populate MT, supervisor, and personnel.
+ */
+export interface RosteringShiftPersonnel {
+  user_id: number;       // rostering users.id (maps to local_users.rostering_user_id)
+  name: string;
+  role: string;          // rostering role: 'Cns' | 'Support' | 'Manager Teknik' | etc.
+  grade?: number | null;
+  employee_type: string; // 'CNS' | 'Support' | 'Manager Teknik'
+  group_number?: number | null;
+}
+
+export interface RosteringShiftTimes {
+  start_time: string;    // e.g. "07:00:00"
+  end_time: string;      // e.g. "13:00:00"
+}
+
+export interface RosteringShiftManager {
+  user_id: number;
+  name: string;
+  role: string;
+  employee_type: string;
+}
+
+export interface RosteringShiftSupervisor {
+  user_id: number;
+  name: string;
+  role: string;
+  grade: number;
+}
+
+/**
+ * Full shift context from atoms-rostering.
+ * roster_available = false means no published roster for this date/shift.
+ * When false, fall back to manual selection from local_users.
+ */
+export interface ShiftContextResponse {
+  date: string;
+  shift_type: ShiftType;
+  shift_times: RosteringShiftTimes | null;
+  has_supervisor: boolean;
+  roster_available: boolean;
+  manager: RosteringShiftManager | null;
+  supervisor: RosteringShiftSupervisor | null;
+  personnel: RosteringShiftPersonnel[];
+}
+
 // ─── Dashboard ─────────────────────────────────────────────
 export interface DashboardChecklistItem {
   id: string;
@@ -88,16 +137,27 @@ export interface WOPersonnel {
   signature_url?: string;
 }
 
+export type WorkOrderSignatureRole = 'mt' | 'supervisor' | 'technician';
+
+export interface WorkOrderSignatureInfo {
+  name: string | null;
+  signature: string | null;
+  signed_by: number | null;
+  signed_at: string | null;
+}
+
 export interface WorkOrder {
   id: number;
   wo_number: string;
   wo_type: WOType; // NEW: shift or personal
   division: 'CNSD' | 'TFP';
+  shift_id?: number | null;
   shift_type: ShiftType;
   shift_date: string;
   manager_id?: number;
-  supervisor_id?: number;
-  assigned_technician_id?: number; // NEW: for personal WO only
+  supervisor_id?: number | null;
+  assigned_technician_id?: number | null; // NEW: for personal WO only
+  has_supervisor?: boolean;
   personnel: WOPersonnel[];
   description: string;
   output_types: OutputType[];
@@ -110,13 +170,19 @@ export interface WorkOrder {
   notes_pemberi_tugas?: string;
   status: WOStatus;
   manager_name_snapshot?: string;
-  supervisor_name_snapshot?: string;
+  supervisor_name_snapshot?: string | null;
+  mt_name?: string | null;
+  supervisor_name?: string | null;
+  technician_name?: string | null;
+  required_signatures?: WorkOrderSignatureRole[];
+  pending_signatures?: WorkOrderSignatureRole[];
+  signatures?: Partial<Record<WorkOrderSignatureRole, WorkOrderSignatureInfo>>;
   created_by: number;
   created_at: string;
   updated_at: string;
-  closed_at?: string;
+  closed_at?: string | null;
   manager?: { id: number; name: string };
-  supervisor?: { id: number; name: string };
+  supervisor?: { id: number; name: string } | null;
 }
 
 // ─── CNSD Equipment ────────────────────────────────────────
@@ -256,12 +322,22 @@ export interface Logbook {
 }
 
 // ─── Ground Check / Meter Reading ──────────────────────────
+
+/**
+ * Equipment item as stored in the backend (ground_check_readings table).
+ * Used when data comes from the real API.
+ */
 export interface MeterReadingEquipment {
   id: string;
   name: string;
   category: 'Navigation' | 'Communication';
   frequency?: string;
   status: 'Normal' | 'Tidak Normal';
+  // API shape (from backend)
+  shift_date?: string;
+  shift_type?: ShiftType;
+  checked_by?: number;
+  // Display-only fields (resolved from local_users or mock)
   lastChecked: string;
   checkedBy: string;
 }

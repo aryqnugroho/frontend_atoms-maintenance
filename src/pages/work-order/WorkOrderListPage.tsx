@@ -9,6 +9,7 @@ import { Badge } from '@/components/common/Badge';
 import { WorkOrderFormModal } from '@/pages/work-order/components/WorkOrderFormModal';
 import { mockWorkOrders } from '@/data/mockData';
 import { workOrderService } from '@/services/workOrderService';
+import { useAuth } from '@/hooks/useAuth';
 import type { WorkOrder } from '@/types';
 
 export const WorkOrderListPage: React.FC = () => {
@@ -18,6 +19,9 @@ export const WorkOrderListPage: React.FC = () => {
   const [divisionFilter, setDivisionFilter] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingWoId, setEditingWoId] = useState<number | null>(null);
+
+  const { user } = useAuth();
+  const canDelete = user?.role === 'Admin' || user?.role === 'Manager Teknik';
 
   // API state
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>(mockWorkOrders);
@@ -66,7 +70,12 @@ export const WorkOrderListPage: React.FC = () => {
   const handleDelete = async (id: number) => {
     if (!confirm('Apakah Anda yakin ingin menghapus Work Order ini?')) return;
     try {
-      await workOrderService.deleteWorkOrder(id);
+      if (isApiAvailable) {
+        await workOrderService.deleteWorkOrder(id);
+      } else {
+        const { deleteMockWorkOrder } = await import('@/data/mockData');
+        deleteMockWorkOrder(id);
+      }
       fetchWorkOrders();
     } catch {
       alert('Gagal menghapus Work Order.');
@@ -206,9 +215,11 @@ export const WorkOrderListPage: React.FC = () => {
                         <button onClick={() => navigate(`/work-orders/${wo.id}/print`)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Print PDF">
                           <Printer size={16} />
                         </button>
-                        <button onClick={() => handleDelete(wo.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
-                          <Trash2 size={16} />
-                        </button>
+                        {canDelete && (
+                          <button onClick={() => handleDelete(wo.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -16,8 +16,8 @@ interface StatusConfig {
 
 const statusConfig: Record<StatusKey, StatusConfig> = {
   completed:        { dot: 'bg-status-green-dot',  text: 'text-status-green-text',  pill: 'bg-status-green-bg text-status-green-text ring-status-green-ring',   label: 'Completed' },
-  on_hold:          { dot: 'bg-status-red-dot',    text: 'text-status-red-text',    pill: 'bg-status-red-bg text-status-red-text ring-status-red-ring',         label: 'On Hold' },
-  ongoing:          { dot: 'bg-status-amber-dot',  text: 'text-status-amber-text',  pill: 'bg-status-amber-bg text-status-amber-text ring-status-amber-ring',   label: 'Ongoing' },
+  on_hold:          { dot: 'bg-status-amber-dot',  text: 'text-status-amber-text',  pill: 'bg-status-amber-bg text-status-amber-text ring-status-amber-ring',   label: 'On Hold' },
+  ongoing:          { dot: 'bg-blue-500',          text: 'text-blue-700',           pill: 'bg-blue-50 text-blue-700 ring-blue-200',                            label: 'Ongoing' },
   normal:           { dot: 'bg-status-green-dot',  text: 'text-status-green-text',  pill: 'bg-status-green-bg text-status-green-text ring-status-green-ring',   label: 'Normal' },
   abnormal:         { dot: 'bg-status-red-dot',    text: 'text-status-red-text',    pill: 'bg-status-red-bg text-status-red-text ring-status-red-ring',         label: 'Abnormal' },
   draft:            { dot: 'bg-status-slate-dot',   text: 'text-status-slate-text',   pill: 'bg-status-slate-bg text-status-slate-text ring-status-slate-ring',     label: 'Draft' },

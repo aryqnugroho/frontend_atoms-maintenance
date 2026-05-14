@@ -7,8 +7,9 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { Badge } from '@/components/common/Badge';
 import { Textarea } from '@/components/common/Textarea';
+import { WorkOrderSignaturePanel } from '@/components/work-orders/WorkOrderSignaturePanel';
 import { mockWorkOrders } from '@/data/mockData';
-import { workOrderService } from '@/services/workOrderService';
+import { workOrderService, type UpdateWorkOrderPayload } from '@/services/workOrderService';
 import { useAuth } from '@/hooks/useAuth';
 import type { WorkOrder, CompletionStatus } from '@/types';
 
@@ -58,12 +59,10 @@ export const WorkOrderDetailPage: React.FC = () => {
     if (!wo) return;
     setIsSaving(true);
     try {
-      const updateData: Record<string, string> = {};
+      const updateData: UpdateWorkOrderPayload = {};
       if (completionStatus) updateData.completion_status = completionStatus;
       if (notesKendala) updateData.notes_kendala = notesKendala;
       if (notesUsulan) updateData.notes_usulan = notesUsulan;
-      if (completionStatus === 'selesai') updateData.status = 'completed';
-      if (completionStatus === 'belum_selesai_dilanjut') updateData.status = 'on_hold';
 
       const updated = await workOrderService.updateWorkOrder(wo.id, updateData);
       setWo(updated);
@@ -117,7 +116,7 @@ export const WorkOrderDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
-        <Button variant="outline" className="gap-2">
+        <Button variant="outline" className="gap-2" onClick={() => navigate(`/work-orders/${wo.id}/print`)}>
           <Printer size={16} />
           Print PDF
         </Button>
@@ -147,7 +146,7 @@ export const WorkOrderDetailPage: React.FC = () => {
             </div>
             <div>
               <p className="text-xs text-slate-500 mb-0.5">Supervisor</p>
-              <p className="text-sm font-medium text-slate-800">{wo.supervisor_name_snapshot}</p>
+              <p className="text-sm font-medium text-slate-800">{wo.supervisor_name_snapshot || 'Tidak Ada'}</p>
             </div>
           </div>
 
@@ -169,6 +168,8 @@ export const WorkOrderDetailPage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      <WorkOrderSignaturePanel workOrder={wo} onWorkOrderUpdated={setWo} />
 
       {/* Section 2: Pelaksanaan (if any) */}
       {(wo.start_time || wo.completion_status || wo.notes_kendala) && (

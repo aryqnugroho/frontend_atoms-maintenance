@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Save } from 'lucide-react';
+﻿import React, { useState, useEffect } from 'react';
+import { Save, RefreshCw } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
@@ -8,7 +8,7 @@ import { Select } from '@/components/common/Select';
 import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { mockShiftSchedule, mockWorkOrders, updateMockWorkOrder, createMockWorkOrder } from '@/data/mockData';
 import { workOrderService } from '@/services/workOrderService';
-import type { OutputType, WorkOrder } from '@/types';
+import type { OutputType, WorkOrder, ShiftContextResponse, ShiftType } from '@/types';
 
 const outputOptions: { label: string; value: OutputType }[] = [
   { label: 'Meter Reading / Pengukuran', value: 'meter_reading' },
@@ -42,10 +42,43 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // â”€â”€ Rostering shift context â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Loaded from GET /api/v1/personnel/shift-today on modal open.
+  // Falls back to mockShiftSchedule if API unavailable or roster not published.
+  const [shiftContext, setShiftContext] = useState<ShiftContextResponse | null>(null);
+  const [shiftContextLoading, setShiftContextLoading] = useState(false);
+
+  // Derive current shift from time (same logic as backend)
+  const getCurrentShiftType = (): ShiftType => {
+    const hour = new Date().getHours();
+    if (hour >= 7 && hour < 13) return 'pagi';
+    if (hour >= 13 && hour < 19) return 'siang';
+    return 'malam';
+  };
+
+  // Load real shift context from rostering when modal opens in create mode
+  useEffect(() => {
+    if (isOpen && workOrderId === null) {
+      const loadContext = async () => {
+        setShiftContextLoading(true);
+        try {
+          const ctx = await workOrderService.getShiftContext(getCurrentShiftType());
+          setShiftContext(ctx);
+        } catch {
+          setShiftContext(null); // silently fall back to mock
+        } finally {
+          setShiftContextLoading(false);
+        }
+      };
+      void loadContext();
+    }
+  }, [isOpen, workOrderId]);
+
+  // Resolve shift data: prefer rostering context, fall back to mock
   const shift = mockShiftSchedule;
+  const rosterAvailable = shiftContext?.roster_available ?? false;
 
   useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect */
     if (isOpen) {
       if (workOrderId !== null) {
         // Edit Mode
@@ -78,12 +111,9 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
       }
     } else {
       setWorkOrder(null);
+      setShiftContext(null);
     }
-    /* eslint-enable react-hooks/set-state-in-effect */
   }, [isOpen, workOrderId]);
-
-  // We don't return early if !workOrder because we support Create mode
-  // if (!workOrder) return null;
 
   const toggleOutput = (val: OutputType) => {
     setOutputs((prev) =>
@@ -91,35 +121,78 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
     );
   };
 
+  /**
+   * Resolve manager_id for WO creation.
+   * Priority: rostering context â†’ mock shift schedule.
+   */
+  const resolveManagerId = (): number | undefined => {
+    if (rosterAvailable && shiftContext?.manager) {
+      // Find local_users entry by rostering_user_id match via name (best effort)
+      // The backend will also auto-resolve via rostering DB if manager_id is omitted
+      return undefined; // Let backend auto-resolve from rostering
+    }
+    return shift.personnel.find((p) => p.role === 'Manager Teknik')?.id;
+  };
+
+  /**
+   * Resolve supervisor_id for WO creation.
+   * Priority: rostering context â†’ mock shift schedule.
+   */
+  const resolveSupervisorId = (div: string): number | undefined => {
+    if (rosterAvailable && shiftContext !== null) {
+      // Backend will auto-resolve supervisor from rostering if omitted
+      return undefined;
+    }
+    return shift.personnel.find((p) => p.role === `Supervisor ${div}`)?.id;
+  };
+
+  /**
+   * Get available technicians for personal WO selection.
+   * Priority: rostering context personnel â†’ mock shift schedule.
+   */
+  const getAvailableTechnicians = (div: string) => {
+    if (rosterAvailable && shiftContext && shiftContext.personnel.length > 0) {
+      // Filter rostering personnel by division
+      const empType = div === 'CNSD' ? 'CNS' : 'Support';
+      return shiftContext.personnel
+        .filter((p) => p.employee_type === empType)
+        .map((p) => ({ id: p.user_id, name: p.name, role: p.employee_type }));
+    }
+    // Fallback to mock
+    return shift.personnel.filter((p) => {
+      if (div === 'CNSD') return p.role === 'Teknisi CNSD';
+      if (div === 'TFP') return p.role === 'Teknisi TFP';
+      return false;
+    });
+  };
+
+  /**
+   * Build personnel array for WO creation.
+   * For shift WO: all technicians in the division.
+   * For personal WO: only the selected technician.
+   */
+  const buildPersonnelArray = (div: string): { user_id: number; role_label: string }[] => {
+    if (woType === 'personal' && selectedTechnician) {
+      const techs = getAvailableTechnicians(div);
+      const tech = techs.find((t) => t.id === Number(selectedTechnician));
+      if (tech) return [{ user_id: tech.id, role_label: 'Teknisi' }];
+      return [];
+    }
+    // Shift WO: all technicians in division
+    const techs = getAvailableTechnicians(div);
+    return techs.map((t, i) => ({ user_id: t.id, role_label: `Teknisi ${i + 1}` }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Determine personnel array
-    let updatedPersonnel: { user_id: number; name: string; role_label: string }[] = workOrder?.personnel || [];
-    
-    const technicians = shift.personnel.filter((p) => {
-      if (division === 'CNSD') return p.role === 'Teknisi CNSD';
-      if (division === 'TFP') return p.role === 'Teknisi TFP';
-      return false;
-    });
-
-    if (woType === 'personal' && selectedTechnician) {
-      const tech = technicians.find(t => t.id === Number(selectedTechnician));
-      if (tech) {
-        updatedPersonnel = [{ user_id: tech.id, name: tech.name, role_label: tech.role }];
-      }
-    } else if (woType === 'shift' && division !== workOrder?.division) {
-       updatedPersonnel = technicians.map(p => ({ user_id: p.id, name: p.name, role_label: p.role }));
-    }
-
     const isEdit = workOrderId !== null;
-    const superv = shift.personnel.find((p) => p.role === `Supervisor ${division}`);
     const mgr = shift.personnel.find((p) => p.role === 'Manager Teknik');
+    const superv = shift.personnel.find((p) => p.role === `Supervisor ${division}`);
 
     try {
       if (isEdit && workOrder) {
-        // Try API first
         await workOrderService.updateWorkOrder(workOrder.id, {
           wo_type: woType,
           division: division as 'CNSD' | 'TFP',
@@ -129,14 +202,15 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
           notes_kendala: notesKendala || undefined,
           notes_usulan: notesUsulan || undefined,
           notes_pemberi_tugas: notesPemberiTugas || undefined,
-          personnel: updatedPersonnel.map(p => ({ user_id: p.user_id, role_label: p.role_label })),
+          personnel: buildPersonnelArray(division),
         });
       } else {
-        // Try API first
+        // Create: manager_id/supervisor_id omitted when roster available
+        // so backend auto-resolves from rostering DB
         await workOrderService.createWorkOrder({
           wo_type: woType,
           shift_date: new Date().toISOString().split('T')[0],
-          shift_type: shift.current_shift,
+          shift_type: shiftContext?.shift_type ?? shift.current_shift,
           division: division as 'CNSD' | 'TFP',
           description,
           output_types: outputs,
@@ -144,10 +218,11 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
           notes_kendala: notesKendala || undefined,
           notes_usulan: notesUsulan || undefined,
           notes_pemberi_tugas: notesPemberiTugas || undefined,
-          manager_id: mgr?.id,
-          supervisor_id: superv?.id,
+          // Only pass IDs when roster is NOT available (manual fallback)
+          manager_id: rosterAvailable ? undefined : resolveManagerId(),
+          supervisor_id: rosterAvailable ? undefined : resolveSupervisorId(division),
           assigned_technician_id: woType === 'personal' ? Number(selectedTechnician) : undefined,
-          personnel: updatedPersonnel.map(p => ({ user_id: p.user_id, role_label: p.role_label })),
+          personnel: buildPersonnelArray(division),
         });
       }
     } catch {
@@ -162,7 +237,7 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
           notes_kendala: notesKendala,
           notes_usulan: notesUsulan,
           notes_pemberi_tugas: notesPemberiTugas,
-          personnel: updatedPersonnel,
+          personnel: (workOrder.personnel || []),
         };
         updateMockWorkOrder(updatedWO);
       } else {
@@ -179,7 +254,11 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
           notes_kendala: notesKendala,
           notes_usulan: notesUsulan,
           notes_pemberi_tugas: notesPemberiTugas,
-          personnel: updatedPersonnel,
+          personnel: buildPersonnelArray(division).map((p) => ({
+            user_id: p.user_id,
+            name: '',
+            role_label: p.role_label,
+          })),
           start_time: timeStr,
           supervisor_id: superv?.id,
           supervisor_name_snapshot: superv?.name,
@@ -195,15 +274,13 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
     onClose();
   };
 
-  const availableTechnicians = shift.personnel.filter((p) => {
-    if (division === 'CNSD') return p.role === 'Teknisi CNSD';
-    if (division === 'TFP') return p.role === 'Teknisi TFP';
-    return false;
-  });
-
+  const availableTechnicians = getAvailableTechnicians(division);
   const isEdit = workOrderId !== null;
-  const displayShift = isEdit && workOrder ? workOrder.shift_type : shift.current_shift;
-  const displayDate = isEdit && workOrder ? workOrder.shift_date : new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+  const currentShiftType = shiftContext?.shift_type ?? shift.current_shift;
+  const displayShift = isEdit && workOrder ? workOrder.shift_type : currentShiftType;
+  const displayDate = isEdit && workOrder
+    ? workOrder.shift_date
+    : new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
   const displayStatus = isEdit && workOrder ? workOrder.status.replace('_', ' ') : 'ONGOING';
   const modalTitle = isEdit ? `Edit Work Order: ${workOrder?.wo_number}` : 'Buat Work Order Baru';
 
@@ -217,13 +294,42 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
             <p className="text-xs text-slate-500 mb-0.5">Shift Dinas</p>
             <div className="flex items-center gap-2">
               <ShiftBadge shift={displayShift} />
+              {/* Roster status indicator */}
+              {!isEdit && (
+                shiftContextLoading ? (
+                  <span className="text-xs text-slate-400 flex items-center gap-1">
+                    <RefreshCw size={10} className="animate-spin" /> Memuat roster...
+                  </span>
+                ) : rosterAvailable ? (
+                  <span className="text-xs text-emerald-600 font-medium">â— Roster aktif</span>
+                ) : (
+                  <span className="text-xs text-amber-500 font-medium">â— Roster belum dipublish</span>
+                )
+              )}
             </div>
           </div>
           <div>
             <p className="text-xs text-slate-500 mb-0.5">Tanggal</p>
             <p className="text-sm font-medium text-slate-700">{displayDate}</p>
           </div>
-          <div className="md:col-span-2">
+          {/* Show resolved MT and supervisor when roster is available */}
+          {!isEdit && rosterAvailable && shiftContext && (
+            <>
+              {shiftContext.manager && (
+                <div>
+                  <p className="text-xs text-slate-500 mb-0.5">Manager Teknik (dari Roster)</p>
+                  <p className="text-sm font-medium text-slate-700">{shiftContext.manager.name}</p>
+                </div>
+              )}
+              {shiftContext.supervisor && (
+                <div>
+                  <p className="text-xs text-slate-500 mb-0.5">Supervisor (dari Roster)</p>
+                  <p className="text-sm font-medium text-slate-700">{shiftContext.supervisor.name}</p>
+                </div>
+              )}
+            </>
+          )}
+          <div className={(!isEdit && rosterAvailable && shiftContext?.manager) ? '' : 'md:col-span-2'}>
             <p className="text-xs text-slate-500 mb-0.5">Status</p>
             <p className="text-sm font-semibold uppercase tracking-wider text-slate-700">
               {displayStatus}
@@ -308,6 +414,9 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 Pilih Teknisi <span className="text-red-500">*</span>
+                {rosterAvailable && (
+                  <span className="ml-2 text-xs font-normal text-emerald-600">(dari roster aktif)</span>
+                )}
               </label>
               <select
                 value={selectedTechnician}
@@ -418,3 +527,4 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
     </Modal>
   );
 };
+

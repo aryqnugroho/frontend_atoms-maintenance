@@ -1,212 +1,275 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Loader2, Printer } from 'lucide-react';
+import { Button } from '@/components/common/Button';
 import { mockWorkOrders } from '@/data/mockData';
-import { Loader2 } from 'lucide-react';
+import { workOrderService } from '@/services/workOrderService';
+import type { WorkOrder, WorkOrderSignatureInfo, WorkOrderSignatureRole } from '@/types';
+
+const outputLabels: Record<string, string> = {
+  meter_reading: 'Lembar Meter Reading',
+  status_peralatan: 'Status Peralatan',
+  logbook: 'Pencatatan Logbook',
+  other: 'Lainnya',
+};
+
+const roleLabels: Record<WorkOrderSignatureRole, string> = {
+  mt: 'MANAGER TEKNIK',
+  supervisor: 'SUPERVISOR',
+  technician: 'TEKNISI',
+};
+
+const formatDate = (value?: string) => {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+};
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '';
+  return new Date(value).toLocaleString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+interface SignaturePrintColumnProps {
+  label: string;
+  signerName: string;
+  signature?: WorkOrderSignatureInfo;
+  isNotRequired?: boolean;
+}
+
+const SignaturePrintColumn: React.FC<SignaturePrintColumnProps> = ({
+  label,
+  signerName,
+  signature,
+  isNotRequired = false,
+}) => (
+  <div className="flex min-h-[130px] flex-1 flex-col items-center border-r border-black p-2 text-center last:border-r-0">
+    <div className="text-[11px] font-bold">{label}</div>
+    <div className="mt-2 flex h-16 w-full items-center justify-center">
+      {isNotRequired ? (
+        <span className="text-[10px] text-slate-500">Tidak Ada</span>
+      ) : signature?.signature ? (
+        <img src={signature.signature} alt={`Tanda tangan ${label}`} className="max-h-16 max-w-full object-contain" />
+      ) : (
+        <div className="h-14 w-28 border border-dashed border-slate-400" />
+      )}
+    </div>
+    <div className="mt-auto text-[11px] font-semibold">{isNotRequired ? 'Tidak Ada' : signerName || '-'}</div>
+    <div className="text-[10px] text-slate-600">{formatDateTime(signature?.signed_at)}</div>
+  </div>
+);
 
 export const WorkOrderPrintView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const workOrder = mockWorkOrders.find((w) => w.id === Number(id));
+  const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (workOrder) {
-      const timer = setTimeout(() => {
-        window.print();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [workOrder]);
+    const fetchPrintData = async () => {
+      try {
+        const data = await workOrderService.getWorkOrderPrintData(Number(id));
+        setWorkOrder(data.work_order);
+      } catch {
+        setWorkOrder(mockWorkOrders.find((w) => w.id === Number(id)) ?? null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
+    void fetchPrintData();
+  }, [id]);
 
-  if (!workOrder) {
+  const signatures = useMemo(() => workOrder?.signatures ?? {}, [workOrder]);
+  const signatureColumns = useMemo(() => {
+    if (!workOrder) return [];
+
+    return [
+      {
+        role: 'mt' as const,
+        signerName: signatures.mt?.name ?? workOrder.mt_name ?? workOrder.manager_name_snapshot ?? 'Manager Teknik',
+      },
+      {
+        role: 'supervisor' as const,
+        signerName: signatures.supervisor?.name ?? workOrder.supervisor_name ?? workOrder.supervisor_name_snapshot ?? 'Supervisor',
+        isNotRequired: workOrder.has_supervisor === false,
+      },
+      {
+        role: 'technician' as const,
+        signerName: signatures.technician?.name ?? workOrder.technician_name ?? workOrder.personnel[0]?.name ?? 'Teknisi',
+      },
+    ];
+  }, [signatures, workOrder]);
+
+  if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <Loader2 className="animate-spin h-8 w-8 text-brand-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-brand-primary" />
       </div>
     );
   }
 
-  const shiftUpper = workOrder.shift_type.toUpperCase();
+  if (!workOrder) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4">
+        <p className="text-sm text-slate-600">Work Order tidak ditemukan.</p>
+        <Button variant="outline" onClick={() => navigate('/work-orders')}>Kembali</Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white min-h-screen text-black w-full print:bg-white p-4 print:p-0">
-      {/* Hide on print controls */}
-      <div className="max-w-[210mm] mx-auto mb-4 print:hidden flex justify-between">
-        <button
-          onClick={() => navigate('/work-orders')}
-          className="px-4 py-2 border border-slate-300 rounded hover:bg-slate-50 text-sm font-medium"
-        >
+    <div className="min-h-screen w-full bg-slate-100 p-4 text-black print:bg-white print:p-0">
+      <style>
+        {`@media print {
+          @page { size: A4; margin: 10mm; }
+          body { background: white !important; }
+        }`}
+      </style>
+
+      <div className="mx-auto mb-4 flex max-w-[210mm] items-center justify-between print:hidden">
+        <Button variant="outline" className="gap-2" onClick={() => navigate('/work-orders')}>
+          <ArrowLeft size={16} />
           Kembali
-        </button>
-        <button
-          onClick={() => window.print()}
-          className="px-4 py-2 bg-brand-primary text-white rounded hover:bg-indigo-700 text-sm font-medium shadow-sm"
-        >
+        </Button>
+        <Button className="gap-2" onClick={() => window.print()}>
+          <Printer size={16} />
           Print PDF
-        </button>
+        </Button>
       </div>
 
-      {/* A4 Container */}
-      <div className="max-w-[210mm] mx-auto bg-white print:max-w-none print:w-full print:mx-0 font-sans text-sm border border-black print:border-none">
-        
-        {/* Header */}
+      <div className="mx-auto max-w-[210mm] border border-black bg-white font-sans text-sm print:mx-0 print:w-full print:max-w-none print:border-0">
         <div className="flex border-b border-black">
-          <div className="w-[30%] border-r border-black p-4 flex items-center justify-center">
+          <div className="flex w-[30%] items-center justify-center border-r border-black p-4">
             <img src="/assets/icon/logoairnav.svg" alt="AirNav" className="h-16" />
             <div className="ml-2 text-[10px] font-bold leading-tight">
               <div>PERUM LPPNPI</div>
               <div>Cabang Surabaya</div>
             </div>
           </div>
-          <div className="w-[70%] flex items-center justify-center">
-            <h1 className="text-xl font-bold uppercase tracking-wide">MAINTENANCE REQUEST & WORK ORDER</h1>
+          <div className="flex w-[70%] flex-col items-center justify-center px-4 text-center">
+            <h1 className="text-lg font-bold uppercase tracking-wide">Maintenance Request & Work Order</h1>
+            <p className="mt-1 text-xs font-semibold">{workOrder.wo_number}</p>
           </div>
         </div>
 
-        {/* Tertuju */}
-        <div className="bg-gray-200 border-b border-black text-center font-bold py-1">
-          Tertuju : {workOrder.division}
+        <div className="border-b border-black bg-gray-200 py-1 text-center text-xs font-bold">
+          Tertuju: {workOrder.division}
         </div>
 
-        {/* Info Grid */}
-        <div className="flex border-b border-black">
-          <div className="w-[60%] border-r border-black p-2 min-h-[80px]">
-            <div className="font-bold text-xs mb-1">
-              Shift Dinas : {shiftUpper === 'PAGI' ? <u>PAGI</u> : 'PAGI'} / {shiftUpper === 'SIANG' ? <u>SIANG</u> : 'SIANG'} / {shiftUpper === 'MALAM' ? <u>MALAM</u> : 'MALAM'}
-            </div>
-            <div className="font-bold text-xs mb-1">Nama Personil :</div>
-            <div className="pl-4 text-xs font-medium">
-              {workOrder.personnel.map((p, idx) => (
-                <div key={idx}>{idx + 1}. {p.name}</div>
-              ))}
-              {workOrder.personnel.length === 0 && <div>1. -</div>}
-            </div>
+        <div className="grid grid-cols-[60%_40%] border-b border-black text-xs">
+          <div className="border-r border-black p-2">
+            <div className="font-bold">Shift Dinas: {workOrder.shift_type.toUpperCase()}</div>
+            <div className="mt-2 font-bold">Personel Shift:</div>
+            <table className="mt-1 w-full border border-black text-[11px]">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="w-10 border-r border-black px-1 py-1">No</th>
+                  <th className="border-r border-black px-1 py-1 text-left">Nama</th>
+                  <th className="px-1 py-1 text-left">Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workOrder.personnel.length > 0 ? workOrder.personnel.map((person, index) => (
+                  <tr key={`${person.user_id}-${index}`}>
+                    <td className="border-r border-t border-black px-1 py-1 text-center">{index + 1}</td>
+                    <td className="border-r border-t border-black px-1 py-1">{person.name}</td>
+                    <td className="border-t border-black px-1 py-1">{person.role_label}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td className="border-r border-t border-black px-1 py-1 text-center">1</td>
+                    <td className="border-r border-t border-black px-1 py-1">-</td>
+                    <td className="border-t border-black px-1 py-1">-</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-          <div className="w-[40%] p-2 font-bold text-xs">
-            <div className="grid grid-cols-[60px_1fr] gap-1 mb-1">
+          <div className="p-2 font-bold">
+            <div className="grid grid-cols-[82px_1fr] gap-1">
               <div>Tanggal</div>
-              <div>: {workOrder.shift_date}</div>
+              <div>: {formatDate(workOrder.shift_date)}</div>
             </div>
-            <div className="grid grid-cols-[60px_1fr] gap-1">
-              <div>Jam</div>
+            <div className="grid grid-cols-[82px_1fr] gap-1">
+              <div>Jam Mulai</div>
               <div>: {workOrder.start_time || '.......'}</div>
             </div>
+            <div className="grid grid-cols-[82px_1fr] gap-1">
+              <div>Jam Selesai</div>
+              <div>: {workOrder.end_time || '.......'}</div>
+            </div>
+            <div className="grid grid-cols-[82px_1fr] gap-1">
+              <div>Status</div>
+              <div>: {workOrder.status}</div>
+            </div>
           </div>
         </div>
 
-        {/* Diskripsi */}
-        <div className="border-b border-black p-2 h-[200px]">
-          <div className="font-bold text-xs mb-2">Diskripsi Perintah :</div>
-          <div className="text-sm whitespace-pre-wrap px-2">{workOrder.description}</div>
+        <div className="border-b border-black p-2">
+          <div className="text-xs font-bold">Deskripsi Perintah:</div>
+          <div className="mt-2 min-h-[130px] whitespace-pre-wrap px-2 text-sm">{workOrder.description}</div>
         </div>
 
-        {/* Output */}
-        <div className="border-b border-black p-2 flex items-center gap-6 text-xs font-bold">
-          <div>Output :</div>
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input type="radio" checked={workOrder.output_types.includes('meter_reading')} readOnly className="print:appearance-none print:w-3 print:h-3 print:border print:border-black print:rounded-full" />
-            Lembar Meter Reading
-          </label>
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input type="radio" checked={workOrder.output_types.includes('status_peralatan')} readOnly className="print:appearance-none print:w-3 print:h-3 print:border print:border-black print:rounded-full" />
-            Status Peralatan
-          </label>
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input type="radio" checked={workOrder.output_types.includes('logbook')} readOnly className="print:appearance-none print:w-3 print:h-3 print:border print:border-black print:rounded-full" />
-            Pencatatan Logbook
-          </label>
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input type="radio" checked={workOrder.output_types.includes('other')} readOnly className="print:appearance-none print:w-3 print:h-3 print:border print:border-black print:rounded-full" />
-            {workOrder.output_other || '........................'}
-          </label>
-        </div>
-
-        {/* Signatures Top */}
-        <div className="flex border-b border-black h-[100px] text-center font-bold text-xs">
-          <div className="w-1/3 border-r border-black p-2 relative flex flex-col items-center">
-            MANAGER TEKNIK
-            {/* Mock signature placeholder if completed */}
-            {workOrder.status === 'completed' && <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-gray-400 italic font-normal text-[10px]">Ttd. {workOrder.manager_name_snapshot}</div>}
-          </div>
-          <div className="w-1/3 border-r border-black p-2 relative flex flex-col items-center">
-            SUPERVISOR
-            {/* Mock signature placeholder if completed */}
-            {workOrder.status === 'completed' && <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-gray-400 italic font-normal text-[10px]">Ttd. {workOrder.supervisor_name_snapshot}</div>}
-          </div>
-          <div className="w-1/3 p-2 relative flex flex-col items-center">
-            PELAKSANA
-            {workOrder.status === 'completed' && <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-gray-400 italic font-normal text-[10px]">Ttd. {workOrder.personnel[0]?.name}</div>}
+        <div className="border-b border-black p-2 text-xs">
+          <div className="font-bold">Output:</div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {Object.entries(outputLabels).map(([key, label]) => (
+              <div key={key} className="flex items-center gap-2">
+                <span className="flex h-3 w-3 items-center justify-center border border-black text-[9px]">
+                  {workOrder.output_types.includes(key as never) ? 'X' : ''}
+                </span>
+                <span>{key === 'other' && workOrder.output_other ? workOrder.output_other : label}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Separator / Spacer */}
-        <div className="border-b border-black h-6 bg-gray-50"></div>
-
-        {/* Pelaksanaan Title */}
-        <div className="bg-gray-200 border-b border-black text-center font-bold py-1 text-xs">
+        <div className="border-b border-black bg-gray-200 py-1 text-center text-xs font-bold">
           Pelaksanaan
         </div>
 
-        {/* Jam */}
-        <div className="flex border-b border-black text-xs font-bold">
-          <div className="w-1/2 border-r border-black p-1 pl-2">
-            Jam Mulai : {workOrder.start_time || ''}
-          </div>
-          <div className="w-1/2 p-1 pl-2">
-            Jam Selesai : {workOrder.end_time || ''}
-          </div>
+        <div className="grid grid-cols-3 border-b border-black text-xs font-bold">
+          <div className="border-r border-black p-2">Selesai: {workOrder.completion_status === 'selesai' ? 'X' : ''}</div>
+          <div className="border-r border-black p-2">Dilanjutkan: {workOrder.completion_status === 'belum_selesai_dilanjut' ? 'X' : ''}</div>
+          <div className="p-2">Tidak Bisa: {workOrder.completion_status === 'tidak_bisa' ? 'X' : ''}</div>
         </div>
 
-        {/* Status Selesai */}
-        <div className="flex border-b border-black text-xs font-bold divide-x divide-black">
-          <div className="flex-1 p-2 flex items-center gap-2">
-            <input type="radio" checked={workOrder.completion_status === 'selesai'} readOnly className="print:appearance-none print:w-3 print:h-3 print:border print:border-black print:rounded-full" />
-            : Selesai
-          </div>
-          <div className="flex-1 p-2 flex items-center gap-2">
-            <input type="radio" checked={workOrder.completion_status === 'belum_selesai_dilanjut'} readOnly className="print:appearance-none print:w-3 print:h-3 print:border print:border-black print:rounded-full" />
-            : Belum Selesai dilanjut shift berikutnya
-          </div>
-          <div className="flex-1 p-2 flex items-center gap-2">
-            <input type="radio" checked={workOrder.completion_status === 'tidak_bisa'} readOnly className="print:appearance-none print:w-3 print:h-3 print:border print:border-black print:rounded-full" />
-            : Tidak bisa dilaksanakan
-          </div>
+        <div className="border-b border-black p-2">
+          <div className="text-xs font-bold">Catatan/Kendala:</div>
+          <div className="mt-1 min-h-[70px] whitespace-pre-wrap px-2 text-sm">{workOrder.notes_kendala || ''}</div>
         </div>
 
-        {/* Catatan/Kendala */}
-        <div className="border-b border-black p-2 h-[120px]">
-          <div className="font-bold text-xs mb-1">Catatan/Kendala :</div>
-          <div className="text-sm px-2">{workOrder.notes_kendala}</div>
+        <div className="border-b border-black p-2">
+          <div className="text-xs font-bold">Usulan:</div>
+          <div className="mt-1 min-h-[55px] whitespace-pre-wrap px-2 text-sm">{workOrder.notes_usulan || ''}</div>
         </div>
 
-        {/* Usulan */}
-        <div className="border-b border-black p-2 h-[80px]">
-          <div className="font-bold text-xs mb-1">Usulan :</div>
-          <div className="text-sm px-2">{workOrder.notes_usulan}</div>
+        <div className="border-b border-black p-2">
+          <div className="text-xs font-bold">Catatan Pemberi Tugas:</div>
+          <div className="mt-1 min-h-[55px] whitespace-pre-wrap px-2 text-sm">{workOrder.notes_pemberi_tugas || ''}</div>
         </div>
 
-        {/* Catatan Pemberi Tugas */}
-        <div className="border-b border-black p-2 h-[80px]">
-          <div className="font-bold text-xs mb-1">Catatan Pemberi Tugas :</div>
-          <div className="text-sm px-2">{workOrder.notes_pemberi_tugas}</div>
+        <div className="flex">
+          {signatureColumns.map((column) => (
+            <SignaturePrintColumn
+              key={column.role}
+              label={roleLabels[column.role]}
+              signerName={column.signerName}
+              signature={signatures[column.role]}
+              isNotRequired={column.isNotRequired}
+            />
+          ))}
         </div>
-
-        {/* Signatures Bottom */}
-        <div className="flex h-[100px] text-center font-bold text-xs">
-          <div className="w-1/3 border-r border-black p-2 relative flex flex-col items-center">
-            MANAGER TEKNIK
-            {workOrder.status === 'completed' && <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-gray-400 italic font-normal text-[10px]">Ttd. {workOrder.manager_name_snapshot}</div>}
-          </div>
-          <div className="w-1/3 border-r border-black p-2 relative flex flex-col items-center">
-            SUPERVISOR
-            {workOrder.status === 'completed' && <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-gray-400 italic font-normal text-[10px]">Ttd. {workOrder.supervisor_name_snapshot}</div>}
-          </div>
-          <div className="w-1/3 p-2 relative flex flex-col items-center">
-            PELAKSANA
-            {workOrder.status === 'completed' && <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-gray-400 italic font-normal text-[10px]">Ttd. {workOrder.personnel[0]?.name}</div>}
-          </div>
-        </div>
-
       </div>
     </div>
   );
