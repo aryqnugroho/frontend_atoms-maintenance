@@ -11,6 +11,12 @@ import { CnsdIndexPage } from '@/pages/cnsd/CnsdIndexPage';
 import { CnsdReadinessListPage } from '@/pages/cnsd/CnsdReadinessListPage';
 import { CnsdReadinessDetailPage } from '@/pages/cnsd/CnsdReadinessDetailPage';
 import { CnsdReadinessPrintView } from '@/pages/cnsd/CnsdReadinessPrintView';
+import { CnsdRadarMeterListPage } from '@/pages/cnsd/CnsdRadarMeterListPage';
+import { CnsdRadarMeterDetailPage } from '@/pages/cnsd/CnsdRadarMeterDetailPage';
+import { CnsdRadarMeterPrintView } from '@/pages/cnsd/CnsdRadarMeterPrintView';
+import { CnsdRecorderMeterListPage } from '@/pages/cnsd/CnsdRecorderMeterListPage';
+import { CnsdRecorderMeterDetailPage } from '@/pages/cnsd/CnsdRecorderMeterDetailPage';
+import { CnsdRecorderMeterPrintView } from '@/pages/cnsd/CnsdRecorderMeterPrintView';
 import { TfpIndexPage } from '@/pages/tfp/TfpIndexPage';
 import { TfpAobGroundFormPage } from '@/pages/tfp/TfpAobGroundFormPage';
 import { GroundCheckIndexPage } from '@/pages/ground-check/GroundCheckIndexPage';
@@ -29,6 +35,8 @@ export const router = createBrowserRouter([
     children: [
       { path: '/work-orders/:id/print', element: <WorkOrderPrintView /> },
       { path: '/cnsd/readiness/:id/print', element: <CnsdReadinessPrintView /> },
+      { path: '/cnsd/radar-meter/:id/print', element: <CnsdRadarMeterPrintView /> },
+      { path: '/cnsd/recorder-meter/:id/print', element: <CnsdRecorderMeterPrintView /> },
       {
         element: <AppShell />,
         children: [
@@ -41,9 +49,15 @@ export const router = createBrowserRouter([
 
           // CNSD
           { path: '/cnsd', element: <CnsdIndexPage /> },
-          // Active module: Kesiapan Peralatan CNSD (Form EQ-1)
+          // Active module 1: Kesiapan Peralatan CNSD (Form EQ-1)
           { path: '/cnsd/readiness', element: <CnsdReadinessListPage /> },
           { path: '/cnsd/readiness/:id', element: <CnsdReadinessDetailPage /> },
+          // Active module 2: Radar Meter Reading (Form RADAR-METER)
+          { path: '/cnsd/radar-meter', element: <CnsdRadarMeterListPage /> },
+          { path: '/cnsd/radar-meter/:id', element: <CnsdRadarMeterDetailPage /> },
+          // Active module 3: Recorder Meter Reading (FORM C-3)
+          { path: '/cnsd/recorder-meter', element: <CnsdRecorderMeterListPage /> },
+          { path: '/cnsd/recorder-meter/:id', element: <CnsdRecorderMeterDetailPage /> },
           // Backward-compat: legacy /cnsd/eq-1 link redirects to new list
           { path: '/cnsd/eq-1', element: <Navigate to="/cnsd/readiness" replace /> },
           { path: '/cnsd/:code/coming-soon', element: <ComingSoonPage /> },

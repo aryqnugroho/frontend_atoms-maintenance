@@ -202,8 +202,8 @@ export let mockWorkOrders: WorkOrder[] = [
 // ─── CNSD Categories ───────────────────────────────────────
 export const mockCnsdCategories: CnsdCategory[] = [
   { id: 1, code: 'CNSD-001', name: 'Kesiapan Peralatan CNSD', location: 'Main Equipment Room', is_active_mvp: true, sort_order: 1 },
-  { id: 2, code: 'CNSD-002', name: 'Radar', location: 'Gedung Radar', is_active_mvp: false, sort_order: 2 },
-  { id: 3, code: 'CNSD-003', name: 'Recorder', location: 'Main Equipment Room', is_active_mvp: false, sort_order: 3 },
+  { id: 2, code: 'CNSD-002', name: 'Radar', location: 'Gedung Radar', is_active_mvp: true, sort_order: 2 },
+  { id: 3, code: 'CNSD-003', name: 'Recorder', location: 'Main Equipment Room', is_active_mvp: true, sort_order: 3 },
   { id: 4, code: 'CNSD-004', name: 'AMSC', location: 'Ruang AMSC', is_active_mvp: false, sort_order: 4 },
   { id: 5, code: 'CNSD-005', name: 'Transmitter', location: 'Gedung Transmitter', is_active_mvp: false, sort_order: 5 },
   { id: 6, code: 'CNSD-006', name: 'Receiver', location: 'Gedung Transmitter', is_active_mvp: false, sort_order: 6 },
