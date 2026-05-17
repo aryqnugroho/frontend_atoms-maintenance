@@ -8,7 +8,9 @@ import { WorkOrderListPage } from '@/pages/work-order/WorkOrderListPage';
 import { WorkOrderDetailPage } from '@/pages/work-order/WorkOrderDetailPage';
 import { WorkOrderPrintView } from '@/pages/work-order/WorkOrderPrintView';
 import { CnsdIndexPage } from '@/pages/cnsd/CnsdIndexPage';
-import { CnsdEq1FormPage } from '@/pages/cnsd/CnsdEq1FormPage';
+import { CnsdReadinessListPage } from '@/pages/cnsd/CnsdReadinessListPage';
+import { CnsdReadinessDetailPage } from '@/pages/cnsd/CnsdReadinessDetailPage';
+import { CnsdReadinessPrintView } from '@/pages/cnsd/CnsdReadinessPrintView';
 import { TfpIndexPage } from '@/pages/tfp/TfpIndexPage';
 import { TfpAobGroundFormPage } from '@/pages/tfp/TfpAobGroundFormPage';
 import { GroundCheckIndexPage } from '@/pages/ground-check/GroundCheckIndexPage';
@@ -26,6 +28,7 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute />,
     children: [
       { path: '/work-orders/:id/print', element: <WorkOrderPrintView /> },
+      { path: '/cnsd/readiness/:id/print', element: <CnsdReadinessPrintView /> },
       {
         element: <AppShell />,
         children: [
@@ -38,7 +41,11 @@ export const router = createBrowserRouter([
 
           // CNSD
           { path: '/cnsd', element: <CnsdIndexPage /> },
-          { path: '/cnsd/eq-1', element: <CnsdEq1FormPage /> },
+          // Active module: Kesiapan Peralatan CNSD (Form EQ-1)
+          { path: '/cnsd/readiness', element: <CnsdReadinessListPage /> },
+          { path: '/cnsd/readiness/:id', element: <CnsdReadinessDetailPage /> },
+          // Backward-compat: legacy /cnsd/eq-1 link redirects to new list
+          { path: '/cnsd/eq-1', element: <Navigate to="/cnsd/readiness" replace /> },
           { path: '/cnsd/:code/coming-soon', element: <ComingSoonPage /> },
 
           // TFP

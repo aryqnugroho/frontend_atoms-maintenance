@@ -26,25 +26,37 @@ export const WorkOrderDetailPage: React.FC = () => {
   const { user } = useAuth();
 
   // API state
-  const [wo, setWo] = useState<WorkOrder | undefined>(
-    mockWorkOrders.find((w) => w.id === Number(id))
-  );
+  const [wo, setWo] = useState<WorkOrder | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchWorkOrder = async () => {
-      try {
-        const data = await workOrderService.getWorkOrder(Number(id));
-        setWo(data);
-      } catch {
-        // Fallback to mock data
-        setWo(mockWorkOrders.find((w) => w.id === Number(id)));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchWorkOrder();
+  // Reusable fetch — called on mount, on tab focus, and after mutations.
+  // Always pulls from the API to avoid stale state.
+  const fetchWorkOrder = React.useCallback(async () => {
+    if (!id) return;
+    try {
+      const data = await workOrderService.getWorkOrder(Number(id));
+      setWo(data);
+    } catch {
+      // API unreachable — fall back to mock so the page can still render.
+      setWo(mockWorkOrders.find((w) => w.id === Number(id)));
+    } finally {
+      setIsLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    void fetchWorkOrder();
+  }, [fetchWorkOrder]);
+
+  // Refetch when the tab/window regains focus so a WO updated in another tab
+  // (or after returning from edit/print) shows fresh data without manual reload.
+  useEffect(() => {
+    const onFocus = () => {
+      void fetchWorkOrder();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [fetchWorkOrder]);
 
   // Check if user is a technician
   const isTechnician = user?.role === 'Teknisi CNSD' || user?.role === 'Teknisi TFP';
@@ -64,8 +76,10 @@ export const WorkOrderDetailPage: React.FC = () => {
       if (notesKendala) updateData.notes_kendala = notesKendala;
       if (notesUsulan) updateData.notes_usulan = notesUsulan;
 
-      const updated = await workOrderService.updateWorkOrder(wo.id, updateData);
-      setWo(updated);
+      await workOrderService.updateWorkOrder(wo.id, updateData);
+      // Always re-fetch from API to guarantee fresh state — never trust the
+      // mutation response alone for the page render.
+      await fetchWorkOrder();
       alert('Feedback berhasil disimpan!');
     } catch {
       alert('Gagal menyimpan feedback.');
@@ -169,7 +183,14 @@ export const WorkOrderDetailPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <WorkOrderSignaturePanel workOrder={wo} onWorkOrderUpdated={setWo} />
+      <WorkOrderSignaturePanel
+        workOrder={wo}
+        onWorkOrderUpdated={(updated) => {
+          setWo(updated);
+          // Re-fetch to guarantee canonical state (signatures + signer info).
+          void fetchWorkOrder();
+        }}
+      />
 
       {/* Section 2: Pelaksanaan (if any) */}
       {(wo.start_time || wo.completion_status || wo.notes_kendala) && (

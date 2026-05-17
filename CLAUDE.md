@@ -205,9 +205,9 @@ The application uses **React Context** for state management:
 
 1. **`AuthContext`** — User authentication state
    - Stores `user`, `token`, `isAuthenticated`, `isLoading`
-   - Login/logout with localStorage persistence
-   - `updateUser()` for mock login flow (sets user directly without API)
-   - Token stored in `localStorage` as `auth_token`, user as `user`
+   - SSO token-from-URL flow (production) + mock login (dev)
+   - Token stored in `sessionStorage` as `auth_token` (bukan localStorage)
+   - `updateUser()` untuk mock login flow (sets user directly without API)
 
 2. **`NotificationContext`** — In-app notifications
    - Initialized with `mockNotifications` from mock data

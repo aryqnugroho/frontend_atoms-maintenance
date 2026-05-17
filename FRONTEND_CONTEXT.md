@@ -43,8 +43,9 @@ The ATOMS-Maintenance frontend is a React-based operational web application for 
 |--------|--------|
 | Framework | React 19 + TypeScript 6 + Vite 8 |
 | Styling | Tailwind CSS 3.4 |
-| Backend | None — all mock data |
-| Auth | Mock (localStorage-based) |
+| Backend | ✅ Integrated — Work Orders full lifecycle verified |
+| Auth | ✅ SSO implemented — token proxy via rostering API. Mock mode aktif (`VITE_DEV_MOCK_AUTH=true`) |
+| Token storage | sessionStorage (bukan localStorage) |
 | Theme | Light-mode only |
 | Deployment | Not yet deployed |
 
@@ -126,11 +127,16 @@ The frontend already has partial mock login support:
 - Shift swap workflows
 - Notification management
 
-### SSO Flow (Future)
-1. User navigates to maintenance app → redirected to rostering login page
-2. User authenticates in rostering → receives Sanctum token
-3. Token is stored in localStorage → used for all maintenance API calls
-4. Maintenance backend validates token via rostering proxy
+### SSO Flow (✅ Implemented 2026-05-15)
+1. User klik tombol Maintenance di atoms-rostering frontend (port 5174)
+2. `MenuGrid.tsx` baca token dari `sessionStorage` → redirect ke `http://localhost:5173?token={token}`
+3. `AuthContext.initAuth()` baca `?token` dari URL → hapus dari URL
+4. Panggil `GET /api/v1/auth/verify` → backend proxy ke `GET http://localhost:8001/api/auth/me`
+5. Jika valid: simpan token di `sessionStorage['auth_token']`, set user di context
+6. Jika invalid: redirect ke `http://localhost:5174/login`
+
+**Mock dev mode:** Set `VITE_DEV_MOCK_AUTH=true` → SSO di-bypass, login via mock form di `/login`.
+Lihat `.agents/instructions/sso-rules.md` untuk detail lengkap.
 
 ---
 
@@ -152,7 +158,8 @@ The frontend already has partial mock login support:
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `VITE_API_URL` | `http://localhost:8000/api` | Backend API base URL |
-| `VITE_DEV_MOCK_AUTH` | `true` | Enable mock auth for development |
+| `VITE_DEV_MOCK_AUTH` | `true` | Enable mock auth untuk development |
+| `VITE_ROSTERING_FRONTEND_URL` | `http://localhost:5174` | URL rostering frontend (SSO redirect target) |
 | `VITE_REVERB_APP_KEY` | `atoms-maintenance-key` | WebSocket key (future) |
 | `VITE_REVERB_HOST` | `localhost` | WebSocket host (future) |
 | `VITE_REVERB_PORT` | `8080` | WebSocket port (future) |

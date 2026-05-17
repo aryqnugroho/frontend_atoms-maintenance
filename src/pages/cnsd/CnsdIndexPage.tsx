@@ -5,6 +5,17 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { ComingSoonCard } from '@/components/common/ComingSoonCard';
 import { mockCnsdCategories } from '@/data/mockData';
 
+/**
+ * CNSD index page.
+ *
+ * Currently only the first card ("Kesiapan Peralatan CNSD") is wired up to a
+ * real backend module — Form EQ-1. All other CNSD cards remain Coming Soon
+ * and are intentionally non-clickable.
+ *
+ * Clicking the active card lands on /cnsd/readiness (list of EQ-1 records),
+ * NOT directly on the form. That matches the Work Order pattern where users
+ * see a list first and create-or-open from there.
+ */
 export const CnsdIndexPage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -23,11 +34,11 @@ export const CnsdIndexPage: React.FC = () => {
           cat.is_active_mvp ? (
             <button
               key={cat.id}
-              onClick={() => navigate('/cnsd/eq-1')}
+              onClick={() => navigate('/cnsd/readiness')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  navigate('/cnsd/eq-1');
+                  navigate('/cnsd/readiness');
                 }
               }}
               className="text-left rounded-2xl border-2 border-maintenance-cnsd/30 bg-white p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maintenance-cnsd focus-visible:ring-offset-2"

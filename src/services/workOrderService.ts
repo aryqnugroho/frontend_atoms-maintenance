@@ -5,9 +5,10 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 /**
  * Get the Authorization header with the Bearer token.
+ * Reads from sessionStorage (never localStorage — SSO constraint).
  */
 function getAuthHeaders() {
-  const token = localStorage.getItem('auth_token');
+  const token = sessionStorage.getItem('auth_token');
   return {
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
@@ -16,12 +17,14 @@ function getAuthHeaders() {
 
 /**
  * Work Order query parameters for filtering and pagination.
+ * All fields are sent as query params to the backend when non-empty/non-default.
  */
 export interface WorkOrderQueryParams {
   division?: string;
   status?: string;
-  shift_date?: string;
-  shift_type?: string;
+  shift_date?: string;  // YYYY-MM-DD
+  shift_type?: string;  // pagi | siang | malam
+  year?: string;        // four-digit year, e.g. "2026"
   wo_type?: string;
   search?: string;
   page?: number;
@@ -167,6 +170,17 @@ export const workOrderService = {
     await axios.delete(`${API_URL}/v1/work-orders/${id}`, {
       headers: getAuthHeaders(),
     });
+  },
+
+  /**
+   * Get distinct years available in shift_date, descending.
+   * Used to populate the year filter dropdown.
+   */
+  async getYears(): Promise<number[]> {
+    const response = await axios.get(`${API_URL}/v1/work-orders/years`, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data as number[];
   },
 
   /**

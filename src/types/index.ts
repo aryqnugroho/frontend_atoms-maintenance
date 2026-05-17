@@ -101,7 +101,12 @@ export interface ShiftContextResponse {
   has_supervisor: boolean;
   roster_available: boolean;
   manager: RosteringShiftManager | null;
+  /** Primary supervisor: CNSD preferred, falls back to TFP. Kept for compatibility. */
   supervisor: RosteringShiftSupervisor | null;
+  /** CNSD supervisor (CNS employee with grade ≥ 13) on this shift. */
+  supervisor_cnsd: RosteringShiftSupervisor | null;
+  /** TFP supervisor (Support employee with grade ≥ 13) on this shift. */
+  supervisor_tfp: RosteringShiftSupervisor | null;
   personnel: RosteringShiftPersonnel[];
 }
 

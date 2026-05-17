@@ -52,7 +52,7 @@ export const mockShiftSchedule: ShiftScheduleResponse = {
 
 // ─── Dashboard Checklist ───────────────────────────────────
 export const mockChecklist: DashboardChecklistItem[] = [
-  { id: 'cnsd-eq1', label: 'Kesiapan Peralatan CNSD', division: 'CNSD', is_active: true, is_completed: true, route: '/cnsd/eq-1' },
+  { id: 'cnsd-eq1', label: 'Kesiapan Peralatan CNSD', division: 'CNSD', is_active: true, is_completed: true, route: '/cnsd/readiness' },
   { id: 'cnsd-shelter', label: 'Shelter ILS & Transmitter', division: 'CNSD', is_active: false, is_completed: false },
   { id: 'tfp-aob', label: 'Performance Check AOB Lantai Ground', division: 'TFP', is_active: true, is_completed: false, route: '/tfp/aob-ground' },
   { id: 'tfp-pagi', label: 'Performance Check Pagi', division: 'TFP', is_active: false, is_completed: false },

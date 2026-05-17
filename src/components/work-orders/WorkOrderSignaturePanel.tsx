@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import axios from 'axios';
-import { PenLine } from 'lucide-react';
+import { PenLine, Lock } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Card';
 import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
@@ -33,6 +33,18 @@ const getCurrentUserSignatureRole = (role?: string): WorkOrderSignatureRole | nu
   if (role === 'Supervisor CNSD' || role === 'Supervisor TFP') return 'supervisor';
   if (role === 'Teknisi CNSD' || role === 'Teknisi TFP') return 'technician';
   return null;
+};
+
+/**
+ * Tolerant name comparison that mirrors the backend WorkOrderService::namesMatch.
+ * Trim, collapse whitespace, case-insensitive.
+ */
+const namesMatch = (a?: string | null, b?: string | null): boolean => {
+  if (!a || !b) return false;
+  const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+  const na = norm(a);
+  const nb = norm(b);
+  return na !== '' && na === nb;
 };
 
 const resolveValidationMessage = (data: unknown) => {
@@ -80,10 +92,28 @@ export const WorkOrderSignaturePanel: React.FC<WorkOrderSignaturePanelProps> = (
     },
   ], [workOrder]);
 
+  /**
+   * The current user is the authorized signer for `column` only when:
+   *  1. Their maintenance role matches the column role (MT / Supervisor / Teknisi).
+   *  2. Their name matches the cached signer name on the WO (tolerant compare).
+   *
+   * For Teknisi (shift WOs), the user is also authorized when their name matches
+   * any person listed in workOrder.personnel.
+   */
+  const isAuthorizedSigner = (column: SignatureColumn) => {
+    if (currentUserSignatureRole !== column.role) return false;
+    if (!user?.name) return false;
+    if (namesMatch(column.signerName, user.name)) return true;
+    if (column.role === 'technician') {
+      return workOrder.personnel.some((p) => namesMatch(p.name, user.name));
+    }
+    return false;
+  };
+
   const canSign = (column: SignatureColumn) => {
     if (workOrder.status === 'completed' || column.isNotRequired) return false;
-    if (currentUserSignatureRole !== column.role) return false;
-    if (column.info?.signature) return false;
+    if (column.info?.signature) return false; // already signed → immutable
+    if (!isAuthorizedSigner(column)) return false;
     if (pendingSignatures.length > 0) return pendingSignatures.includes(column.role);
     return true;
   };
@@ -108,22 +138,24 @@ export const WorkOrderSignaturePanel: React.FC<WorkOrderSignaturePanelProps> = (
         return;
       }
 
+      const serverMessage = resolveValidationMessage(error.response.data);
+
       if (error.response.status === 409) {
-        setErrorMessage('Tanda tangan sudah ada untuk role ini');
+        setErrorMessage(serverMessage ?? 'Tanda tangan sudah ada untuk role ini');
         return;
       }
 
       if (error.response.status === 403) {
-        setErrorMessage('Anda tidak memiliki akses untuk role ini');
+        setErrorMessage(serverMessage ?? 'Anda tidak berhak menandatangani role ini');
         return;
       }
 
       if (error.response.status === 422) {
-        setErrorMessage(resolveValidationMessage(error.response.data) ?? 'Data tanda tangan tidak valid');
+        setErrorMessage(serverMessage ?? 'Data tanda tangan tidak valid');
         return;
       }
 
-      setErrorMessage(resolveValidationMessage(error.response.data) ?? 'Koneksi gagal, coba lagi');
+      setErrorMessage(serverMessage ?? 'Koneksi gagal, coba lagi');
     } finally {
       setIsSigning(false);
       setActiveRole(null);
@@ -138,7 +170,7 @@ export const WorkOrderSignaturePanel: React.FC<WorkOrderSignaturePanelProps> = (
         <div className="flex items-start justify-between gap-4">
           <div>
             <CardTitle className="text-base text-slate-900">Tanda Tangan</CardTitle>
-            <p className="mt-1 text-xs text-slate-500">Status tanda tangan disimpan permanen setelah dikirim.</p>
+            <p className="mt-1 text-xs text-slate-500">Tanda tangan disimpan permanen dan hanya dapat dilakukan oleh penanda tangan yang berwenang.</p>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
             {workOrder.status}
@@ -155,6 +187,14 @@ export const WorkOrderSignaturePanel: React.FC<WorkOrderSignaturePanelProps> = (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {columns.map((column) => {
             const pending = !column.info?.signature && !column.isNotRequired;
+            const showSignButton = canSign(column);
+            const isAlreadySigned = Boolean(column.info?.signature);
+            const showLockedNote =
+              !showSignButton &&
+              !isAlreadySigned &&
+              !column.isNotRequired &&
+              workOrder.status !== 'completed' &&
+              user?.name && !namesMatch(column.signerName, user.name);
 
             return (
               <div key={column.role} className="space-y-3">
@@ -166,7 +206,7 @@ export const WorkOrderSignaturePanel: React.FC<WorkOrderSignaturePanelProps> = (
                   isPending={pending}
                   isNotRequired={column.isNotRequired}
                 />
-                {canSign(column) && (
+                {showSignButton && (
                   <Button
                     type="button"
                     size="sm"
@@ -177,6 +217,12 @@ export const WorkOrderSignaturePanel: React.FC<WorkOrderSignaturePanelProps> = (
                     <PenLine size={16} />
                     Tanda Tangan
                   </Button>
+                )}
+                {showLockedNote && (
+                  <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-600">
+                    <Lock size={12} className="mt-0.5 text-slate-400 shrink-0" />
+                    <span>Tanda tangan hanya dapat dilakukan oleh <span className="font-semibold text-slate-800">{column.signerName}</span></span>
+                  </div>
                 )}
               </div>
             );

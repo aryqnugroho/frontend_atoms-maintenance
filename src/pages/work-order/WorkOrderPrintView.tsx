@@ -174,21 +174,18 @@ export const WorkOrderPrintView: React.FC = () => {
               <thead>
                 <tr className="bg-gray-100">
                   <th className="w-10 border-r border-black px-1 py-1">No</th>
-                  <th className="border-r border-black px-1 py-1 text-left">Nama</th>
-                  <th className="px-1 py-1 text-left">Role</th>
+                  <th className="px-1 py-1 text-left">Nama</th>
                 </tr>
               </thead>
               <tbody>
                 {workOrder.personnel.length > 0 ? workOrder.personnel.map((person, index) => (
                   <tr key={`${person.user_id}-${index}`}>
                     <td className="border-r border-t border-black px-1 py-1 text-center">{index + 1}</td>
-                    <td className="border-r border-t border-black px-1 py-1">{person.name}</td>
-                    <td className="border-t border-black px-1 py-1">{person.role_label}</td>
+                    <td className="border-t border-black px-1 py-1">{person.name}</td>
                   </tr>
                 )) : (
                   <tr>
                     <td className="border-r border-t border-black px-1 py-1 text-center">1</td>
-                    <td className="border-r border-t border-black px-1 py-1">-</td>
                     <td className="border-t border-black px-1 py-1">-</td>
                   </tr>
                 )}
@@ -225,8 +222,8 @@ export const WorkOrderPrintView: React.FC = () => {
           <div className="mt-2 grid grid-cols-2 gap-2">
             {Object.entries(outputLabels).map(([key, label]) => (
               <div key={key} className="flex items-center gap-2">
-                <span className="flex h-3 w-3 items-center justify-center border border-black text-[9px]">
-                  {workOrder.output_types.includes(key as never) ? 'X' : ''}
+                <span className="flex h-3 w-3 items-center justify-center border border-black text-[10px] leading-none">
+                  {workOrder.output_types.includes(key as never) ? '✓' : ''}
                 </span>
                 <span>{key === 'other' && workOrder.output_other ? workOrder.output_other : label}</span>
               </div>
@@ -239,9 +236,24 @@ export const WorkOrderPrintView: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-3 border-b border-black text-xs font-bold">
-          <div className="border-r border-black p-2">Selesai: {workOrder.completion_status === 'selesai' ? 'X' : ''}</div>
-          <div className="border-r border-black p-2">Dilanjutkan: {workOrder.completion_status === 'belum_selesai_dilanjut' ? 'X' : ''}</div>
-          <div className="p-2">Tidak Bisa: {workOrder.completion_status === 'tidak_bisa' ? 'X' : ''}</div>
+          <div className="border-r border-black p-2 flex items-center gap-2">
+            <span className="flex h-3 w-3 items-center justify-center border border-black text-[10px] leading-none">
+              {workOrder.completion_status === 'selesai' ? '✓' : ''}
+            </span>
+            <span>Selesai</span>
+          </div>
+          <div className="border-r border-black p-2 flex items-center gap-2">
+            <span className="flex h-3 w-3 items-center justify-center border border-black text-[10px] leading-none">
+              {workOrder.completion_status === 'belum_selesai_dilanjut' ? '✓' : ''}
+            </span>
+            <span>Dilanjutkan</span>
+          </div>
+          <div className="p-2 flex items-center gap-2">
+            <span className="flex h-3 w-3 items-center justify-center border border-black text-[10px] leading-none">
+              {workOrder.completion_status === 'tidak_bisa' ? '✓' : ''}
+            </span>
+            <span>Tidak Bisa</span>
+          </div>
         </div>
 
         <div className="border-b border-black p-2">

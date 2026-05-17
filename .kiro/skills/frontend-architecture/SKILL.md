@@ -16,7 +16,7 @@ Always follow these rules when working on the ATOMS-Maintenance frontend.
 1. **Axios over Fetch**: Use `axios` exclusively for all API calls.
 2. **Base Configuration**: Retrieve the API base URL from `import.meta.env.VITE_API_URL`. Do not hardcode URLs.
 3. **Response Unwrapping**: Standardize un-wrapping the `ApiResponse` payload format from the backend. The backend will return `{ success: true, message: string, data: any }`. Services must extract and return `response.data.data`.
-4. **Mock Auth Compatibility**: Handle the fallback gracefully when `VITE_DEV_MOCK_AUTH=true`. Ensure local `localStorage` mock logic only runs if the API is entirely unresponsive or disabled. 
+4. **Mock Auth Compatibility**: Handle the fallback gracefully when `VITE_DEV_MOCK_AUTH=true`. Token disimpan di `sessionStorage` (bukan localStorage). Mock logic hanya berjalan saat API tidak tersedia atau mock mode aktif.
 
 ---
 
@@ -55,9 +55,18 @@ Always follow these rules when working on the ATOMS-Maintenance frontend.
 ## Mock Auth Rules
 
 1. **`VITE_DEV_MOCK_AUTH=true`** — Frontend shows role selector on login, injects mock user, no API call.
-2. **`VITE_DEV_MOCK_AUTH=false`** — Frontend uses real login flow via `authService.ts`.
+2. **`VITE_DEV_MOCK_AUTH=false`** — Frontend uses real SSO flow via `AuthContext.initAuth()`.
 3. **Mock token format:** `mock-token-{user_id}`.
 4. **Mock users** defined in `src/data/mockData.ts` → `mockUsers` array.
+5. **Mock form di `LoginPage.tsx` harus dipertahankan** — jangan dihapus.
+
+## SSO Rules (Production)
+
+1. **Jangan simpan token di localStorage** — gunakan `sessionStorage`, key: `auth_token`.
+2. **SSO sudah implemented** — `AuthContext.tsx` handle token-from-URL flow. Jangan buat auth baru.
+3. **Production redirect:** Jika tidak ada token dan bukan mock mode → redirect ke `VITE_ROSTERING_FRONTEND_URL`.
+4. **Token format:** Sanctum opaque `{id}|{random}` — URL-encode dengan `encodeURIComponent()`.
+5. Lihat `.agents/instructions/sso-rules.md` untuk detail lengkap.
 
 ---
 
