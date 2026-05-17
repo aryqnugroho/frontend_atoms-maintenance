@@ -44,9 +44,8 @@ const ALL_COL_KEYS: ItemColKey[] = [
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-const isDisabled = (item: TfpAobGroundItem, colKey: ItemColKey): boolean => {
-  return item.is_disabled_map?.[colKey] === true;
-};
+const isDisabled = (item: TfpAobGroundItem, colKey: ItemColKey): boolean =>
+  item.is_disabled_map?.[colKey] === true;
 
 /** Determine if a parameter row is the "Mode" row */
 const isModeRow = (item: TfpAobGroundItem): boolean =>
@@ -62,7 +61,7 @@ const isSingleValueRow = (item: TfpAobGroundItem): boolean => {
   return name.startsWith('kwh') || name.startsWith('suhu eq');
 };
 
-// ─── Cell input component ──────────────────────────────────────────────────
+// ─── Cell input component (used for rows 1–17 only) ───────────────────────
 
 interface CellInputProps {
   item: TfpAobGroundItem;
@@ -73,96 +72,21 @@ interface CellInputProps {
 }
 
 const CellInput: React.FC<CellInputProps> = ({ item, colKey, value, onChange, isCompleted }) => {
-  const cellDisabled = isDisabled(item, colKey);
-  const disabled = cellDisabled || isCompleted;
-
-  if (disabled) {
-    // Disabled cell: parent <td> already has bg-slate-300 for hard-disabled
-    // (template-locked) cells. The inner div is just a transparent spacer to
-    // keep row height consistent with editable cells.
-    return (
-      <div
-        className={cn(
-          'w-full h-8',
-          cellDisabled ? '' : 'rounded-sm bg-slate-50',
-        )}
-        aria-hidden="true"
-        title={cellDisabled ? 'Cell tidak diisi (sesuai form resmi)' : undefined}
-      />
-    );
+  if (isDisabled(item, colKey)) {
+    return <div className="w-full h-7 bg-slate-200 rounded" aria-hidden="true" />;
   }
 
-  // Mode row: dropdown Auto/Manual for COS and ATS only
-  if (isModeRow(item)) {
-    const isCosInput = colKey === 'panel_cos_a03_input';
-    const isAtsInput = colKey === 'panel_ats_a12_input';
-    if (!isCosInput && !isAtsInput) {
-      return <div className="w-full h-8" aria-hidden="true" />;
-    }
-    return (
-      <select
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(
-          'w-full h-8 px-1.5 text-xs rounded border focus:ring-1 focus:outline-none font-medium',
-          value === 'Auto'
-            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 focus:ring-emerald-200'
-            : value === 'Manual'
-              ? 'bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-200'
-              : 'bg-white border-slate-200 text-slate-700 focus:ring-slate-300',
-        )}
-      >
-        <option value="">—</option>
-        <option value="Auto">Auto</option>
-        <option value="Manual">Manual</option>
-      </select>
-    );
+  if (isCompleted) {
+    return <span className="text-xs text-slate-700">{value || '—'}</span>;
   }
 
-  // Suplai Aktif row: PLN/UPS for COS, PLN 1/PLN 2 for ATS
-  if (isSuplaiRow(item)) {
-    const isCosInput = colKey === 'panel_cos_a03_input';
-    const isAtsInput = colKey === 'panel_ats_a12_input';
-    if (!isCosInput && !isAtsInput) {
-      return <div className="w-full h-8" aria-hidden="true" />;
-    }
-    const opts = isCosInput ? ['PLN', 'UPS'] : ['PLN 1', 'PLN 2'];
-    return (
-      <select
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(
-          'w-full h-8 px-1.5 text-xs rounded border focus:ring-1 focus:outline-none font-medium',
-          value === 'PLN' || value === 'PLN 1'
-            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 focus:ring-emerald-200'
-            : value === 'UPS' || value === 'PLN 2'
-              ? 'bg-sky-50 text-sky-700 border-sky-200 focus:ring-sky-200'
-              : 'bg-white border-slate-200 text-slate-700 focus:ring-slate-300',
-        )}
-      >
-        <option value="">—</option>
-        {opts.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    );
-  }
-
-  // Single-value rows: only panel_cos_a03_input is the active cell
-  if (isSingleValueRow(item) && colKey !== 'panel_cos_a03_input') {
-    return <div className="w-full h-8" aria-hidden="true" />;
-  }
-
-  // Default: free text input
   return (
     <input
       type="text"
       inputMode="decimal"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full h-8 px-1.5 text-center text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none"
+      className="w-full h-7 px-1.5 text-center text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-sky-400 focus:outline-none"
     />
   );
 };
@@ -435,208 +359,325 @@ export const TfpAobGroundDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── Unified table: parameters (left) + facilities (right) ─── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2 bg-slate-50/60">
-          <Zap size={16} className="text-amber-600" />
-          <h2 className="text-sm font-bold text-slate-800">
-            Parameter Kelistrikan & Kondisi Fasilitas
-          </h2>
-          <span className="ml-auto text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-            <CheckSquare size={12} className="inline mr-1 -mt-0.5 text-sky-600" />
-            Mengikuti format form resmi
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse min-w-[1100px]" style={{ tableLayout: 'fixed' }}>
-            <colgroup>
-              <col style={{ width: '36px' }} />   {/* No */}
-              <col style={{ width: '160px' }} />  {/* Parameter */}
-              <col style={{ width: '60px' }} />   {/* COS Input */}
-              <col style={{ width: '60px' }} />   {/* COS Output */}
-              <col style={{ width: '60px' }} />   {/* ATS Input */}
-              <col style={{ width: '60px' }} />   {/* ATS Output */}
-              <col style={{ width: '60px' }} />   {/* UPS A Input */}
-              <col style={{ width: '60px' }} />   {/* UPS A Output */}
-              <col style={{ width: '60px' }} />   {/* UPS B Input */}
-              <col style={{ width: '60px' }} />   {/* UPS B Output */}
-              <col style={{ width: '180px' }} />  {/* Nama Fasilitas */}
-              <col style={{ width: '120px' }} />  {/* Kondisi */}
-              <col style={{ width: '180px' }} />  {/* Keterangan */}
-            </colgroup>
-            <thead>
-              <tr className="bg-slate-800 text-white">
-                <th rowSpan={2} className="px-2 py-2 text-center font-semibold border border-slate-600 align-middle">
-                  No
-                </th>
-                <th rowSpan={2} className="px-3 py-2 text-left font-semibold border border-slate-600 align-middle">
-                  Parameter
-                </th>
-                <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-slate-600">
-                  Panel COS (A 03)
-                </th>
-                <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-slate-600">
-                  Panel ATS (A 12)
-                </th>
-                <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-slate-600">
-                  UPS TESCOM A
-                </th>
-                <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-slate-600">
-                  UPS TESCOM B
-                </th>
-                <th rowSpan={2} className="px-2 py-2 text-center font-semibold border border-slate-600 align-middle bg-sky-700">
-                  Nama Fasilitas
-                </th>
-                <th rowSpan={2} className="px-2 py-2 text-center font-semibold border border-slate-600 align-middle bg-sky-700">
-                  Kondisi
-                </th>
-                <th rowSpan={2} className="px-2 py-2 text-center font-semibold border border-slate-600 align-middle bg-sky-700">
-                  Keterangan
-                </th>
-              </tr>
-              <tr className="bg-slate-700 text-slate-200 italic">
-                {['Input', 'Output', 'Input', 'Output', 'Input', 'Output', 'Input', 'Output'].map(
-                  (lbl, i) => (
-                    <th
-                      key={i}
-                      className="px-1 py-1 text-center font-medium border border-slate-600"
-                    >
-                      {lbl}
-                    </th>
-                  ),
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: Math.max(record.items.length, record.facilities.length) }).map(
-                (_, idx) => {
-                  const item = record.items[idx] ?? null;
-                  const facility = record.facilities[idx] ?? null;
-                  const rowKondisi = facility ? facilityValues[facility.id]?.kondisi ?? 'Baik' : '';
-                  return (
-                    <tr
-                      key={`row-${idx}`}
-                      className={cn(
-                        idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60',
-                        item && (isModeRow(item) || isSuplaiRow(item)) ? 'bg-blue-50/60' : '',
-                      )}
-                    >
-                      {/* No */}
-                      <td className="px-2 py-1.5 text-slate-400 font-mono text-center border border-slate-200">
-                        {item ? idx + 1 : ''}
-                      </td>
-                      {/* Parameter */}
-                      <td className="px-3 py-1.5 font-medium text-slate-700 border border-slate-200">
-                        {item ? (
-                          <>
-                            {item.parameter_name}
-                            {item.unit && (
-                              <span className="text-slate-400 ml-1 text-[10px]">({item.unit})</span>
-                            )}
-                          </>
-                        ) : null}
-                      </td>
-                      {/* 8 panel cells */}
-                      {item
-                        ? ALL_COL_KEYS.map((colKey) => {
-                            const cellHardDisabled = isDisabled(item, colKey);
-                            // Compute dynamic-disabled flag for Mode / Suplai / single-value rows
-                            const cellDynamicDisabled =
-                              (isModeRow(item) &&
-                                colKey !== 'panel_cos_a03_input' &&
-                                colKey !== 'panel_ats_a12_input') ||
-                              (isSuplaiRow(item) &&
-                                colKey !== 'panel_cos_a03_input' &&
-                                colKey !== 'panel_ats_a12_input') ||
-                              (isSingleValueRow(item) && colKey !== 'panel_cos_a03_input');
-                            const greyCell = cellHardDisabled || cellDynamicDisabled;
-                            return (
-                              <td
-                                key={colKey}
-                                className={cn(
-                                  'px-1.5 py-1 border border-slate-200',
-                                  greyCell ? 'bg-slate-300' : '',
-                                )}
-                              >
-                                <CellInput
-                                  item={item}
-                                  colKey={colKey}
-                                  value={itemValues[item.id]?.[colKey] ?? ''}
-                                  onChange={(val) => setItemCell(item.id, colKey, val)}
-                                  isCompleted={isCompleted}
-                                />
-                              </td>
-                            );
-                          })
-                        : Array.from({ length: 8 }).map((_, i) => (
-                            <td key={`pad-${i}`} className="px-1.5 py-1 border border-slate-200" />
-                          ))}
-                      {/* Nama Fasilitas */}
-                      <td className="px-2 py-1.5 text-xs font-medium text-slate-700 border border-slate-200">
-                        {facility?.facility_name ?? ''}
-                      </td>
-                      {/* Kondisi */}
-                      <td className="px-1 py-1 border border-slate-200">
-                        {facility ? (
-                          isCompleted ? (
-                            <span
-                              className={cn(
-                                'text-xs font-semibold text-center block',
-                                rowKondisi === 'Baik' || rowKondisi === 'Normal'
-                                  ? 'text-emerald-700'
-                                  : 'text-red-700',
-                              )}
-                            >
-                              {rowKondisi || '—'}
-                            </span>
+      {/* ─── Two-panel layout: Parameter table (left) + Facility panel (right) ─── */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6 items-start">
+
+        {/* ── Left panel: Parameter Pengukuran ── */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2 bg-slate-50/60">
+            <Zap size={16} className="text-amber-600" />
+            <h2 className="text-sm font-bold text-slate-800">Parameter Pengukuran</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse min-w-[700px]" style={{ tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: '32px' }} />
+                <col style={{ width: '150px' }} />
+                <col style={{ width: '62px' }} />
+                <col style={{ width: '62px' }} />
+                <col style={{ width: '62px' }} />
+                <col style={{ width: '62px' }} />
+                <col style={{ width: '62px' }} />
+                <col style={{ width: '62px' }} />
+                <col style={{ width: '62px' }} />
+                <col style={{ width: '62px' }} />
+              </colgroup>
+              <thead>
+                <tr className="bg-sky-800 text-white">
+                  <th rowSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 align-middle text-xs">
+                    No
+                  </th>
+                  <th rowSpan={2} className="px-3 py-2 text-left font-semibold border border-sky-700 align-middle text-xs">
+                    Parameter
+                  </th>
+                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">
+                    Panel COS (A 03)
+                  </th>
+                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">
+                    Panel ATS (A 12)
+                  </th>
+                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">
+                    UPS TESCOM A
+                  </th>
+                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">
+                    UPS TESCOM B
+                  </th>
+                </tr>
+                <tr className="bg-sky-700 text-sky-100">
+                  {['Input', 'Output', 'Input', 'Output', 'Input', 'Output', 'Input', 'Output'].map(
+                    (lbl, i) => (
+                      <th key={i} className="px-1 py-1.5 text-center font-medium border border-sky-600 text-[11px]">
+                        {lbl}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {record.items.map((item, idx) => {
+                  const rowBase = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
+
+                  // ── Row 18: Mode (colSpan=2 per panel group) ──
+                  if (isModeRow(item)) {
+                    const cosVal = itemValues[item.id]?.panel_cos_a03_input ?? '';
+                    const atsVal = itemValues[item.id]?.panel_ats_a12_input ?? '';
+                    const modeSelectCls = (val: string) =>
+                      cn(
+                        'w-full h-7 px-1.5 text-xs rounded border focus:ring-1 focus:outline-none font-medium',
+                        val === 'Auto'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 focus:ring-emerald-200'
+                          : val === 'Manual'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-200'
+                          : 'bg-white border-slate-200 text-slate-700 focus:ring-slate-300',
+                      );
+                    return (
+                      <tr key={item.id} className="bg-blue-50/40">
+                        <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">
+                          {idx + 1}
+                        </td>
+                        <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
+                          {item.parameter_name}
+                          <span className="text-slate-400 ml-1 text-[10px]">(Auto/Manual)</span>
+                        </td>
+                        {/* COS: colSpan=2 */}
+                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100">
+                          {isCompleted ? (
+                            <span className="text-xs text-slate-700">{cosVal || '—'}</span>
                           ) : (
                             <select
-                              value={rowKondisi}
-                              onChange={(e) =>
-                                setFacilityField(facility.id, 'kondisi', e.target.value)
-                              }
-                              className={cn(
-                                'w-full h-8 px-1.5 text-xs rounded border-none focus:ring-1 focus:outline-none font-semibold',
-                                rowKondisi === 'Baik' || rowKondisi === 'Normal'
-                                  ? 'bg-emerald-50 text-emerald-700 focus:ring-emerald-200'
-                                  : 'bg-red-50 text-red-700 focus:ring-red-200',
-                              )}
+                              value={cosVal}
+                              onChange={(e) => setItemCell(item.id, 'panel_cos_a03_input', e.target.value)}
+                              className={modeSelectCls(cosVal)}
                             >
-                              <option value="Baik">Baik</option>
-                              <option value="Normal">Normal</option>
-                              <option value="Tidak Baik">Tidak Baik</option>
+                              <option value="">—</option>
+                              <option value="Auto">Auto</option>
+                              <option value="Manual">Manual</option>
                             </select>
-                          )
-                        ) : null}
-                      </td>
-                      {/* Keterangan */}
-                      <td className="px-2 py-1 border border-slate-200">
-                        {facility ? (
-                          isCompleted ? (
-                            <span className="text-xs text-slate-600">
-                              {facilityValues[facility.id]?.keterangan || '—'}
-                            </span>
+                          )}
+                        </td>
+                        {/* ATS: colSpan=2 */}
+                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100">
+                          {isCompleted ? (
+                            <span className="text-xs text-slate-700">{atsVal || '—'}</span>
+                          ) : (
+                            <select
+                              value={atsVal}
+                              onChange={(e) => setItemCell(item.id, 'panel_ats_a12_input', e.target.value)}
+                              className={modeSelectCls(atsVal)}
+                            >
+                              <option value="">—</option>
+                              <option value="Auto">Auto</option>
+                              <option value="Manual">Manual</option>
+                            </select>
+                          )}
+                        </td>
+                        {/* UPS A: colSpan=2, disabled */}
+                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
+                        {/* UPS B: colSpan=2, disabled */}
+                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
+                      </tr>
+                    );
+                  }
+
+                  // ── Row 19: Suplai Aktif (colSpan=2 per panel group) ──
+                  if (isSuplaiRow(item)) {
+                    const cosVal = itemValues[item.id]?.panel_cos_a03_input ?? '';
+                    const atsVal = itemValues[item.id]?.panel_ats_a12_input ?? '';
+                    const suplaiSelectCls = (val: string) =>
+                      cn(
+                        'w-full h-7 px-1.5 text-xs rounded border focus:ring-1 focus:outline-none font-medium',
+                        val === 'PLN' || val === 'PLN 1'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 focus:ring-emerald-200'
+                          : val === 'UPS' || val === 'PLN 2'
+                          ? 'bg-sky-50 text-sky-700 border-sky-200 focus:ring-sky-200'
+                          : 'bg-white border-slate-200 text-slate-700 focus:ring-slate-300',
+                      );
+                    return (
+                      <tr key={item.id} className="bg-blue-50/40">
+                        <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">
+                          {idx + 1}
+                        </td>
+                        <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
+                          {item.parameter_name}
+                        </td>
+                        {/* COS: colSpan=2, PLN/UPS */}
+                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100">
+                          {isCompleted ? (
+                            <span className="text-xs text-slate-700">{cosVal || '—'}</span>
+                          ) : (
+                            <select
+                              value={cosVal}
+                              onChange={(e) => setItemCell(item.id, 'panel_cos_a03_input', e.target.value)}
+                              className={suplaiSelectCls(cosVal)}
+                            >
+                              <option value="">—</option>
+                              <option value="PLN">PLN</option>
+                              <option value="UPS">UPS</option>
+                            </select>
+                          )}
+                        </td>
+                        {/* ATS: colSpan=2, PLN 1/PLN 2 */}
+                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100">
+                          {isCompleted ? (
+                            <span className="text-xs text-slate-700">{atsVal || '—'}</span>
+                          ) : (
+                            <select
+                              value={atsVal}
+                              onChange={(e) => setItemCell(item.id, 'panel_ats_a12_input', e.target.value)}
+                              className={suplaiSelectCls(atsVal)}
+                            >
+                              <option value="">—</option>
+                              <option value="PLN 1">PLN 1</option>
+                              <option value="PLN 2">PLN 2</option>
+                            </select>
+                          )}
+                        </td>
+                        {/* UPS A: colSpan=2, disabled */}
+                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
+                        {/* UPS B: colSpan=2, disabled */}
+                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
+                      </tr>
+                    );
+                  }
+
+                  // ── Rows 20-21: KWH Meter / Suhu Eq. Room (single value, colSpan=8) ──
+                  if (isSingleValueRow(item)) {
+                    const val = itemValues[item.id]?.panel_cos_a03_input ?? '';
+                    return (
+                      <tr key={item.id} className={rowBase}>
+                        <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">
+                          {idx + 1}
+                        </td>
+                        <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
+                          {item.parameter_name}
+                          {item.unit && (
+                            <span className="text-slate-400 ml-1 text-[10px]">({item.unit})</span>
+                          )}
+                        </td>
+                        <td colSpan={8} className="px-3 py-1 border-l border-slate-100">
+                          {isCompleted ? (
+                            <span className="text-xs text-slate-700">{val || '—'}</span>
                           ) : (
                             <input
                               type="text"
-                              value={facilityValues[facility.id]?.keterangan ?? ''}
-                              onChange={(e) =>
-                                setFacilityField(facility.id, 'keterangan', e.target.value)
-                              }
-                              placeholder="Keterangan..."
-                              className="h-8 px-2 text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none w-full"
+                              inputMode="decimal"
+                              value={val}
+                              onChange={(e) => setItemCell(item.id, 'panel_cos_a03_input', e.target.value)}
+                              className="w-48 h-7 px-2 text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-sky-400 focus:outline-none"
                             />
-                          )
-                        ) : null}
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  // ── Rows 1–17: Normal rows ──
+                  return (
+                    <tr key={item.id} className={rowBase}>
+                      <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">
+                        {idx + 1}
                       </td>
+                      <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
+                        {item.parameter_name}
+                        {item.unit && (
+                          <span className="text-slate-400 ml-1 text-[10px]">({item.unit})</span>
+                        )}
+                      </td>
+                      {ALL_COL_KEYS.map((colKey) => (
+                        <td
+                          key={colKey}
+                          className={cn(
+                            'px-1.5 py-1 border-l border-slate-100',
+                            isDisabled(item, colKey) ? 'bg-slate-200' : '',
+                          )}
+                        >
+                          <CellInput
+                            item={item}
+                            colKey={colKey}
+                            value={itemValues[item.id]?.[colKey] ?? ''}
+                            onChange={(val) => setItemCell(item.id, colKey, val)}
+                            isCompleted={isCompleted}
+                          />
+                        </td>
+                      ))}
                     </tr>
                   );
-                },
-              )}
-            </tbody>
-          </table>
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+
+        {/* ── Right panel: Kondisi Fasilitas ── */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2 bg-slate-50/60">
+            <CheckSquare size={16} className="text-sky-600" />
+            <h2 className="text-sm font-bold text-slate-800">Kondisi Fasilitas</h2>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {/* Column headers */}
+            <div className="grid grid-cols-[1fr_90px_1fr] gap-2 px-4 py-2 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              <span>Nama Fasilitas</span>
+              <span className="text-center">Kondisi</span>
+              <span>Keterangan</span>
+            </div>
+            {record.facilities.map((facility, idx) => {
+              const kondisi = facilityValues[facility.id]?.kondisi ?? 'Baik';
+              const isGood = kondisi === 'Baik' || kondisi === 'Normal';
+              return (
+                <div
+                  key={facility.id}
+                  className={cn(
+                    'grid grid-cols-[1fr_90px_1fr] gap-2 px-4 py-2.5 items-center',
+                    idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40',
+                  )}
+                >
+                  <span className="text-xs font-medium text-slate-700">{facility.facility_name}</span>
+                  {isCompleted ? (
+                    <span
+                      className={cn(
+                        'text-xs font-semibold text-center',
+                        isGood ? 'text-emerald-700' : 'text-red-700',
+                      )}
+                    >
+                      {kondisi || '—'}
+                    </span>
+                  ) : (
+                    <select
+                      value={kondisi}
+                      onChange={(e) => setFacilityField(facility.id, 'kondisi', e.target.value)}
+                      className={cn(
+                        'w-full h-8 px-1.5 text-xs rounded border-none focus:ring-1 focus:outline-none font-semibold',
+                        isGood
+                          ? 'bg-emerald-50 text-emerald-700 focus:ring-emerald-200'
+                          : 'bg-red-50 text-red-700 focus:ring-red-200',
+                      )}
+                    >
+                      <option value="Baik">Baik</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Tidak Baik">Tidak Baik</option>
+                    </select>
+                  )}
+                  {isCompleted ? (
+                    <span className="text-xs text-slate-600">
+                      {facilityValues[facility.id]?.keterangan || '—'}
+                    </span>
+                  ) : (
+                    <input
+                      type="text"
+                      value={facilityValues[facility.id]?.keterangan ?? ''}
+                      onChange={(e) => setFacilityField(facility.id, 'keterangan', e.target.value)}
+                      placeholder="Keterangan..."
+                      className="h-8 px-2 text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none w-full"
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+      </div>{/* end two-panel grid */}
 
       {/* Save button */}
       {!isCompleted && (
@@ -657,7 +698,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
         record={record}
         onUpdated={(updated) => {
           setRecord(updated);
-          // Re-sync local state from updated record
+          // Re-sync local item values from updated record
           const iv: Record<number, Record<ItemColKey, string>> = {};
           updated.items.forEach((item) => {
             iv[item.id] = {
