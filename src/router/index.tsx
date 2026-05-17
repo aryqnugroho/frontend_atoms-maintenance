@@ -18,7 +18,9 @@ import { CnsdRecorderMeterListPage } from '@/pages/cnsd/CnsdRecorderMeterListPag
 import { CnsdRecorderMeterDetailPage } from '@/pages/cnsd/CnsdRecorderMeterDetailPage';
 import { CnsdRecorderMeterPrintView } from '@/pages/cnsd/CnsdRecorderMeterPrintView';
 import { TfpIndexPage } from '@/pages/tfp/TfpIndexPage';
-import { TfpAobGroundFormPage } from '@/pages/tfp/TfpAobGroundFormPage';
+import { TfpAobGroundListPage } from '@/pages/tfp/TfpAobGroundListPage';
+import { TfpAobGroundDetailPage } from '@/pages/tfp/TfpAobGroundDetailPage';
+import { TfpAobGroundPrintView } from '@/pages/tfp/TfpAobGroundPrintView';
 import { GroundCheckIndexPage } from '@/pages/ground-check/GroundCheckIndexPage';
 import { LocalizerFormPage } from '@/pages/ground-check/LocalizerFormPage';
 import { GroundingIndexPage } from '@/pages/grounding/GroundingIndexPage';
@@ -37,6 +39,7 @@ export const router = createBrowserRouter([
       { path: '/cnsd/readiness/:id/print', element: <CnsdReadinessPrintView /> },
       { path: '/cnsd/radar-meter/:id/print', element: <CnsdRadarMeterPrintView /> },
       { path: '/cnsd/recorder-meter/:id/print', element: <CnsdRecorderMeterPrintView /> },
+      { path: '/tfp/aob-ground/:id/print', element: <TfpAobGroundPrintView /> },
       {
         element: <AppShell />,
         children: [
@@ -64,7 +67,9 @@ export const router = createBrowserRouter([
 
           // TFP
           { path: '/tfp', element: <TfpIndexPage /> },
-          { path: '/tfp/aob-ground', element: <TfpAobGroundFormPage /> },
+          // Active module 1: Performance Check AOB Lantai Ground
+          { path: '/tfp/aob-ground', element: <TfpAobGroundListPage /> },
+          { path: '/tfp/aob-ground/:id', element: <TfpAobGroundDetailPage /> },
           { path: '/tfp/:code/coming-soon', element: <ComingSoonPage /> },
 
           // Ground Check
