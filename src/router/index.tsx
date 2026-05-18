@@ -33,6 +33,9 @@ import { TfpAobLt12PrintView } from '@/pages/tfp/TfpAobLt12PrintView';
 import { TfpTransmitterTxListPage } from '@/pages/tfp/TfpTransmitterTxListPage';
 import { TfpTransmitterTxDetailPage } from '@/pages/tfp/TfpTransmitterTxDetailPage';
 import { TfpTransmitterTxPrintView } from '@/pages/tfp/TfpTransmitterTxPrintView';
+import { TfpTowerListPage } from '@/pages/tfp/TfpTowerListPage';
+import { TfpTowerDetailPage } from '@/pages/tfp/TfpTowerDetailPage';
+import { TfpTowerPrintView } from '@/pages/tfp/TfpTowerPrintView';
 import { GroundCheckIndexPage } from '@/pages/ground-check/GroundCheckIndexPage';
 import { LocalizerFormPage } from '@/pages/ground-check/LocalizerFormPage';
 import { GroundingIndexPage } from '@/pages/grounding/GroundingIndexPage';
@@ -56,6 +59,7 @@ export const router = createBrowserRouter([
       { path: '/tfp/aob-ground/:id/print', element: <TfpAobGroundPrintView /> },
       { path: '/tfp/aob-lt12/:id/print', element: <TfpAobLt12PrintView /> },
       { path: '/tfp/transmitter-tx/:id/print', element: <TfpTransmitterTxPrintView /> },
+      { path: '/tfp/tower/:id/print', element: <TfpTowerPrintView /> },
       {
         element: <AppShell />,
         children: [
@@ -98,6 +102,9 @@ export const router = createBrowserRouter([
           // Active module 3: Performance Check Gedung (Transmitter) TX
           { path: '/tfp/transmitter-tx', element: <TfpTransmitterTxListPage /> },
           { path: '/tfp/transmitter-tx/:id', element: <TfpTransmitterTxDetailPage /> },
+          // Active module 4: Performance Check Gedung Tower
+          { path: '/tfp/tower', element: <TfpTowerListPage /> },
+          { path: '/tfp/tower/:id', element: <TfpTowerDetailPage /> },
           { path: '/tfp/:code/coming-soon', element: <ComingSoonPage /> },
 
           // Ground Check

@@ -13,9 +13,10 @@ import { mockTfpCategories } from '@/data/mockData';
  * is_active_mvp flag accidentally gets flipped on.
  */
 const TFP_ACTIVE_ROUTES: Record<string, string> = {
-  'TFP-001': '/tfp/aob-ground', // Performance Check AOB Lantai Ground
-  'TFP-002': '/tfp/aob-lt12',   // Performance Check AOB Lantai 1 & 2
-  'TFP-003': '/tfp/transmitter-tx', // Performance Check Gedung (Transmitter) TX
+  'TFP-001': '/tfp/aob-ground',      // Performance Check AOB Lantai Ground
+  'TFP-002': '/tfp/aob-lt12',        // Performance Check AOB Lantai 1 & 2
+  'TFP-003': '/tfp/transmitter-tx',  // Performance Check Gedung (Transmitter) TX
+  'TFP-005': '/tfp/tower',           // Performance Check Gedung Tower
 };
 
 /**
