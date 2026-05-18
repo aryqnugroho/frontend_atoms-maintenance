@@ -36,6 +36,9 @@ import { TfpTransmitterTxPrintView } from '@/pages/tfp/TfpTransmitterTxPrintView
 import { TfpTowerListPage } from '@/pages/tfp/TfpTowerListPage';
 import { TfpTowerDetailPage } from '@/pages/tfp/TfpTowerDetailPage';
 import { TfpTowerPrintView } from '@/pages/tfp/TfpTowerPrintView';
+import { TfpRadarListPage } from '@/pages/tfp/TfpRadarListPage';
+import { TfpRadarDetailPage } from '@/pages/tfp/TfpRadarDetailPage';
+import { TfpRadarPrintView } from '@/pages/tfp/TfpRadarPrintView';
 import { GroundCheckIndexPage } from '@/pages/ground-check/GroundCheckIndexPage';
 import { LocalizerFormPage } from '@/pages/ground-check/LocalizerFormPage';
 import { GroundingIndexPage } from '@/pages/grounding/GroundingIndexPage';
@@ -62,6 +65,7 @@ export const router = createBrowserRouter([
       { path: '/tfp/aob-lt12/:id/print', element: <TfpAobLt12PrintView /> },
       { path: '/tfp/transmitter-tx/:id/print', element: <TfpTransmitterTxPrintView /> },
       { path: '/tfp/tower/:id/print', element: <TfpTowerPrintView /> },
+      { path: '/tfp/radar-tfp/:id/print', element: <TfpRadarPrintView /> },
       {
         element: <AppShell />,
         children: [
@@ -107,6 +111,9 @@ export const router = createBrowserRouter([
           // Active module 4: Performance Check Gedung Tower
           { path: '/tfp/tower', element: <TfpTowerListPage /> },
           { path: '/tfp/tower/:id', element: <TfpTowerDetailPage /> },
+          // Active module 5: Performance Check Gedung Radar
+          { path: '/tfp/radar-tfp', element: <TfpRadarListPage /> },
+          { path: '/tfp/radar-tfp/:id', element: <TfpRadarDetailPage /> },
           { path: '/tfp/:code/coming-soon', element: <ComingSoonPage /> },
 
           // Ground Check
