@@ -27,6 +27,9 @@ import { TfpAobGroundPrintView } from '@/pages/tfp/TfpAobGroundPrintView';
 import { TfpAobLt12ListPage } from '@/pages/tfp/TfpAobLt12ListPage';
 import { TfpAobLt12DetailPage } from '@/pages/tfp/TfpAobLt12DetailPage';
 import { TfpAobLt12PrintView } from '@/pages/tfp/TfpAobLt12PrintView';
+import { TfpTransmitterTxListPage } from '@/pages/tfp/TfpTransmitterTxListPage';
+import { TfpTransmitterTxDetailPage } from '@/pages/tfp/TfpTransmitterTxDetailPage';
+import { TfpTransmitterTxPrintView } from '@/pages/tfp/TfpTransmitterTxPrintView';
 import { GroundCheckIndexPage } from '@/pages/ground-check/GroundCheckIndexPage';
 import { LocalizerFormPage } from '@/pages/ground-check/LocalizerFormPage';
 import { GroundingIndexPage } from '@/pages/grounding/GroundingIndexPage';
@@ -48,6 +51,7 @@ export const router = createBrowserRouter([
       { path: '/cnsd/amsc-meter/:id/print', element: <CnsdAmscMeterPrintView /> },
       { path: '/tfp/aob-ground/:id/print', element: <TfpAobGroundPrintView /> },
       { path: '/tfp/aob-lt12/:id/print', element: <TfpAobLt12PrintView /> },
+      { path: '/tfp/transmitter-tx/:id/print', element: <TfpTransmitterTxPrintView /> },
       {
         element: <AppShell />,
         children: [
@@ -84,6 +88,9 @@ export const router = createBrowserRouter([
           // Active module 2: Performance Check AOB Lantai 1 & 2
           { path: '/tfp/aob-lt12', element: <TfpAobLt12ListPage /> },
           { path: '/tfp/aob-lt12/:id', element: <TfpAobLt12DetailPage /> },
+          // Active module 3: Performance Check Gedung (Transmitter) TX
+          { path: '/tfp/transmitter-tx', element: <TfpTransmitterTxListPage /> },
+          { path: '/tfp/transmitter-tx/:id', element: <TfpTransmitterTxDetailPage /> },
           { path: '/tfp/:code/coming-soon', element: <ComingSoonPage /> },
 
           // Ground Check
