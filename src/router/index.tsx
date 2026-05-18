@@ -21,6 +21,9 @@ import { TfpIndexPage } from '@/pages/tfp/TfpIndexPage';
 import { TfpAobGroundListPage } from '@/pages/tfp/TfpAobGroundListPage';
 import { TfpAobGroundDetailPage } from '@/pages/tfp/TfpAobGroundDetailPage';
 import { TfpAobGroundPrintView } from '@/pages/tfp/TfpAobGroundPrintView';
+import { TfpAobLt12ListPage } from '@/pages/tfp/TfpAobLt12ListPage';
+import { TfpAobLt12DetailPage } from '@/pages/tfp/TfpAobLt12DetailPage';
+import { TfpAobLt12PrintView } from '@/pages/tfp/TfpAobLt12PrintView';
 import { GroundCheckIndexPage } from '@/pages/ground-check/GroundCheckIndexPage';
 import { LocalizerFormPage } from '@/pages/ground-check/LocalizerFormPage';
 import { GroundingIndexPage } from '@/pages/grounding/GroundingIndexPage';
@@ -40,6 +43,7 @@ export const router = createBrowserRouter([
       { path: '/cnsd/radar-meter/:id/print', element: <CnsdRadarMeterPrintView /> },
       { path: '/cnsd/recorder-meter/:id/print', element: <CnsdRecorderMeterPrintView /> },
       { path: '/tfp/aob-ground/:id/print', element: <TfpAobGroundPrintView /> },
+      { path: '/tfp/aob-lt12/:id/print', element: <TfpAobLt12PrintView /> },
       {
         element: <AppShell />,
         children: [
@@ -70,6 +74,9 @@ export const router = createBrowserRouter([
           // Active module 1: Performance Check AOB Lantai Ground
           { path: '/tfp/aob-ground', element: <TfpAobGroundListPage /> },
           { path: '/tfp/aob-ground/:id', element: <TfpAobGroundDetailPage /> },
+          // Active module 2: Performance Check AOB Lantai 1 & 2
+          { path: '/tfp/aob-lt12', element: <TfpAobLt12ListPage /> },
+          { path: '/tfp/aob-lt12/:id', element: <TfpAobLt12DetailPage /> },
           { path: '/tfp/:code/coming-soon', element: <ComingSoonPage /> },
 
           // Ground Check
