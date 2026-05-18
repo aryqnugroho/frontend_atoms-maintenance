@@ -39,7 +39,8 @@ import { TfpTowerPrintView } from '@/pages/tfp/TfpTowerPrintView';
 import { GroundCheckIndexPage } from '@/pages/ground-check/GroundCheckIndexPage';
 import { LocalizerFormPage } from '@/pages/ground-check/LocalizerFormPage';
 import { GroundingIndexPage } from '@/pages/grounding/GroundingIndexPage';
-import { GroundingCreatePage } from '@/pages/grounding/GroundingCreatePage';
+import { GroundingReportDetailPage } from '@/pages/grounding/GroundingReportDetailPage';
+import { GroundingReportPrintView } from '@/pages/grounding/GroundingReportPrintView';
 import { ComingSoonPage } from '@/pages/shared/ComingSoonPage';
 
 export const router = createBrowserRouter([
@@ -56,6 +57,7 @@ export const router = createBrowserRouter([
       { path: '/cnsd/recorder-meter/:id/print', element: <CnsdRecorderMeterPrintView /> },
       { path: '/cnsd/amsc-meter/:id/print', element: <CnsdAmscMeterPrintView /> },
       { path: '/cnsd/transmitter-meter/:id/print', element: <CnsdTransmitterMeterPrintView /> },
+      { path: '/grounding/reports/:id/print', element: <GroundingReportPrintView /> },
       { path: '/tfp/aob-ground/:id/print', element: <TfpAobGroundPrintView /> },
       { path: '/tfp/aob-lt12/:id/print', element: <TfpAobLt12PrintView /> },
       { path: '/tfp/transmitter-tx/:id/print', element: <TfpTransmitterTxPrintView /> },
@@ -114,7 +116,7 @@ export const router = createBrowserRouter([
 
           // Grounding
           { path: '/grounding', element: <GroundingIndexPage /> },
-          { path: '/grounding/create', element: <GroundingCreatePage /> },
+          { path: '/grounding/reports/:id', element: <GroundingReportDetailPage /> },
           { path: '/grounding/:code/coming-soon', element: <ComingSoonPage /> },
 
           // Reporting (placeholder)
