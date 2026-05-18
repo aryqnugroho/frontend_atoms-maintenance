@@ -17,6 +17,9 @@ import { CnsdRadarMeterPrintView } from '@/pages/cnsd/CnsdRadarMeterPrintView';
 import { CnsdRecorderMeterListPage } from '@/pages/cnsd/CnsdRecorderMeterListPage';
 import { CnsdRecorderMeterDetailPage } from '@/pages/cnsd/CnsdRecorderMeterDetailPage';
 import { CnsdRecorderMeterPrintView } from '@/pages/cnsd/CnsdRecorderMeterPrintView';
+import { CnsdAmscMeterListPage } from '@/pages/cnsd/CnsdAmscMeterListPage';
+import { CnsdAmscMeterDetailPage } from '@/pages/cnsd/CnsdAmscMeterDetailPage';
+import { CnsdAmscMeterPrintView } from '@/pages/cnsd/CnsdAmscMeterPrintView';
 import { TfpIndexPage } from '@/pages/tfp/TfpIndexPage';
 import { TfpAobGroundListPage } from '@/pages/tfp/TfpAobGroundListPage';
 import { TfpAobGroundDetailPage } from '@/pages/tfp/TfpAobGroundDetailPage';
@@ -42,6 +45,7 @@ export const router = createBrowserRouter([
       { path: '/cnsd/readiness/:id/print', element: <CnsdReadinessPrintView /> },
       { path: '/cnsd/radar-meter/:id/print', element: <CnsdRadarMeterPrintView /> },
       { path: '/cnsd/recorder-meter/:id/print', element: <CnsdRecorderMeterPrintView /> },
+      { path: '/cnsd/amsc-meter/:id/print', element: <CnsdAmscMeterPrintView /> },
       { path: '/tfp/aob-ground/:id/print', element: <TfpAobGroundPrintView /> },
       { path: '/tfp/aob-lt12/:id/print', element: <TfpAobLt12PrintView /> },
       {
@@ -65,6 +69,9 @@ export const router = createBrowserRouter([
           // Active module 3: Recorder Meter Reading (FORM C-3)
           { path: '/cnsd/recorder-meter', element: <CnsdRecorderMeterListPage /> },
           { path: '/cnsd/recorder-meter/:id', element: <CnsdRecorderMeterDetailPage /> },
+          // Active module 4: AMSC Meter Reading
+          { path: '/cnsd/amsc-meter', element: <CnsdAmscMeterListPage /> },
+          { path: '/cnsd/amsc-meter/:id', element: <CnsdAmscMeterDetailPage /> },
           // Backward-compat: legacy /cnsd/eq-1 link redirects to new list
           { path: '/cnsd/eq-1', element: <Navigate to="/cnsd/readiness" replace /> },
           { path: '/cnsd/:code/coming-soon', element: <ComingSoonPage /> },

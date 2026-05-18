@@ -16,6 +16,7 @@ const CNSD_ACTIVE_ROUTES: Record<string, string> = {
   'CNSD-001': '/cnsd/readiness',     // Kesiapan Peralatan CNSD (Form EQ-1)
   'CNSD-002': '/cnsd/radar-meter',   // Radar Meter Reading (Form RADAR-METER)
   'CNSD-003': '/cnsd/recorder-meter',// Recorder Meter Reading (FORM C-3)
+  'CNSD-004': '/cnsd/amsc-meter',    // AMSC Meter Reading
 };
 
 /**
