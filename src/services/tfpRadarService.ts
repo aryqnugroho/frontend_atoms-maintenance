@@ -60,3 +60,6 @@ export const TfpRadarService = {
     await axios.delete(`${API_URL}/v1/tfp/radar/${id}`, { headers: getAuthHeaders() });
   },
 };
+
+// Alias for consistent naming with other TFP services
+export const tfpRadarService = TfpRadarService;

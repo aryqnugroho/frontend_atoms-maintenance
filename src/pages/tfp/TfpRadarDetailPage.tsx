@@ -37,7 +37,7 @@ const isKwhRow = (item: TfpRadarItem): boolean =>
 
 const isSuhuRow = (item: TfpRadarItem): boolean => {
   const n = item.parameter_name.toLowerCase();
-  return n.startsWith('suhu tower') || n.startsWith('suhu ruang rx') || n.startsWith('suhu cabin');
+  return n.startsWith('suhu ruang ups') || n.startsWith('suhu ruang adsb') || n.startsWith('suhu ruang radar') || n.startsWith('meter air');
 };
 
 interface CellInputProps {
@@ -208,15 +208,16 @@ export const TfpRadarDetailPage: React.FC = () => {
                   <th rowSpan={2} className="px-1 py-2 text-center font-semibold border border-sky-700 text-[9px]">Panel RD 01</th>
                   <th rowSpan={2} className="px-1 py-2 text-center font-semibold border border-sky-700 text-[9px]">Panel RD 02</th>
                   <th colSpan={2} className="px-1 py-1 text-center font-semibold border border-sky-700 text-[9px]">Panel COS (RD 03)</th>
-                  <th rowSpan={2} className="px-1 py-2 text-center font-semibold border border-sky-700 text-[9px]">UPS TOPAZ</th>
+                  <th colSpan={2} className="px-1 py-1 text-center font-semibold border border-sky-700 text-[9px]">UPS TOPAZ</th>
                   <th rowSpan={2} className="px-1 py-2 text-center font-semibold border border-sky-700 text-[9px]">Panel RD 04 Lobby Radar</th>
                   <th rowSpan={2} className="px-1 py-2 text-center font-semibold border border-sky-700 text-[9px]">Panel RD 05 Ruang ADSB</th>
                   <th rowSpan={2} className="px-1 py-2 text-center font-semibold border border-sky-700 text-[9px]">Panel RD 06 CCTV Indoor</th>
                   <th rowSpan={2} className="px-1 py-2 text-center font-semibold border border-sky-700 text-[9px]">Panel RD 07 Ruang Battery</th>
                   <th rowSpan={2} className="px-1 py-2 text-center font-semibold border border-sky-700 text-[9px]">Panel RD 08 (PJU)</th>
-                  <th rowSpan={2} className="px-1 py-2 text-center font-semibold border border-sky-700 text-[9px]"></th>
                 </tr>
                 <tr className="bg-sky-700 text-sky-100">
+                  <th className="px-1 py-1 text-center font-medium border border-sky-600 text-[10px]">Input</th>
+                  <th className="px-1 py-1 text-center font-medium border border-sky-600 text-[10px]">Output</th>
                   <th className="px-1 py-1 text-center font-medium border border-sky-600 text-[10px]">Input</th>
                   <th className="px-1 py-1 text-center font-medium border border-sky-600 text-[10px]">Output</th>
                 </tr>
@@ -226,7 +227,8 @@ export const TfpRadarDetailPage: React.FC = () => {
                   const rowBase = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
 
                   if (isModeRow(item)) {
-                    const atsVal = itemValues[item.id]?.panel_cos_rd03_input ?? '';
+                    const cosVal = itemValues[item.id]?.panel_cos_rd03_input ?? '';
+                    const upsVal = itemValues[item.id]?.ups_topaz_input ?? '';
                     return (
                       <tr key={item.id} className="bg-blue-50/40">
                         <td className="px-1 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">{idx + 1}</td>
@@ -234,9 +236,12 @@ export const TfpRadarDetailPage: React.FC = () => {
                         <td className="px-1 py-1 border-l border-slate-100 bg-slate-200" />
                         <td className="px-1 py-1 border-l border-slate-100 bg-slate-200" />
                         <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100">
-                          {isCompleted ? <span className="text-xs text-slate-700">{atsVal || '—'}</span> : <select value={atsVal} onChange={(e) => setItemCell(item.id, 'panel_cos_rd03_input', e.target.value)} className={modeSelectCls(atsVal)}><option value="">—</option><option value="Auto">Auto</option><option value="Manual">Manual</option></select>}
+                          {isCompleted ? <span className="text-xs text-slate-700">{cosVal || '—'}</span> : <select value={cosVal} onChange={(e) => setItemCell(item.id, 'panel_cos_rd03_input', e.target.value)} className={modeSelectCls(cosVal)}><option value="">—</option><option value="Auto">Auto</option><option value="Manual">Manual</option></select>}
                         </td>
-                        {['ups_topaz_input','ups_topaz_output','panel_rd04','panel_rd05','panel_rd06','panel_rd07','panel_rd08'].map((k) => (
+                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100">
+                          {isCompleted ? <span className="text-xs text-slate-700">{upsVal || '—'}</span> : <select value={upsVal} onChange={(e) => setItemCell(item.id, 'ups_topaz_input', e.target.value)} className={modeSelectCls(upsVal)}><option value="">—</option><option value="Auto">Auto</option><option value="Manual">Manual</option></select>}
+                        </td>
+                        {['panel_rd04','panel_rd05','panel_rd06','panel_rd07','panel_rd08'].map((k) => (
                           <td key={k} className="px-1 py-1 border-l border-slate-100 bg-slate-200" />
                         ))}
                       </tr>
@@ -244,7 +249,8 @@ export const TfpRadarDetailPage: React.FC = () => {
                   }
 
                   if (isSuplaiRow(item)) {
-                    const atsVal = itemValues[item.id]?.panel_cos_rd03_input ?? '';
+                    const cosVal = itemValues[item.id]?.panel_cos_rd03_input ?? '';
+                    const upsVal = itemValues[item.id]?.ups_topaz_input ?? '';
                     return (
                       <tr key={item.id} className="bg-blue-50/40">
                         <td className="px-1 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">{idx + 1}</td>
@@ -252,9 +258,12 @@ export const TfpRadarDetailPage: React.FC = () => {
                         <td className="px-1 py-1 border-l border-slate-100 bg-slate-200" />
                         <td className="px-1 py-1 border-l border-slate-100 bg-slate-200" />
                         <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100">
-                          {isCompleted ? <span className="text-xs text-slate-700">{atsVal || '—'}</span> : <select value={atsVal} onChange={(e) => setItemCell(item.id, 'panel_cos_rd03_input', e.target.value)} className={suplaiSelectCls(atsVal)}><option value="">—</option><option value="PLN 1">PLN 1</option><option value="PLN 2">PLN 2</option></select>}
+                          {isCompleted ? <span className="text-xs text-slate-700">{cosVal || '—'}</span> : <select value={cosVal} onChange={(e) => setItemCell(item.id, 'panel_cos_rd03_input', e.target.value)} className={suplaiSelectCls(cosVal)}><option value="">—</option><option value="PLN 1">PLN 1</option><option value="PLN 2">PLN 2</option></select>}
                         </td>
-                        {['ups_topaz_input','ups_topaz_output','panel_rd04','panel_rd05','panel_rd06','panel_rd07','panel_rd08'].map((k) => (
+                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100">
+                          {isCompleted ? <span className="text-xs text-slate-700">{upsVal || '—'}</span> : <select value={upsVal} onChange={(e) => setItemCell(item.id, 'ups_topaz_input', e.target.value)} className={suplaiSelectCls(upsVal)}><option value="">—</option><option value="PLN 1">PLN 1</option><option value="PLN 2">PLN 2</option></select>}
+                        </td>
+                        {['panel_rd04','panel_rd05','panel_rd06','panel_rd07','panel_rd08'].map((k) => (
                           <td key={k} className="px-1 py-1 border-l border-slate-100 bg-slate-200" />
                         ))}
                       </tr>
@@ -262,17 +271,15 @@ export const TfpRadarDetailPage: React.FC = () => {
                   }
 
                   if (isKwhRow(item)) {
-                    const val = itemValues[item.id]?.panel_cos_rd03_input ?? '';
+                    const val = itemValues[item.id]?.panel_rd01 ?? '';
                     return (
                       <tr key={item.id} className={rowBase}>
                         <td className="px-1 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">{idx + 1}</td>
                         <td className="px-2 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">{item.parameter_name}</td>
-                        <td className="px-1 py-1 border-l border-slate-100 bg-slate-200" />
-                        <td className="px-1 py-1 border-l border-slate-100 bg-slate-200" />
                         <td className="px-1.5 py-1 border-l border-slate-100">
-                          {isCompleted ? <span className="text-xs text-slate-700">{val || '—'}</span> : <input type="text" inputMode="decimal" value={val} onChange={(e) => setItemCell(item.id, 'panel_cos_rd03_input', e.target.value)} className="w-full h-7 px-1.5 text-center text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-sky-400 focus:outline-none" />}
+                          {isCompleted ? <span className="text-xs text-slate-700">{val || '—'}</span> : <input type="text" inputMode="decimal" value={val} onChange={(e) => setItemCell(item.id, 'panel_rd01', e.target.value)} className="w-full h-7 px-1.5 text-center text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-sky-400 focus:outline-none" />}
                         </td>
-                        {['panel_cos_rd03_output','ups_topaz_input','ups_topaz_output','panel_rd04','panel_rd05','panel_rd06','panel_rd07','panel_rd08'].map((k) => (
+                        {['panel_rd02','panel_cos_rd03_input','panel_cos_rd03_output','ups_topaz_input','ups_topaz_output','panel_rd04','panel_rd05','panel_rd06','panel_rd07','panel_rd08'].map((k) => (
                           <td key={k} className="px-1 py-1 border-l border-slate-100 bg-slate-200" />
                         ))}
                       </tr>

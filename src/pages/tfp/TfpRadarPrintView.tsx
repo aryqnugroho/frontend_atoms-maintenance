@@ -26,7 +26,7 @@ const isSuplaiRow = (item: TfpRadarItem): boolean => item.parameter_name.toLower
 const isKwhRow = (item: TfpRadarItem): boolean => item.parameter_name.toLowerCase().startsWith('kwh');
 const isSuhuRow = (item: TfpRadarItem): boolean => {
   const n = item.parameter_name.toLowerCase();
-  return n.startsWith('suhu tower') || n.startsWith('suhu ruang rx') || n.startsWith('suhu cabin');
+  return n.startsWith('suhu ruang ups') || n.startsWith('suhu ruang adsb') || n.startsWith('suhu ruang radar') || n.startsWith('meter air');
 };
 
 const formatDate = (v?: string | null): string => {
@@ -42,17 +42,21 @@ const renderPrintCell = (item: TfpRadarItem, colKey: ItemColKey): React.ReactEle
   if (isModeRow(item)) {
     if (colKey === 'panel_cos_rd03_input') return <td className="border border-black px-1 py-1 text-center text-[10px] font-semibold">{val(item.panel_cos_rd03_input) || 'Auto / Manual'}</td>;
     if (colKey === 'panel_cos_rd03_output') return <td className="border border-black bg-gray-300 px-1 py-1" />;
+    if (colKey === 'ups_topaz_input') return <td className="border border-black px-1 py-1 text-center text-[10px] font-semibold">{val(item.ups_topaz_input) || 'Auto / Manual'}</td>;
+    if (colKey === 'ups_topaz_output') return <td className="border border-black bg-gray-300 px-1 py-1" />;
     return <td className="border border-black px-1 py-1 text-center text-[10px]">{val(item[colKey] as string | null)}</td>;
   }
 
   if (isSuplaiRow(item)) {
     if (colKey === 'panel_cos_rd03_input') return <td className="border border-black px-1 py-1 text-center text-[10px] font-semibold">{val(item.panel_cos_rd03_input) || 'PLN 1 / PLN 2'}</td>;
     if (colKey === 'panel_cos_rd03_output') return <td className="border border-black bg-gray-300 px-1 py-1" />;
+    if (colKey === 'ups_topaz_input') return <td className="border border-black px-1 py-1 text-center text-[10px] font-semibold">{val(item.ups_topaz_input) || 'PLN 1 / PLN 2'}</td>;
+    if (colKey === 'ups_topaz_output') return <td className="border border-black bg-gray-300 px-1 py-1" />;
     return <td className="border border-black px-1 py-1 text-center text-[10px]">{val(item[colKey] as string | null)}</td>;
   }
 
   if (isKwhRow(item)) {
-    if (colKey === 'panel_cos_rd03_input') return <td className="border border-black px-1 py-1 text-center text-[10px]">{val(item.panel_cos_rd03_input)}</td>;
+    if (colKey === 'panel_rd01') return <td className="border border-black px-1 py-1 text-center text-[10px]">{val(item.panel_rd01)}</td>;
     return <td className="border border-black bg-gray-300 px-1 py-1" />;
   }
 
@@ -132,10 +136,9 @@ export const TfpRadarPrintView: React.FC = () => {
             <col style={{ width: '20px' }} /><col style={{ width: '95px' }} />
             <col style={{ width: '30px' }} /><col style={{ width: '30px' }} />
             <col style={{ width: '28px' }} /><col style={{ width: '28px' }} />
-            <col style={{ width: '30px' }} /><col style={{ width: '30px' }} />
+            <col style={{ width: '28px' }} /><col style={{ width: '28px' }} />
             <col style={{ width: '30px' }} /><col style={{ width: '30px' }} />
             <col style={{ width: '32px' }} /><col style={{ width: '30px' }} />
-            <col style={{ width: '30px' }} />
             <col style={{ width: '105px' }} /><col style={{ width: '42px' }} /><col style={{ width: '75px' }} />
           </colgroup>
           <thead>
@@ -145,18 +148,19 @@ export const TfpRadarPrintView: React.FC = () => {
               <th rowSpan={2} className="border border-black px-0.5 py-0.5 text-center font-bold text-[7px]">Panel RD 01</th>
               <th rowSpan={2} className="border border-black px-0.5 py-0.5 text-center font-bold text-[7px]">Panel RD 02</th>
               <th colSpan={2} className="border border-black px-0.5 py-0.5 text-center font-bold text-[8px]">Panel COS (RD 03)</th>
-              <th rowSpan={2} className="border border-black px-0.5 py-0.5 text-center font-bold text-[7px]">UPS TOPAZ</th>
+              <th colSpan={2} className="border border-black px-0.5 py-0.5 text-center font-bold text-[8px]">UPS TOPAZ</th>
               <th rowSpan={2} className="border border-black px-0.5 py-0.5 text-center font-bold text-[7px]">Panel RD 04 Lobby Radar</th>
               <th rowSpan={2} className="border border-black px-0.5 py-0.5 text-center font-bold text-[7px]">Panel RD 05 Ruang ADSB</th>
               <th rowSpan={2} className="border border-black px-0.5 py-0.5 text-center font-bold text-[7px]">Panel RD 06 CCTV Indoor</th>
               <th rowSpan={2} className="border border-black px-0.5 py-0.5 text-center font-bold text-[7px]">Panel RD 07 Ruang Battery</th>
               <th rowSpan={2} className="border border-black px-0.5 py-0.5 text-center font-bold text-[7px]">Panel RD 08 (PJU)</th>
-              <th rowSpan={2} className="border border-black px-0.5 py-0.5 text-center font-bold text-[7px]"></th>
               <th rowSpan={2} className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle">Nama Fasilitas</th>
               <th rowSpan={2} className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle">Kondisi</th>
               <th rowSpan={2} className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle">Keterangan</th>
             </tr>
             <tr className="bg-blue-50 italic">
+              <th className="border border-black px-0.5 py-0.5 text-center font-semibold text-[8px]">Input</th>
+              <th className="border border-black px-0.5 py-0.5 text-center font-semibold text-[8px]">Output</th>
               <th className="border border-black px-0.5 py-0.5 text-center font-semibold text-[8px]">Input</th>
               <th className="border border-black px-0.5 py-0.5 text-center font-semibold text-[8px]">Output</th>
             </tr>
