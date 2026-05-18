@@ -20,6 +20,7 @@ const TFP_ACTIVE_ROUTES: Record<string, string> = {
   'TFP-005': '/tfp/tower',           // Performance Check Gedung Tower
   'TFP-006': '/tfp/dvor',            // Performance Check Gedung DVOR (VOR)
   'TFP-007': '/tfp/localizer',       // Performance Check Gedung Localizer
+  'TFP-008': '/tfp/glidepath',       // Performance Check Gedung Glide Path
 };
 
 /**

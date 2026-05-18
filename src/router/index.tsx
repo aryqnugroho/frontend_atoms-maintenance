@@ -45,6 +45,9 @@ import { TfpDvorPrintView } from '@/pages/tfp/TfpDvorPrintView';
 import { TfpLocalizerListPage } from '@/pages/tfp/TfpLocalizerListPage';
 import { TfpLocalizerDetailPage } from '@/pages/tfp/TfpLocalizerDetailPage';
 import { TfpLocalizerPrintView } from '@/pages/tfp/TfpLocalizerPrintView';
+import { TfpGlidepathListPage } from '@/pages/tfp/TfpGlidepathListPage';
+import { TfpGlidepathDetailPage } from '@/pages/tfp/TfpGlidepathDetailPage';
+import { TfpGlidepathPrintView } from '@/pages/tfp/TfpGlidepathPrintView';
 import { GroundCheckIndexPage } from '@/pages/ground-check/GroundCheckIndexPage';
 import { LocalizerFormPage } from '@/pages/ground-check/LocalizerFormPage';
 import { GroundingIndexPage } from '@/pages/grounding/GroundingIndexPage';
@@ -74,6 +77,7 @@ export const router = createBrowserRouter([
       { path: '/tfp/radar-tfp/:id/print', element: <TfpRadarPrintView /> },
       { path: '/tfp/dvor/:id/print', element: <TfpDvorPrintView /> },
       { path: '/tfp/localizer/:id/print', element: <TfpLocalizerPrintView /> },
+      { path: '/tfp/glidepath/:id/print', element: <TfpGlidepathPrintView /> },
       {
         element: <AppShell />,
         children: [
@@ -128,6 +132,9 @@ export const router = createBrowserRouter([
           // Active module 7: Performance Check Gedung Localizer
           { path: '/tfp/localizer', element: <TfpLocalizerListPage /> },
           { path: '/tfp/localizer/:id', element: <TfpLocalizerDetailPage /> },
+          // Active module 8: Performance Check Gedung Glide Path
+          { path: '/tfp/glidepath', element: <TfpGlidepathListPage /> },
+          { path: '/tfp/glidepath/:id', element: <TfpGlidepathDetailPage /> },
           { path: '/tfp/:code/coming-soon', element: <ComingSoonPage /> },
 
           // Ground Check
