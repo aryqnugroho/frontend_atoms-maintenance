@@ -18,6 +18,7 @@ const TFP_ACTIVE_ROUTES: Record<string, string> = {
   'TFP-003': '/tfp/transmitter-tx',  // Performance Check Gedung (Transmitter) TX
   'TFP-004': '/tfp/radar-tfp',       // Performance Check Gedung Radar
   'TFP-005': '/tfp/tower',           // Performance Check Gedung Tower
+  'TFP-006': '/tfp/dvor',            // Performance Check Gedung DVOR (VOR)
 };
 
 /**

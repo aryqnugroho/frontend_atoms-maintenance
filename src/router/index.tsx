@@ -39,6 +39,9 @@ import { TfpTowerPrintView } from '@/pages/tfp/TfpTowerPrintView';
 import { TfpRadarListPage } from '@/pages/tfp/TfpRadarListPage';
 import { TfpRadarDetailPage } from '@/pages/tfp/TfpRadarDetailPage';
 import { TfpRadarPrintView } from '@/pages/tfp/TfpRadarPrintView';
+import { TfpDvorListPage } from '@/pages/tfp/TfpDvorListPage';
+import { TfpDvorDetailPage } from '@/pages/tfp/TfpDvorDetailPage';
+import { TfpDvorPrintView } from '@/pages/tfp/TfpDvorPrintView';
 import { GroundCheckIndexPage } from '@/pages/ground-check/GroundCheckIndexPage';
 import { LocalizerFormPage } from '@/pages/ground-check/LocalizerFormPage';
 import { GroundingIndexPage } from '@/pages/grounding/GroundingIndexPage';
@@ -66,6 +69,7 @@ export const router = createBrowserRouter([
       { path: '/tfp/transmitter-tx/:id/print', element: <TfpTransmitterTxPrintView /> },
       { path: '/tfp/tower/:id/print', element: <TfpTowerPrintView /> },
       { path: '/tfp/radar-tfp/:id/print', element: <TfpRadarPrintView /> },
+      { path: '/tfp/dvor/:id/print', element: <TfpDvorPrintView /> },
       {
         element: <AppShell />,
         children: [
@@ -114,6 +118,9 @@ export const router = createBrowserRouter([
           // Active module 5: Performance Check Gedung Radar
           { path: '/tfp/radar-tfp', element: <TfpRadarListPage /> },
           { path: '/tfp/radar-tfp/:id', element: <TfpRadarDetailPage /> },
+          // Active module 6: Performance Check Gedung DVOR (VOR)
+          { path: '/tfp/dvor', element: <TfpDvorListPage /> },
+          { path: '/tfp/dvor/:id', element: <TfpDvorDetailPage /> },
           { path: '/tfp/:code/coming-soon', element: <ComingSoonPage /> },
 
           // Ground Check

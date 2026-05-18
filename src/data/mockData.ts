@@ -223,7 +223,7 @@ export const mockTfpCategories: TfpCategory[] = [
   { id: 3, code: 'TFP-003', name: 'Transmitter (TFP)', location: 'Gedung Transmitter', is_active_mvp: true, sort_order: 3 },
   { id: 4, code: 'TFP-004', name: 'Radar (TFP)', location: 'Gedung Radar', is_active_mvp: true, sort_order: 4 },
   { id: 5, code: 'TFP-005', name: 'Tower', location: 'ATC Tower', is_active_mvp: true, sort_order: 5 },
-  { id: 6, code: 'TFP-006', name: 'VOR (TFP)', location: 'Shelter VOR', is_active_mvp: false, sort_order: 6 },
+  { id: 6, code: 'TFP-006', name: 'VOR (TFP)', location: 'Shelter VOR', is_active_mvp: true, sort_order: 6 },
   { id: 7, code: 'TFP-007', name: 'Localizer (TFP)', location: 'Shelter Localizer', is_active_mvp: false, sort_order: 7 },
   { id: 8, code: 'TFP-008', name: 'Glide Path (TFP)', location: 'Shelter Glide Path', is_active_mvp: false, sort_order: 8 },
 ];
