@@ -72,6 +72,8 @@ export interface CnsdAmscMeterRecordSummary {
   facility: string;
   date: string;
   shift_type: ShiftType;
+  day_name: string | null;
+  time_filled: string | null;
   location: string;
   merk: string;
   type: string;
@@ -91,6 +93,8 @@ export interface CnsdAmscMeterRecordDetail {
   facility: string;
   date: string;
   shift_type: ShiftType;
+  day_name: string | null;
+  time_filled: string | null;
   location: string;
   merk: string;
   type: string;
