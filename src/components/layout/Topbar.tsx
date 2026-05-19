@@ -3,13 +3,16 @@ import { NavLink } from 'react-router-dom';
 import {
   Bell, LogOut, Menu, X, Clock,
   LayoutDashboard, FileText, CheckSquare, Activity,
-  Plane, Zap, Users, ClipboardList,
+  Plane, Zap, Users, ClipboardList, BookOpen, ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotification } from '@/hooks/useNotification';
-import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { cn } from '@/lib/utils';
-import { mockShiftSchedule, mockNotifications } from '@/data/mockData';
+import { mockNotifications } from '@/data/mockData';
+
+// ─── Env ──────────────────────────────────────────────────────
+const ROSTERING_URL =
+  import.meta.env.VITE_ROSTERING_FRONTEND_URL || 'http://localhost:5174';
 
 // ─── Nav definition ───────────────────────────────────────────
 interface NavItem {
@@ -20,14 +23,15 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { name: 'Dashboard',       path: '/dashboard',    icon: LayoutDashboard, roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-  { name: 'Work Order',      path: '/work-orders',  icon: FileText,        roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-  { name: 'CNSD',            path: '/cnsd',         icon: CheckSquare,     roles: ['Manager Teknik', 'Supervisor CNSD', 'Teknisi CNSD'] },
-  { name: 'TFP',             path: '/tfp',          icon: Activity,        roles: ['Manager Teknik', 'Supervisor TFP', 'Teknisi TFP'] },
-  { name: 'Ground Check',    path: '/ground-check', icon: Plane,           roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-  { name: 'Grounding',       path: '/grounding',    icon: Zap,             roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-  { name: 'Reporting',       path: '/reporting',    icon: ClipboardList,   roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-  { name: 'User Management', path: '/admin/users',  icon: Users,           roles: ['Admin'] },
+  { name: 'Dashboard',    path: '/dashboard',    icon: LayoutDashboard, roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
+  { name: 'Work Order',   path: '/work-orders',  icon: FileText,        roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
+  { name: 'CNSD',         path: '/cnsd',         icon: CheckSquare,     roles: ['Manager Teknik', 'Supervisor CNSD', 'Teknisi CNSD'] },
+  { name: 'TFP',          path: '/tfp',          icon: Activity,        roles: ['Manager Teknik', 'Supervisor TFP', 'Teknisi TFP'] },
+  { name: 'Ground Check', path: '/ground-check', icon: Plane,           roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
+  { name: 'Grounding',    path: '/grounding',    icon: Zap,             roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
+  { name: 'Reporting',    path: '/reporting',    icon: ClipboardList,   roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
+  { name: 'Logbook',      path: '/logbooks',     icon: BookOpen,        roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
+  { name: 'User Mgmt',    path: '/admin/users',  icon: Users,           roles: ['Admin'] },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────
@@ -46,7 +50,6 @@ export const Topbar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
 
-  const shift = mockShiftSchedule;
   const unread = unreadCount || mockNotifications.filter((n) => !n.is_read).length;
 
   const visibleItems = navItems.filter(
@@ -55,7 +58,8 @@ export const Topbar: React.FC = () => {
 
   const desktopLinkCls = ({ isActive }: { isActive: boolean }) =>
     cn(
-      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
+      // Compact: icon + short label, tight padding
+      'flex items-center gap-1 px-2 py-1.5 rounded-lg text-[12px] font-medium transition-all duration-150 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
       isActive
         ? 'bg-white/20 text-white'
         : 'text-white/70 hover:bg-white/10 hover:text-white'
@@ -77,7 +81,7 @@ export const Topbar: React.FC = () => {
       {/* Main Topbar                                            */}
       {/* ═══════════════════════════════════════════════════════ */}
       <header className="sticky top-0 z-40 bg-sidebar border-b border-[#1a2456] shadow-md" role="banner">
-        <div className="flex items-center h-14 px-2 sm:px-4 md:px-6 gap-1 sm:gap-3">
+        <div className="flex items-center h-14 px-3 sm:px-4 md:px-5 gap-2">
 
           {/* ── Mobile hamburger ── */}
           <button
@@ -91,34 +95,41 @@ export const Topbar: React.FC = () => {
           </button>
 
           {/* ── Logo + Brand ── */}
+          {/* Fixed min-width so brand never squishes into nav links */}
           <NavLink
             to="/dashboard"
-            className="flex items-center gap-2 shrink-0 select-none"
+            className="flex items-center gap-2 shrink-0 select-none min-w-[140px] sm:min-w-[160px]"
             onClick={() => setMobileOpen(false)}
           >
             <img
               src="/assets/icon/logoairnav.svg"
               alt="AirNav Surabaya"
-              className="h-7 w-auto sm:h-8"
+              className="h-7 w-auto sm:h-8 shrink-0"
             />
-            <div className="flex flex-col">
-              <p className="text-xs sm:text-sm font-bold tracking-tight leading-none text-white">
+            <div className="flex flex-col justify-center leading-none">
+              <p className="text-[13px] font-bold tracking-tight text-white leading-tight">
                 AirNav Surabaya
               </p>
-              <p className="text-[10px] sm:text-[11px] text-white/60 font-medium tracking-wide leading-tight">
+              {/* Hide subtitle on very small screens to save space */}
+              <p className="hidden sm:block text-[10px] text-white/55 font-medium tracking-wide leading-tight mt-0.5">
                 ATOMS-Maintenance
               </p>
             </div>
           </NavLink>
 
           {/* ── Divider (desktop only) ── */}
-          <div className="hidden lg:block w-px h-5 bg-white/20 mx-0.5 shrink-0" />
+          <div className="hidden lg:block w-px h-5 bg-white/20 shrink-0" />
 
           {/* ── Desktop nav links ── */}
-          <nav className="hidden lg:flex items-center gap-0.5 flex-1 overflow-x-auto scrollbar-none" role="navigation" aria-label="Main navigation">
+          {/* overflow-x-auto + scrollbar-none as safety net, but compact sizing should prevent overflow */}
+          <nav
+            className="hidden lg:flex items-center gap-0 flex-1 overflow-x-auto scrollbar-none"
+            role="navigation"
+            aria-label="Main navigation"
+          >
             {visibleItems.map((item) => (
               <NavLink key={item.path} to={item.path} className={desktopLinkCls}>
-                <item.icon size={16} aria-hidden="true" />
+                <item.icon size={14} aria-hidden="true" />
                 <span>{item.name}</span>
               </NavLink>
             ))}
@@ -127,10 +138,21 @@ export const Topbar: React.FC = () => {
           {/* ── Spacer on mobile to push actions right ── */}
           <div className="flex-1 lg:hidden" />
 
-          {/* ── Shift badge (visible on larger mobile + desktop) ── */}
-          <div className="hidden min-[400px]:flex shrink-0">
-            <ShiftBadge shift={shift.current_shift} />
-          </div>
+          {/* ── Right action cluster ── */}
+          {/* Shift badge REMOVED from topbar — visible in Dashboard page header instead */}
+
+          {/* ── Shortcut: Buka ATOMS Rostering ── */}
+          <a
+            href={ROSTERING_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-1 p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+            title="Buka ATOMS Rostering"
+            aria-label="Buka ATOMS Rostering di tab baru"
+          >
+            <ExternalLink size={16} aria-hidden="true" />
+            <span className="hidden xl:inline text-[11px] font-medium">Rostering</span>
+          </a>
 
           {/* ── Notification bell ── */}
           <div className="relative shrink-0">
@@ -141,9 +163,12 @@ export const Topbar: React.FC = () => {
               aria-expanded={showNotif}
               aria-haspopup="true"
             >
-              <Bell size={19} aria-hidden="true" />
+              <Bell size={18} aria-hidden="true" />
               {unread > 0 && (
-                <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] min-w-[15px] h-[15px] px-0.5 rounded-full flex items-center justify-center font-bold leading-none" aria-label={`${unread} notifikasi belum dibaca`}>
+                <span
+                  className="absolute top-1 right-1 bg-red-500 text-white text-[9px] min-w-[15px] h-[15px] px-0.5 rounded-full flex items-center justify-center font-bold leading-none"
+                  aria-label={`${unread} notifikasi belum dibaca`}
+                >
                   {unread}
                 </span>
               )}
@@ -153,7 +178,11 @@ export const Topbar: React.FC = () => {
             {showNotif && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowNotif(false)} aria-hidden="true" />
-                <div className="absolute right-0 top-full mt-2 w-[320px] max-w-[calc(100vw-1rem)] bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden" role="menu" aria-label="Daftar notifikasi">
+                <div
+                  className="absolute right-0 top-full mt-2 w-[320px] max-w-[calc(100vw-1rem)] bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden"
+                  role="menu"
+                  aria-label="Daftar notifikasi"
+                >
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-900">Notifikasi</h3>
                     <button className="text-xs text-brand-primary hover:underline font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:rounded">
@@ -191,23 +220,31 @@ export const Topbar: React.FC = () => {
           </div>
 
           {/* ── User info + logout ── */}
-          <div className="flex items-center gap-1 sm:gap-1.5 pl-1.5 sm:pl-2 border-l border-white/15 shrink-0">
+          <div className="flex items-center gap-1 pl-1.5 border-l border-white/15 shrink-0">
+            {/* Name + role — only on medium+ screens */}
             <div className="hidden md:block text-right">
-              <p className="text-[13px] font-semibold leading-tight text-white">
+              <p className="text-[12px] font-semibold leading-tight text-white truncate max-w-[100px]">
                 {user?.name || 'User'}
               </p>
-              <p className="text-[10px] text-white/45 leading-tight">{user?.role || 'Guest'}</p>
+              <p className="text-[10px] text-white/45 leading-tight truncate max-w-[100px]">
+                {user?.role || 'Guest'}
+              </p>
             </div>
-            <div className="h-8 w-8 rounded-full bg-white/20 ring-2 ring-white/10 text-white flex items-center justify-center text-sm font-bold shrink-0" aria-hidden="true">
+            {/* Avatar */}
+            <div
+              className="h-7 w-7 rounded-full bg-white/20 ring-2 ring-white/10 text-white flex items-center justify-center text-xs font-bold shrink-0"
+              aria-hidden="true"
+            >
               {userInitial}
             </div>
+            {/* Logout */}
             <button
               onClick={logout}
-              className="p-2 rounded-lg text-white/55 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+              className="p-1.5 rounded-lg text-white/55 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
               title="Keluar"
               aria-label="Keluar dari aplikasi"
             >
-              <LogOut size={17} aria-hidden="true" />
+              <LogOut size={16} aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -232,10 +269,12 @@ export const Topbar: React.FC = () => {
             role="navigation"
             aria-label="Mobile navigation"
           >
-
             {/* User identity block */}
             <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10">
-              <div className="h-10 w-10 rounded-full bg-white/20 ring-2 ring-white/15 text-white flex items-center justify-center text-base font-bold shrink-0" aria-hidden="true">
+              <div
+                className="h-10 w-10 rounded-full bg-white/20 ring-2 ring-white/15 text-white flex items-center justify-center text-base font-bold shrink-0"
+                aria-hidden="true"
+              >
                 {userInitial}
               </div>
               <div className="min-w-0">
@@ -246,11 +285,6 @@ export const Topbar: React.FC = () => {
                   {user?.role || 'Guest'}
                 </p>
               </div>
-            </div>
-
-            {/* Shift badge on mobile */}
-            <div className="px-5 py-2.5 border-b border-white/5">
-              <ShiftBadge shift={shift.current_shift} />
             </div>
 
             {/* Nav links */}
@@ -268,17 +302,30 @@ export const Topbar: React.FC = () => {
               ))}
             </div>
 
-            {/* Footer */}
-            <div className="px-5 py-3 border-t border-white/10 flex items-center justify-between">
-              <p className="text-[10px] text-white/30">ATOMS-Maintenance v2.0</p>
-              <button
-                onClick={logout}
-                className="flex items-center gap-1.5 text-white/50 hover:text-white text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:rounded"
-                aria-label="Keluar dari aplikasi"
+            {/* Footer: Rostering shortcut + logout */}
+            <div className="px-5 py-3 border-t border-white/10 space-y-2">
+              {/* Rostering shortcut in mobile drawer */}
+              <a
+                href={ROSTERING_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-white/60 hover:text-white text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:rounded"
+                aria-label="Buka ATOMS Rostering di tab baru"
               >
-                <LogOut size={13} aria-hidden="true" />
-                Keluar
-              </button>
+                <ExternalLink size={13} aria-hidden="true" />
+                Buka ATOMS Rostering
+              </a>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] text-white/30">ATOMS-Maintenance v2.0</p>
+                <button
+                  onClick={logout}
+                  className="flex items-center gap-1.5 text-white/50 hover:text-white text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:rounded"
+                  aria-label="Keluar dari aplikasi"
+                >
+                  <LogOut size={13} aria-hidden="true" />
+                  Keluar
+                </button>
+              </div>
             </div>
           </nav>
         </>

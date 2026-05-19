@@ -74,6 +74,7 @@ import { GroundingReportPrintView } from '@/pages/grounding/GroundingReportPrint
 import { ReportingListPage } from '@/pages/reporting/ReportingListPage';
 import { ReportingDamageFormPage } from '@/pages/reporting/ReportingDamageFormPage';
 import { ReportingDamagePrintView } from '@/pages/reporting/ReportingDamagePrintView';
+import { LogbookPage } from '@/pages/logbook/LogbookPage';
 import { ComingSoonPage } from '@/pages/shared/ComingSoonPage';
 
 export const router = createBrowserRouter([
@@ -202,8 +203,8 @@ export const router = createBrowserRouter([
           { path: '/reports/create', element: <Navigate to="/reporting/damage-reports/new" replace /> },
           { path: '/reports/:id', element: <ComingSoonPage /> },
 
-          // Logbook (placeholder)
-          { path: '/logbooks', element: <ComingSoonPage /> },
+          // Logbook
+          { path: '/logbooks', element: <LogbookPage /> },
 
           { path: '/admin/users', element: <ComingSoonPage /> },
 
