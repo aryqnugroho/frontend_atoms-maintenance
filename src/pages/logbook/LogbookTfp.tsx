@@ -19,6 +19,19 @@ import { useAuth } from '@/hooks/useAuth';
 import { logbookTfpService } from '@/services/logbookTfpService';
 import type { LogbookTfpSummary } from '@/types/logbookTfp';
 
+// ─── Shift accent palette ─────────────────────────────────
+// Selaras dengan LogbookTfpDetail (pagi=amber, siang=sky, malam=indigo)
+const SHIFT_BADGE: Record<'pagi' | 'siang' | 'malam', string> = {
+  pagi: 'bg-amber-50 text-amber-700 border-amber-200',
+  siang: 'bg-sky-50 text-sky-700 border-sky-200',
+  malam: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+};
+const SHIFT_DOT: Record<'pagi' | 'siang' | 'malam', string> = {
+  pagi: 'bg-amber-400',
+  siang: 'bg-sky-400',
+  malam: 'bg-indigo-400',
+};
+
 // ─── Helpers ──────────────────────────────────────────────
 const formatDate = (dateStr: string): string => {
   try {
@@ -404,23 +417,29 @@ export const LogbookTfp: React.FC = () => {
                         <p className="text-xs text-slate-400 mt-0.5">{formatDate(lb.date).split(',')[0]}</p>
                       </td>
 
-                      {/* Manager Teknik On Duty */}
+                      {/* Manager Teknik On Duty (per shift, urut pagi → siang → malam) */}
                       <td className="px-6 py-4">
-                        {lb.is_signed && lb.manager_signed_by_name ? (
-                          <div>
-                            <p className="text-xs font-semibold text-slate-700">{lb.manager_signed_by_name}</p>
-                            <p className="text-[11px] text-emerald-600 mt-0.5 font-medium">Sudah TTD</p>
-                          </div>
-                        ) : lb.created_by_name ? (
-                          <div>
-                            <p className="text-xs text-slate-700">{lb.created_by_name}</p>
-                            <p className="text-[11px] text-slate-400 mt-0.5">Dibuat oleh</p>
+                        {lb.managers_on_duty && lb.managers_on_duty.length > 0 ? (
+                          <div className="space-y-1">
+                            {lb.managers_on_duty.map((mgr) => (
+                              <div key={`${mgr.shift}-${mgr.user_id}`} className="flex items-center gap-2">
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide border ${SHIFT_BADGE[mgr.shift]}`}
+                                >
+                                  <span className={`h-1.5 w-1.5 rounded-full ${SHIFT_DOT[mgr.shift]}`} />
+                                  {mgr.shift}
+                                </span>
+                                <span className="text-xs font-medium text-slate-700 leading-tight">
+                                  {mgr.name}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         ) : (
-                          <span className="text-slate-300 text-xs">—</span>
+                          <span className="text-xs text-slate-400 italic">Roster belum dipublish</span>
                         )}
                         {lb.notes_count > 0 && (
-                          <p className="inline-flex items-center gap-1 mt-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium px-1.5 py-0.5">
+                          <p className="inline-flex items-center gap-1 mt-2 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium px-1.5 py-0.5">
                             {lb.notes_count} catatan
                           </p>
                         )}

@@ -9,6 +9,12 @@ export interface TfpEquipment {
   order: number;
 }
 
+export interface ManagerOnDutyEntry {
+  shift: 'pagi' | 'siang' | 'malam';
+  name: string;
+  user_id: number;
+}
+
 export interface LogbookTfpSummary {
   id: number;
   date: string;
@@ -18,6 +24,8 @@ export interface LogbookTfpSummary {
   notes_count: number;
   created_by_name: string | null;
   created_at: string;
+  /** All Manager Teknik on duty for the logbook date, sorted pagi → siang → malam. */
+  managers_on_duty: ManagerOnDutyEntry[];
 }
 
 export interface LogbookTfpItem {
