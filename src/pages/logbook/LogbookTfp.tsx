@@ -71,7 +71,13 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onClose, onCreated })
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
         const data = err.response.data as { message?: string };
-        setError(data.message ?? 'Gagal membuat logbook.');
+        const msg = data.message ?? 'Gagal membuat logbook.';
+        // Never show raw SQL to user — detect common patterns
+        if (msg.includes('SQLSTATE') || msg.includes('duplicate key') || msg.includes('unique constraint')) {
+          setError('Logbook untuk tanggal ini sudah ada. Pilih tanggal lain atau buka logbook yang sudah ada.');
+        } else {
+          setError(msg);
+        }
       } else {
         setError('Gagal membuat logbook. Coba lagi.');
       }
