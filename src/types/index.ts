@@ -188,6 +188,7 @@ export interface WorkOrder {
   closed_at?: string | null;
   manager?: { id: number; name: string };
   supervisor?: { id: number; name: string } | null;
+  creator?: { id: number; name: string } | null;
 }
 
 // ─── CNSD Equipment ────────────────────────────────────────

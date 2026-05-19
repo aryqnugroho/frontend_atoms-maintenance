@@ -7,7 +7,6 @@ import {
   Activity,
   ClipboardList,
   BookOpen,
-  AlertTriangle,
   ArrowRight,
   Bell,
   Users,
@@ -25,12 +24,14 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
 import {
   mockChecklist,
-  mockTroubleEquipment,
   mockNotifications,
 } from '@/data/mockData';
 import { workOrderService } from '@/services/workOrderService';
+import { reportingDamageReportService } from '@/services/reportingDamageReportService';
 import { getCurrentShiftType, getCurrentShiftDate, getShiftLabel } from '@/lib/shiftUtils';
 import type { ShiftContextResponse, WorkOrder } from '@/types';
+import type { ReportingDamageReportSummary } from '@/types/reporting';
+import { OBSTACLE_CODE_LABELS } from '@/types/reporting';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -162,17 +163,23 @@ export const DashboardPage: React.FC = () => {
     });
   }
 
-  // ─── Work Order Aktif (real API) ──────────────────────────
+  // ─── Work Order Aktif (real API) — max 3 ─────────────────
   const [activeWOs, setActiveWOs] = useState<WorkOrder[]>([]);
   const [woLoading, setWoLoading] = useState(true);
 
   const fetchActiveWOs = useCallback(async () => {
     setWoLoading(true);
     try {
-      const response = await workOrderService.getWorkOrders({ per_page: 10, sort_by: 'created_at', sort_dir: 'desc' });
-      // Show all WOs that are not completed (ongoing + on_hold)
+      // Fetch ongoing + on_hold only, max 3 items
+      const response = await workOrderService.getWorkOrders({
+        per_page: 10,
+        sort_by: 'created_at',
+        sort_dir: 'desc',
+      });
       const all = response.data ?? [];
-      setActiveWOs(all.filter((wo) => wo.status !== 'completed'));
+      // Priority: ongoing first, then on_hold, exclude completed
+      const active = all.filter((wo) => wo.status === 'ongoing' || wo.status === 'on_hold');
+      setActiveWOs(active.slice(0, 3));
     } catch {
       setActiveWOs([]);
     } finally {
@@ -183,6 +190,35 @@ export const DashboardPage: React.FC = () => {
   useEffect(() => {
     void fetchActiveWOs();
   }, [fetchActiveWOs]);
+
+  // ─── Laporan Kerusakan Terbaru (real API) — max 3 ─────────
+  const [recentReports, setRecentReports] = useState<ReportingDamageReportSummary[]>([]);
+  const [reportLoading, setReportLoading] = useState(true);
+
+  const fetchRecentReports = useCallback(async () => {
+    setReportLoading(true);
+    try {
+      // Fetch ongoing + on_hold first
+      const response = await reportingDamageReportService.listReports({
+        per_page: 10,
+        sort_by: 'report_date',
+        sort_dir: 'desc',
+      });
+      const all = response.data ?? [];
+      // Priority: ongoing/on_hold first, then completed if nothing else
+      const active = all.filter((r) => r.status === 'ongoing' || r.status === 'on_hold');
+      const result = active.length > 0 ? active.slice(0, 3) : all.slice(0, 3);
+      setRecentReports(result);
+    } catch {
+      setRecentReports([]);
+    } finally {
+      setReportLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchRecentReports();
+  }, [fetchRecentReports]);
 
   const completedActive = mockChecklist.filter((c) => c.is_active && c.is_completed).length;
   const totalActive = mockChecklist.filter((c) => c.is_active).length;
@@ -518,7 +554,7 @@ export const DashboardPage: React.FC = () => {
               </Button>
             </div>
           </div>
-          <div className="p-6">
+          <div className="p-4">
             {woLoading ? (
               <div className="flex items-center justify-center py-8 gap-2 text-slate-400">
                 <RefreshCw size={15} className="animate-spin" />
@@ -527,21 +563,22 @@ export const DashboardPage: React.FC = () => {
             ) : activeWOs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
                 <FileText size={28} className="text-slate-300" />
-                <p className="text-sm font-medium text-slate-500">Work Order belum ada</p>
-                <p className="text-xs text-slate-400">Belum ada Work Order yang aktif saat ini.</p>
+                <p className="text-sm font-medium text-slate-500">Tidak ada Work Order aktif</p>
+                <p className="text-xs text-slate-400">Semua Work Order sudah selesai atau belum ada data.</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {activeWOs.map((wo) => (
                   <div
                     key={wo.id}
                     onClick={() => navigate(`/work-orders/${wo.id}`)}
-                    className="flex items-center justify-between px-4 py-3 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors border border-gray-200"
+                    className="px-4 py-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors border border-gray-200 space-y-1.5"
                   >
-                    <div className="space-y-1 flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-mono text-slate-500">{wo.wo_number}</p>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                    {/* Row 1: WO number + division + status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-xs font-mono text-slate-500 shrink-0">{wo.wo_number}</p>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${
                           wo.division === 'CNSD'
                             ? 'bg-sky-50 text-sky-700'
                             : 'bg-emerald-50 text-emerald-700'
@@ -549,10 +586,21 @@ export const DashboardPage: React.FC = () => {
                           {wo.division}
                         </span>
                       </div>
-                      <p className="text-sm font-semibold text-slate-800 truncate">{wo.description}</p>
-                    </div>
-                    <div className="ml-4 shrink-0">
                       <StatusBadge status={wo.status} variant="pill" />
+                    </div>
+                    {/* Row 2: Description */}
+                    <p className="text-sm font-semibold text-slate-800 truncate">{wo.description}</p>
+                    {/* Row 3: Shift + Creator */}
+                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                      <span className="capitalize">
+                        Shift {wo.shift_type}
+                      </span>
+                      {wo.creator?.name && (
+                        <>
+                          <span className="text-slate-300">•</span>
+                          <span className="truncate">Oleh: {wo.creator.name}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -561,37 +609,69 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Peralatan Trouble */}
+        {/* Laporan Kerusakan Terbaru */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
           <div className="px-6 py-4 border-b border-gray-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <AlertTriangle size={20} className="text-red-600" />
-                <h3 className="text-base font-bold text-slate-800">Peralatan Trouble</h3>
+                <ClipboardList size={20} className="text-purple-600" />
+                <h3 className="text-base font-bold text-slate-800">Laporan Kerusakan Terbaru</h3>
               </div>
-              <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded">{mockTroubleEquipment.length} item</span>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/reporting')} className="text-xs gap-1 text-purple-700 hover:text-purple-800">
+                Lihat semua <ArrowRight size={14} />
+              </Button>
             </div>
           </div>
-          <div className="p-6">
-            {mockTroubleEquipment.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-8">Tidak ada peralatan trouble saat ini.</p>
+          <div className="p-4">
+            {reportLoading ? (
+              <div className="flex items-center justify-center py-8 gap-2 text-slate-400">
+                <RefreshCw size={15} className="animate-spin" />
+                <span className="text-sm">Memuat laporan…</span>
+              </div>
+            ) : recentReports.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+                <ClipboardList size={28} className="text-slate-300" />
+                <p className="text-sm font-medium text-slate-500">Belum ada Laporan Kerusakan</p>
+                <p className="text-xs text-slate-400">Laporan kerusakan akan muncul di sini.</p>
+              </div>
             ) : (
-              <div className="space-y-3">
-                {mockTroubleEquipment.map((eq) => (
-                  <div key={eq.id} className="flex items-start gap-3 px-4 py-3 rounded-lg bg-red-50 border border-red-200">
-                    <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                      <AlertTriangle size={18} className="text-red-600" />
+              <div className="space-y-2">
+                {recentReports.map((r) => (
+                  <div
+                    key={r.id}
+                    onClick={() => navigate(`/reporting/damage-reports/${r.id}`)}
+                    className="px-4 py-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors border border-gray-200 space-y-1.5"
+                  >
+                    {/* Row 1: Nomor surat + kategori + status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-xs font-mono text-slate-500 shrink-0">{r.report_number}</p>
+                        <DamageCategoryBadge category={r.damage_category} />
+                      </div>
+                      <StatusBadge status={r.status} variant="pill" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-800">{eq.equipment_name}</p>
-                      <p className="text-xs text-red-600 mt-1 font-medium">{eq.parameter}</p>
-                      <p className="text-xs text-slate-500 mt-2">
-                        <span className={`font-medium ${eq.division === 'CNSD' ? 'text-sky-700' : 'text-emerald-700'}`}>{eq.division}</span>
-                        <span className="mx-1.5">•</span>
-                        Shift {eq.shift}
-                        <span className="mx-1.5">•</span>
-                        {eq.reported_by}
-                      </p>
+                    {/* Row 2: Nama peralatan */}
+                    <p className="text-sm font-semibold text-slate-800 truncate">{r.equipment_name}</p>
+                    {/* Row 3: Fasilitas + kode hambatan + manager */}
+                    <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
+                      <span className="truncate max-w-[100px]">{r.facility}</span>
+                      {r.obstacle_code && (
+                        <>
+                          <span className="text-slate-300">•</span>
+                          <span
+                            className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600"
+                            title={OBSTACLE_CODE_LABELS[r.obstacle_code]}
+                          >
+                            {r.obstacle_code}
+                          </span>
+                        </>
+                      )}
+                      {r.manager_name && (
+                        <>
+                          <span className="text-slate-300">•</span>
+                          <span className="truncate">MT: {r.manager_name}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -650,5 +730,20 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// ─── Helper: Damage Category Badge ────────────────────────
+const DamageCategoryBadge: React.FC<{ category: string }> = ({ category }) => {
+  const map: Record<string, string> = {
+    Ringan: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    Sedang: 'bg-amber-50 text-amber-700 border-amber-200',
+    Berat: 'bg-red-50 text-red-700 border-red-200',
+  };
+  const cls = map[category] ?? 'bg-slate-50 text-slate-700 border-slate-200';
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold shrink-0 ${cls}`}>
+      {category}
+    </span>
   );
 };

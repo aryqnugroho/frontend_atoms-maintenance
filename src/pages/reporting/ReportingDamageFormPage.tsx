@@ -804,9 +804,9 @@ const FormSection: React.FC<{
   children: React.ReactNode;
 }> = ({ number, title, subtitle, children }) => (
   <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-    <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-purple-50/50 to-transparent">
+    <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-transparent">
       <div className="flex items-baseline gap-3">
-        <span className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-purple-600 text-white text-xs font-bold">
+        <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-[#222E6A] text-white text-xs font-bold shrink-0">
           {number}
         </span>
         <div>
