@@ -1,0 +1,329 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Radio, ArrowLeft, Save, Printer, Users, Calendar, MapPin } from 'lucide-react';
+import { Button } from '@/components/common/Button';
+import { PageHeader } from '@/components/common/PageHeader';
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { ShiftBadge } from '@/components/common/ShiftBadge';
+import { useAuth } from '@/hooks/useAuth';
+import { cnsdTdmeMeterService } from '@/services/cnsdTdmeMeterService';
+import { CnsdTdmeMeterSignaturePanel } from './components/CnsdTdmeMeterSignaturePanel';
+import type { CnsdTdmeMeterRecordDetail, CnsdTdmeMeterItem } from '@/types/cnsdTdme';
+
+type SectionTab = 'A' | 'B';
+
+const SECTION_TABS: { code: SectionTab; label: string }[] = [
+  { code: 'A', label: 'Peralatan' },
+  { code: 'B', label: 'Lingkungan Kerja' },
+];
+
+function getDropdownOptions(item: CnsdTdmeMeterItem): string[] | null {
+  const nominal = item.nominal ?? '';
+  if (nominal === 'Normal / Alrm') return ['Normal', 'Alrm'];
+  if (nominal === '√ / -' || nominal === '√ / –') return ['√', '-'];
+  if (nominal === 'local / Remote') return ['local', 'Remote'];
+  if (nominal === '√') return ['√', '-'];
+  return null;
+}
+
+export const CnsdTdmeMeterDetailPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user: _user } = useAuth();
+
+  // ─── All hooks at top level — Rules of Hooks compliant ────
+  const [record, setRecord] = useState<CnsdTdmeMeterRecordDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<SectionTab>('A');
+  const [localItems, setLocalItems] = useState<CnsdTdmeMeterItem[]>([]);
+
+  const fetchRecord = useCallback(async () => {
+    if (!id) return;
+    setIsLoading(true);
+    try {
+      const data = await cnsdTdmeMeterService.getRecord(Number(id));
+      setRecord(data); setLocalItems(data.items); setErrorMessage(null);
+    } catch {
+      setErrorMessage('Gagal memuat data form T-DME.');
+    } finally { setIsLoading(false); }
+  }, [id]);
+
+  useEffect(() => { void fetchRecord(); }, [fetchRecord]);
+
+  const handleItemChange = (itemId: number, field: 'hasil_1' | 'hasil_2' | 'keterangan', value: string | null) => {
+    setLocalItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, [field]: value } : it)));
+  };
+
+  const handleSave = async () => {
+    if (!record) return;
+    setIsSaving(true); setErrorMessage(null); setSuccessMessage(null);
+    try {
+      const updated = await cnsdTdmeMeterService.updateRecord(record.id, {
+        items: localItems.map((it) => ({ id: it.id, hasil_1: it.hasil_1, hasil_2: it.hasil_2, keterangan: it.keterangan })),
+      });
+      setRecord(updated); setLocalItems(updated.items);
+      setSuccessMessage('Perubahan berhasil disimpan.');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch { setErrorMessage('Gagal menyimpan perubahan.'); }
+    finally { setIsSaving(false); }
+  };
+
+  const handleSignSuccess = (updated: CnsdTdmeMeterRecordDetail) => {
+    setRecord(updated); setLocalItems(updated.items);
+  };
+
+  // Grouped items for section A — unconditional (Rules of Hooks)
+  const groupedItemsA = useMemo(() => {
+    const groups: Map<number, CnsdTdmeMeterItem[]> = new Map();
+    for (const item of localItems.filter((it) => it.section_code === 'A')) {
+      const gn = item.group_number ?? 0;
+      if (!groups.has(gn)) groups.set(gn, []);
+      groups.get(gn)!.push(item);
+    }
+    return groups;
+  }, [localItems]);
+
+  const sectionBItems = useMemo(() => localItems.filter((it) => it.section_code === 'B'), [localItems]);
+
+  // ─── Early returns after all hooks ────────────────────────
+  if (isLoading) {
+    return (
+      <div className="max-w-7xl mx-auto space-y-4 animate-fade-in">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-100 rounded w-1/3" />
+          <div className="h-64 bg-gray-100 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!record) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errorMessage ?? 'Form tidak ditemukan.'}
+        </div>
+      </div>
+    );
+  }
+
+  const isCompleted = record.status === 'completed';
+
+  const renderInput = (item: CnsdTdmeMeterItem, field: 'hasil_1' | 'hasil_2') => {
+    const val = item[field];
+    const opts = getDropdownOptions(item);
+    if (isCompleted) {
+      return (
+        <span className={`text-xs font-medium ${
+          val === 'Normal' || val === '√' ? 'text-emerald-700'
+          : val === 'Alrm' || val === '-' || val === '–' ? 'text-red-600'
+          : 'text-slate-700'
+        }`}>{val ?? '—'}</span>
+      );
+    }
+    if (opts) {
+      return (
+        <select value={val ?? ''} onChange={(e) => handleItemChange(item.id, field, e.target.value || null)}
+          className={`w-full h-8 rounded border px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400 ${
+            val === 'Normal' || val === '√' ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+            : val === 'Alrm' || val === '-' || val === '–' ? 'bg-red-50 border-red-200 text-red-700'
+            : 'bg-white border-gray-200 text-slate-600'
+          }`} aria-label={`${field === 'hasil_1' ? 'TX1/M1' : 'TX2/M2'} ${item.item_name}`}>
+          <option value="">— pilih —</option>
+          {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      );
+    }
+    return (
+      <input type="text" value={val ?? ''} onChange={(e) => handleItemChange(item.id, field, e.target.value || null)}
+        className="w-full h-8 rounded border border-gray-200 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400"
+        placeholder="..." aria-label={`${field === 'hasil_1' ? 'TX1/M1' : 'TX2/M2'} ${item.item_name}`} />
+    );
+  };
+
+  return (
+    <div className="space-y-5 animate-fade-in max-w-7xl mx-auto">
+      <div className="flex items-center gap-2 text-xs text-slate-500">
+        <button type="button" onClick={() => navigate('/cnsd')} className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors">
+          <ArrowLeft size={14} /> CNSD
+        </button>
+        <span>/</span>
+        <button type="button" onClick={() => navigate('/cnsd/tdme-meter')} className="hover:text-slate-700 transition-colors">
+          Meter Reading T-DME
+        </button>
+        <span>/</span>
+        <span className="text-slate-700 font-medium font-mono">{record.form_number}</span>
+      </div>
+
+      <PageHeader icon={Radio} iconBg="bg-sky-100" iconColor="text-maintenance-cnsd"
+        title={`Meter Reading T-DME — ${record.form_number}`}
+        subtitle={`${record.form_code} · ${record.location}`}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate(`/cnsd/tdme-meter/${record.id}/print`)} className="gap-2">
+              <Printer size={16} /> Print PDF
+            </Button>
+            {!isCompleted && <Button onClick={handleSave} isLoading={isSaving} className="gap-2"><Save size={16} /> Simpan Perubahan</Button>}
+          </div>
+        }
+      />
+
+      {errorMessage && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{errorMessage}</div>}
+      {successMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700" role="status">{successMessage}</div>}
+
+      {/* Header info */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+          <div className="flex items-start gap-2"><Calendar size={15} className="text-slate-400 mt-0.5 shrink-0" /><div><p className="text-xs text-slate-500">Tanggal</p><p className="font-medium text-slate-800">{record.date}</p></div></div>
+          <div className="flex items-start gap-2"><div><p className="text-xs text-slate-500">Shift</p><ShiftBadge shift={record.shift_type as import('@/types').ShiftType} /></div></div>
+          <div className="flex items-start gap-2"><MapPin size={15} className="text-slate-400 mt-0.5 shrink-0" /><div><p className="text-xs text-slate-500">Lokasi</p><p className="font-medium text-slate-800">{record.location}</p></div></div>
+          <div className="flex items-start gap-2"><div><p className="text-xs text-slate-500">Status</p><StatusBadge status={record.status} variant="pill" /></div></div>
+          {record.merk && <div><p className="text-xs text-slate-500">Merk</p><p className="font-medium text-slate-800">{record.merk}</p></div>}
+          {record.form_code && <div><p className="text-xs text-slate-500">Form</p><p className="font-medium text-slate-800">{record.form_code}</p></div>}
+          <div><p className="text-xs text-slate-500">TX 1</p><p className="font-medium text-slate-800">{record.tx1_mode ?? 'MAIN / STANDBY'}</p></div>
+          <div><p className="text-xs text-slate-500">TX 2</p><p className="font-medium text-slate-800">{record.tx2_mode ?? 'MAIN / STANDBY'}</p></div>
+          <div className="flex items-start gap-2"><Users size={15} className="text-slate-400 mt-0.5 shrink-0" /><div><p className="text-xs text-slate-500">Teknisi</p><p className="font-medium text-slate-800">{record.technicians.map((t) => t.technician_name).join(', ') || '—'}</p></div></div>
+        </div>
+      </div>
+
+      {/* Section tabs */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        {SECTION_TABS.map((tab) => (
+          <button key={tab.code} onClick={() => setActiveTab(tab.code)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.code ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Section A — Peralatan */}
+      {activeTab === 'A' && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[700px]">
+              <thead>
+                <tr className="bg-sky-800 text-white">
+                  <th className="px-3 py-2 text-center w-10">NO</th>
+                  <th className="px-3 py-2 text-left">PEMBACAAN METER READING</th>
+                  <th className="px-3 py-2 text-center w-28">NOMINAL</th>
+                  <th className="px-3 py-2 text-center w-28">TX1 / M1</th>
+                  <th className="px-3 py-2 text-center w-28">TX2 / M2</th>
+                  <th className="px-3 py-2 text-left w-36">KETERANGAN</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from(groupedItemsA.entries()).map(([, groupItems]) => {
+                  const headerRow = groupItems.find((it) => it.is_header);
+                  const dataRows = groupItems.filter((it) => !it.is_header);
+                  return (
+                    <React.Fragment key={headerRow?.id ?? groupItems[0]?.id}>
+                      {headerRow && (
+                        <tr className="bg-green-200">
+                          <td className="px-3 py-1.5 text-center font-bold text-slate-700">{headerRow.group_number}</td>
+                          <td colSpan={5} className="px-3 py-1.5 font-bold text-slate-700">{headerRow.group_name}</td>
+                        </tr>
+                      )}
+                      {dataRows.map((item, idx) => {
+                        const isDual = item.hasil_layout === 'dual';
+                        return (
+                          <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                            <td className="px-3 py-2 text-slate-400 text-center"></td>
+                            <td className="px-3 py-2 text-slate-700">{item.item_name}</td>
+                            <td className="px-3 py-2 text-center text-slate-500 text-[10px]">{item.nominal ?? ''}</td>
+                            <td className="px-3 py-2">{renderInput(item, 'hasil_1')}</td>
+                            <td className="px-3 py-2">
+                              {isDual ? renderInput(item, 'hasil_2') : <span className="text-slate-300 text-xs">—</span>}
+                            </td>
+                            <td className="px-3 py-2">
+                              {isCompleted ? (
+                                <span className="text-slate-700">{item.keterangan ?? '—'}</span>
+                              ) : (
+                                <input type="text" value={item.keterangan ?? ''} onChange={(e) => handleItemChange(item.id, 'keterangan', e.target.value || null)}
+                                  className="w-full h-8 rounded border border-gray-200 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400"
+                                  placeholder="Keterangan..." aria-label={`Keterangan ${item.item_name}`} />
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Section B — Lingkungan Kerja */}
+      {activeTab === 'B' && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[500px]">
+              <thead>
+                <tr className="bg-amber-500 text-white">
+                  <th className="px-3 py-2 text-left w-10">NO</th>
+                  <th className="px-3 py-2 text-left">KEGIATAN</th>
+                  <th className="px-3 py-2 text-center w-28">NOMINAL</th>
+                  <th className="px-3 py-2 text-center w-36">HASIL</th>
+                  <th className="px-3 py-2 text-left w-40">KETERANGAN</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sectionBItems.map((item, idx) => {
+                  const opts = getDropdownOptions(item);
+                  return (
+                    <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                      <td className="px-3 py-2 text-slate-500 text-center">{idx + 1}</td>
+                      <td className="px-3 py-2 text-slate-700">{item.item_name}</td>
+                      <td className="px-3 py-2 text-center text-slate-500">{item.nominal ?? '—'}</td>
+                      <td className="px-3 py-2">
+                        {isCompleted ? (
+                          <span className="text-slate-700">{item.hasil_1 ?? '—'}</span>
+                        ) : opts ? (
+                          <select value={item.hasil_1 ?? ''} onChange={(e) => handleItemChange(item.id, 'hasil_1', e.target.value || null)}
+                            className={`w-full h-8 rounded border px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400 ${
+                              item.hasil_1 === '√' ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                              : item.hasil_1 === '-' ? 'bg-red-50 border-red-200 text-red-700'
+                              : 'bg-white border-gray-200 text-slate-600'
+                            }`} aria-label={`Hasil ${item.item_name}`}>
+                            <option value="">— pilih —</option>
+                            {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : (
+                          <input type="text" value={item.hasil_1 ?? ''} onChange={(e) => handleItemChange(item.id, 'hasil_1', e.target.value || null)}
+                            className="w-full h-8 rounded border border-gray-200 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400"
+                            placeholder="Hasil..." aria-label={`Hasil ${item.item_name}`} />
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {isCompleted ? (
+                          <span className="text-slate-700">{item.keterangan ?? '—'}</span>
+                        ) : (
+                          <input type="text" value={item.keterangan ?? ''} onChange={(e) => handleItemChange(item.id, 'keterangan', e.target.value || null)}
+                            className="w-full h-8 rounded border border-gray-200 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400"
+                            placeholder="Keterangan..." aria-label={`Keterangan ${item.item_name}`} />
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!isCompleted && (
+        <div className="flex justify-end">
+          <Button onClick={handleSave} isLoading={isSaving} className="gap-2"><Save size={16} /> Simpan Perubahan</Button>
+        </div>
+      )}
+
+      <CnsdTdmeMeterSignaturePanel record={record} onSignSuccess={handleSignSuccess} />
+    </div>
+  );
+};
