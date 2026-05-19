@@ -41,7 +41,7 @@ const quickNavItems = [
   { label: 'TFP', icon: Activity, path: '/tfp', color: 'text-emerald-700', bgColor: 'bg-emerald-50', hoverColor: 'hover:bg-emerald-100' },
   { label: 'Ground Check', icon: Plane, path: '/ground-check', color: 'text-indigo-700', bgColor: 'bg-indigo-50', hoverColor: 'hover:bg-indigo-100' },
   { label: 'Grounding', icon: Zap, path: '/grounding', color: 'text-yellow-700', bgColor: 'bg-yellow-50', hoverColor: 'hover:bg-yellow-100' },
-  { label: 'Reporting', icon: ClipboardList, path: '/reports', color: 'text-purple-700', bgColor: 'bg-purple-50', hoverColor: 'hover:bg-purple-100' },
+  { label: 'Reporting', icon: ClipboardList, path: '/reporting', color: 'text-purple-700', bgColor: 'bg-purple-50', hoverColor: 'hover:bg-purple-100' },
   { label: 'Logbook', icon: BookOpen, path: '/logbooks', color: 'text-rose-700', bgColor: 'bg-rose-50', hoverColor: 'hover:bg-rose-100' },
 ];
 

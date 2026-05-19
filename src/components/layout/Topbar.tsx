@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   Bell, LogOut, Menu, X, Clock,
   LayoutDashboard, FileText, CheckSquare, Activity,
-  Plane, Zap, Users,
+  Plane, Zap, Users, ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotification } from '@/hooks/useNotification';
@@ -26,6 +26,7 @@ const navItems: NavItem[] = [
   { name: 'TFP',             path: '/tfp',          icon: Activity,        roles: ['Manager Teknik', 'Supervisor TFP', 'Teknisi TFP'] },
   { name: 'Ground Check',    path: '/ground-check', icon: Plane,           roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
   { name: 'Grounding',       path: '/grounding',    icon: Zap,             roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
+  { name: 'Reporting',       path: '/reporting',    icon: ClipboardList,   roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
   { name: 'User Management', path: '/admin/users',  icon: Users,           roles: ['Admin'] },
 ];
 

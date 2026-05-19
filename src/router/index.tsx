@@ -65,6 +65,9 @@ import { LocalizerFormPage } from '@/pages/ground-check/LocalizerFormPage';
 import { GroundingIndexPage } from '@/pages/grounding/GroundingIndexPage';
 import { GroundingReportDetailPage } from '@/pages/grounding/GroundingReportDetailPage';
 import { GroundingReportPrintView } from '@/pages/grounding/GroundingReportPrintView';
+import { ReportingListPage } from '@/pages/reporting/ReportingListPage';
+import { ReportingDamageFormPage } from '@/pages/reporting/ReportingDamageFormPage';
+import { ReportingDamagePrintView } from '@/pages/reporting/ReportingDamagePrintView';
 import { ComingSoonPage } from '@/pages/shared/ComingSoonPage';
 
 export const router = createBrowserRouter([
@@ -85,6 +88,7 @@ export const router = createBrowserRouter([
       { path: '/cnsd/glidepath-meter/:id/print', element: <CnsdGlidepathMeterPrintView /> },
       { path: '/cnsd/localizer-meter/:id/print', element: <CnsdLocalizerMeterPrintView /> },
       { path: '/grounding/reports/:id/print', element: <GroundingReportPrintView /> },
+      { path: '/reporting/damage-reports/:id/print', element: <ReportingDamagePrintView /> },
       { path: '/tfp/aob-ground/:id/print', element: <TfpAobGroundPrintView /> },
       { path: '/tfp/aob-lt12/:id/print', element: <TfpAobLt12PrintView /> },
       { path: '/tfp/transmitter-tx/:id/print', element: <TfpTransmitterTxPrintView /> },
@@ -174,9 +178,14 @@ export const router = createBrowserRouter([
           { path: '/grounding/reports/:id', element: <GroundingReportDetailPage /> },
           { path: '/grounding/:code/coming-soon', element: <ComingSoonPage /> },
 
-          // Reporting (placeholder)
-          { path: '/reports', element: <ComingSoonPage /> },
-          { path: '/reports/create', element: <ComingSoonPage /> },
+          // Reporting (Laporan Kerusakan)
+          { path: '/reporting', element: <ReportingListPage /> },
+          { path: '/reporting/damage-reports', element: <Navigate to="/reporting" replace /> },
+          { path: '/reporting/damage-reports/new', element: <ReportingDamageFormPage /> },
+          { path: '/reporting/damage-reports/:id', element: <ReportingDamageFormPage /> },
+          // Backward-compat: legacy /reports placeholder still works
+          { path: '/reports', element: <Navigate to="/reporting" replace /> },
+          { path: '/reports/create', element: <Navigate to="/reporting/damage-reports/new" replace /> },
           { path: '/reports/:id', element: <ComingSoonPage /> },
 
           // Logbook (placeholder)
