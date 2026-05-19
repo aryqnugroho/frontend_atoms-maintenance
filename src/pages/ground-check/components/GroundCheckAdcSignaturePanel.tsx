@@ -108,13 +108,10 @@ export const GroundCheckAdcSignaturePanel: React.FC<Props> = ({ record, onSignSu
   const canSignManager = userRole === 'Manager Teknik' || userRole === 'Admin';
   const canSignSupervisor =
     userRole === 'Supervisor CNSD' ||
-    userRole === 'Supervisor TFP' ||
     userRole === 'Admin';
   const canSignTechnician =
     userRole === 'Teknisi CNSD' ||
-    userRole === 'Teknisi TFP' ||
     userRole === 'Supervisor CNSD' ||
-    userRole === 'Supervisor TFP' ||
     userRole === 'Admin';
 
   const handleSign = async (signature: string) => {

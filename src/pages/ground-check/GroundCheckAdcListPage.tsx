@@ -45,8 +45,8 @@ const getSignerStatus = (
   if (!userName || !userRole) return 'none';
   if (record.status === 'completed') return 'completed';
   if (userRole === 'Manager Teknik' && namesMatch(record.manager_name, userName)) return 'pending';
-  if ((userRole === 'Supervisor TFP' || userRole === 'Admin') && namesMatch(record.supervisor_name, userName)) return 'pending';
-  if (userRole === 'Teknisi TFP' || userRole === 'Supervisor TFP') {
+  if ((userRole === 'Supervisor CNSD' || userRole === 'Admin') && namesMatch(record.supervisor_name, userName)) return 'pending';
+  if (userRole === 'Teknisi CNSD' || userRole === 'Supervisor CNSD') {
     if (record.technician_names.some((n) => namesMatch(n, userName))) return 'pending';
   }
   return 'none';
@@ -56,7 +56,7 @@ export const GroundCheckAdcListPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canDelete = user?.role === 'Admin' || user?.role === 'Manager Teknik';
-  const canCreate = user?.role === 'Admin' || user?.role === 'Manager Teknik' || user?.role === 'Supervisor TFP' || user?.role === 'Teknisi TFP';
+  const canCreate = user?.role === 'Admin' || user?.role === 'Manager Teknik' || user?.role === 'Supervisor CNSD' || user?.role === 'Teknisi CNSD';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -240,7 +240,7 @@ export const GroundCheckAdcListPage: React.FC = () => {
           <div className="flex flex-col items-center justify-center py-20 space-y-3 px-4 text-center">
             <div className="h-14 w-14 rounded-full bg-indigo-50 flex items-center justify-center"><Radar size={24} className="text-indigo-500/70" /></div>
             <p className="text-base font-semibold text-slate-700">Belum ada Ground Check ADC</p>
-            <p className="text-sm text-slate-400 max-w-md">Klik <strong>Buat Ground Check</strong> untuk membuat form baru. Backend akan otomatis mengisi teknisi TFP, supervisor, dan manager teknik dari roster.</p>
+            <p className="text-sm text-slate-400 max-w-md">Klik <strong>Buat Ground Check</strong> untuk membuat form baru. Backend akan otomatis mengisi teknisi CNSD, supervisor, dan manager teknik dari roster.</p>
             {canCreate && <Button onClick={handleCreate} className="gap-2 mt-2" isLoading={isCreating}><Plus size={15} /> Buat Ground Check</Button>}
           </div>
         ) : isFilterEmpty ? (
@@ -258,7 +258,7 @@ export const GroundCheckAdcListPage: React.FC = () => {
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Tanggal</th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Jam</th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Shift</th>
-                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Teknisi TFP</th>
+                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Teknisi CNSD</th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Supervisor</th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Manager</th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Status</th>
@@ -280,7 +280,7 @@ export const GroundCheckAdcListPage: React.FC = () => {
                           <Users size={13} className="text-slate-400" /><span className="font-semibold">{r.technicians_count}</span><span className="text-slate-400 text-xs">teknisi</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-700">{r.supervisor_name ? <Badge variant="tfp" className="text-xs">{r.supervisor_name}</Badge> : <span className="text-xs text-slate-400">—</span>}</td>
+                      <td className="px-6 py-4 text-slate-700">{r.supervisor_name ? <Badge variant="cnsd" className="text-xs">{r.supervisor_name}</Badge> : <span className="text-xs text-slate-400">—</span>}</td>
                       <td className="px-6 py-4 text-slate-700">{r.manager_name ?? <span className="text-xs text-slate-400">—</span>}</td>
                       <td className="px-6 py-4"><StatusBadge status={r.status} variant="pill" /></td>
                       <td className="px-6 py-4">
