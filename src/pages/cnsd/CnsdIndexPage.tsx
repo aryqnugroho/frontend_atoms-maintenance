@@ -22,6 +22,7 @@ const CNSD_ACTIVE_ROUTES: Record<string, string> = {
   'CNSD-007': '/cnsd/glidepath-meter',    // Glide Path Meter Reading (ILS-GP)
   'CNSD-008': '/cnsd/localizer-meter',    // Localizer Meter Reading (ILS-LLZ)
   'CNSD-009': '/cnsd/tdme-meter',         // T-DME Meter Reading (FORM N-5)
+  'CNSD-010': '/cnsd/dvor-meter',         // DVOR Meter Reading (FORM N-5)
 };
 
 /**

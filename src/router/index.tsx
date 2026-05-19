@@ -35,6 +35,9 @@ import { CnsdLocalizerMeterPrintView } from '@/pages/cnsd/CnsdLocalizerMeterPrin
 import { CnsdTdmeMeterListPage } from '@/pages/cnsd/CnsdTdmeMeterListPage';
 import { CnsdTdmeMeterDetailPage } from '@/pages/cnsd/CnsdTdmeMeterDetailPage';
 import { CnsdTdmeMeterPrintView } from '@/pages/cnsd/CnsdTdmeMeterPrintView';
+import { CnsdDvorMeterListPage } from '@/pages/cnsd/CnsdDvorMeterListPage';
+import { CnsdDvorMeterDetailPage } from '@/pages/cnsd/CnsdDvorMeterDetailPage';
+import { CnsdDvorMeterPrintView } from '@/pages/cnsd/CnsdDvorMeterPrintView';
 import { TfpIndexPage } from '@/pages/tfp/TfpIndexPage';
 import { TfpAobGroundListPage } from '@/pages/tfp/TfpAobGroundListPage';
 import { TfpAobGroundDetailPage } from '@/pages/tfp/TfpAobGroundDetailPage';
@@ -91,6 +94,7 @@ export const router = createBrowserRouter([
       { path: '/cnsd/glidepath-meter/:id/print', element: <CnsdGlidepathMeterPrintView /> },
       { path: '/cnsd/localizer-meter/:id/print', element: <CnsdLocalizerMeterPrintView /> },
       { path: '/cnsd/tdme-meter/:id/print', element: <CnsdTdmeMeterPrintView /> },
+      { path: '/cnsd/dvor-meter/:id/print', element: <CnsdDvorMeterPrintView /> },
       { path: '/grounding/reports/:id/print', element: <GroundingReportPrintView /> },
       { path: '/reporting/damage-reports/:id/print', element: <ReportingDamagePrintView /> },
       { path: '/tfp/aob-ground/:id/print', element: <TfpAobGroundPrintView /> },
@@ -141,6 +145,9 @@ export const router = createBrowserRouter([
           // Active module 9: T-DME Meter Reading (FORM N-5)
           { path: '/cnsd/tdme-meter', element: <CnsdTdmeMeterListPage /> },
           { path: '/cnsd/tdme-meter/:id', element: <CnsdTdmeMeterDetailPage /> },
+          // Active module 10: DVOR Meter Reading (FORM N-5)
+          { path: '/cnsd/dvor-meter', element: <CnsdDvorMeterListPage /> },
+          { path: '/cnsd/dvor-meter/:id', element: <CnsdDvorMeterDetailPage /> },
           // Backward-compat: legacy /cnsd/eq-1 link redirects to new list
           { path: '/cnsd/eq-1', element: <Navigate to="/cnsd/readiness" replace /> },
           { path: '/cnsd/:code/coming-soon', element: <ComingSoonPage /> },
