@@ -62,8 +62,11 @@ export const groundCheckAdcService = {
     equipment_function?: string | null;
     technical_data?: string | null;
     last_calibration?: string | null;
+    time_filled?: string | null;
     items?: Array<{
       id: number;
+      calibration_result?: string | null;
+      tolerance?: string | null;
       tx1_hasil_pd?: string | null;
       tx1_in_tolerance?: string | null;
       tx1_out_of_tolerance?: string | null;

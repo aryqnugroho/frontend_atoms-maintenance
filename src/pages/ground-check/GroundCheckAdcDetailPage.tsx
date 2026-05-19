@@ -29,6 +29,7 @@ import type { ShiftType } from '@/types';
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 interface ItemEditState {
+  calibration_result: string;
   tx1_hasil_pd: string;
   tx1_in_tolerance: string;
   tx1_out_of_tolerance: string;
@@ -37,6 +38,12 @@ interface ItemEditState {
   tx2_out_of_tolerance: string;
   keterangan: string;
 }
+
+/** Return current HH:MM in local time, e.g. "14:35". */
+const currentTimeHHmm = (): string => {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
 
 const TOGGLE_VALUE = '✓';
 
@@ -162,6 +169,8 @@ export const GroundCheckAdcDetailPage: React.FC = () => {
   const [equipmentFunction, setEquipmentFunction] = useState('');
   const [technicalData, setTechnicalData] = useState('');
   const [lastCalibration, setLastCalibration] = useState('');
+  // Time pengisian — default ke real-time saat form dibuka, teknisi boleh edit manual.
+  const [timeFilled, setTimeFilled] = useState<string>(currentTimeHHmm());
 
   // Editable item values
   const [itemValues, setItemValues] = useState<Record<number, ItemEditState>>({});
@@ -182,10 +191,14 @@ export const GroundCheckAdcDetailPage: React.FC = () => {
       setEquipmentFunction(data.equipment_function ?? '');
       setTechnicalData(data.technical_data ?? '');
       setLastCalibration(data.last_calibration ?? '');
+      // Pakai time_filled dari server kalau ada (sudah pernah disimpan), kalau
+      // belum ada (record baru / belum pernah disimpan) → real-time saat form dibuka.
+      setTimeFilled(data.time_filled && data.time_filled.trim() !== '' ? data.time_filled : currentTimeHHmm());
 
       const iv: Record<number, ItemEditState> = {};
       data.items.forEach((item) => {
         iv[item.id] = {
+          calibration_result: item.calibration_result ?? '',
           tx1_hasil_pd: item.tx1_hasil_pd ?? '',
           tx1_in_tolerance: item.tx1_in_tolerance ?? '',
           tx1_out_of_tolerance: item.tx1_out_of_tolerance ?? '',
@@ -221,6 +234,7 @@ export const GroundCheckAdcDetailPage: React.FC = () => {
         .filter((item) => !item.is_header)
         .map((item) => ({
           id: item.id,
+          calibration_result: itemValues[item.id]?.calibration_result || null,
           tx1_hasil_pd: itemValues[item.id]?.tx1_hasil_pd || null,
           tx1_in_tolerance: itemValues[item.id]?.tx1_in_tolerance || null,
           tx1_out_of_tolerance: itemValues[item.id]?.tx1_out_of_tolerance || null,
@@ -234,6 +248,7 @@ export const GroundCheckAdcDetailPage: React.FC = () => {
         equipment_function: equipmentFunction || null,
         technical_data: technicalData || null,
         last_calibration: lastCalibration || null,
+        time_filled: timeFilled || null,
         items: itemsPayload,
       });
       setRecord(result.data);
@@ -383,9 +398,19 @@ export const GroundCheckAdcDetailPage: React.FC = () => {
               <span className="font-medium">{record.day_name ?? ''}</span>
               <span>{record.date}</span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg" title="Waktu pengisian — boleh diedit manual">
               <Clock size={13} className="text-slate-400" />
-              <span>{record.time_filled ?? '—'}</span>
+              {isCompleted ? (
+                <span>{record.time_filled ?? '—'}</span>
+              ) : (
+                <input
+                  type="time"
+                  value={timeFilled}
+                  onChange={(e) => setTimeFilled(e.target.value)}
+                  className="bg-transparent border-0 p-0 text-xs font-medium text-slate-700 focus:outline-none focus:ring-0 w-[58px]"
+                  aria-label="Waktu pengisian"
+                />
+              )}
             </div>
             <ShiftBadge shift={record.shift_type as ShiftType} />
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
@@ -469,25 +494,26 @@ export const GroundCheckAdcDetailPage: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse min-w-[960px]">
             <thead>
-              <tr className="bg-sky-800 text-white">
-                <th rowSpan={3} className="px-2 py-2 text-center font-semibold border border-sky-700 align-middle w-10">No</th>
-                <th rowSpan={3} className="px-3 py-2 text-left font-semibold border border-sky-700 align-middle min-w-[180px]">Parameter</th>
-                <th rowSpan={3} className="px-2 py-2 text-center font-semibold border border-sky-700 align-middle min-w-[110px]">Hasil Kalibrasi</th>
-                <th rowSpan={3} className="px-2 py-2 text-center font-semibold border border-sky-700 align-middle min-w-[90px]">Toleransi</th>
-                <th colSpan={6} className="px-2 py-1 text-center font-semibold border border-sky-700">Pengujian di Darat</th>
-                <th rowSpan={3} className="px-2 py-2 text-center font-semibold border border-sky-700 align-middle min-w-[120px]">Keterangan</th>
+              {/* Minimalist header — putih/abu-abu terang, teks gelap, border tipis */}
+              <tr className="bg-slate-50 text-slate-700">
+                <th rowSpan={3} className="px-2 py-2 text-center font-semibold border border-slate-200 align-middle w-10 text-[11px] uppercase tracking-wider">No</th>
+                <th rowSpan={3} className="px-3 py-2 text-left   font-semibold border border-slate-200 align-middle min-w-[180px] text-[11px] uppercase tracking-wider">Parameter</th>
+                <th rowSpan={3} className="px-2 py-2 text-center font-semibold border border-slate-200 align-middle min-w-[110px] text-[11px] uppercase tracking-wider">Hasil Kalibrasi</th>
+                <th rowSpan={3} className="px-2 py-2 text-center font-semibold border border-slate-200 align-middle min-w-[90px]  text-[11px] uppercase tracking-wider">Toleransi</th>
+                <th colSpan={6} className="px-2 py-1 text-center font-semibold border border-slate-200 text-[11px] uppercase tracking-wider">Pengujian di Darat</th>
+                <th rowSpan={3} className="px-2 py-2 text-center font-semibold border border-slate-200 align-middle min-w-[120px] text-[11px] uppercase tracking-wider">Keterangan</th>
               </tr>
-              <tr className="bg-sky-700 text-sky-100">
-                <th colSpan={3} className="px-2 py-1 text-center font-medium border border-sky-600 text-[11px]">TX1</th>
-                <th colSpan={3} className="px-2 py-1 text-center font-medium border border-sky-600 text-[11px]">TX2</th>
+              <tr className="bg-white text-slate-600">
+                <th colSpan={3} className="px-2 py-1 text-center font-medium border border-slate-200 text-[11px] tracking-wider">TX1</th>
+                <th colSpan={3} className="px-2 py-1 text-center font-medium border border-slate-200 text-[11px] tracking-wider">TX2</th>
               </tr>
-              <tr className="bg-sky-600 text-sky-100">
-                <th className="px-1 py-1 text-center font-medium border border-sky-500 text-[10px] min-w-[90px]">Hasil PD</th>
-                <th className="px-1 py-1 text-center font-medium border border-sky-500 text-[10px] min-w-[56px]">In Tol.</th>
-                <th className="px-1 py-1 text-center font-medium border border-sky-500 text-[10px] min-w-[56px]">Out Tol.</th>
-                <th className="px-1 py-1 text-center font-medium border border-sky-500 text-[10px] min-w-[90px]">Hasil PD</th>
-                <th className="px-1 py-1 text-center font-medium border border-sky-500 text-[10px] min-w-[56px]">In Tol.</th>
-                <th className="px-1 py-1 text-center font-medium border border-sky-500 text-[10px] min-w-[56px]">Out Tol.</th>
+              <tr className="bg-slate-50/70 text-slate-500">
+                <th className="px-1 py-1 text-center font-medium border border-slate-200 text-[10px] min-w-[90px]">Hasil PD</th>
+                <th className="px-1 py-1 text-center font-medium border border-slate-200 text-[10px] min-w-[56px]">In Tol.</th>
+                <th className="px-1 py-1 text-center font-medium border border-slate-200 text-[10px] min-w-[56px]">Out Tol.</th>
+                <th className="px-1 py-1 text-center font-medium border border-slate-200 text-[10px] min-w-[90px]">Hasil PD</th>
+                <th className="px-1 py-1 text-center font-medium border border-slate-200 text-[10px] min-w-[56px]">In Tol.</th>
+                <th className="px-1 py-1 text-center font-medium border border-slate-200 text-[10px] min-w-[56px]">Out Tol.</th>
               </tr>
             </thead>
             <tbody>
@@ -507,13 +533,26 @@ export const GroundCheckAdcDetailPage: React.FC = () => {
                 const vals = itemValues[item.id];
 
                 return (
-                  <tr key={item.id} className={`${rowBase} hover:bg-sky-50/40 transition-colors`}>
+                  <tr key={item.id} className={`${rowBase} hover:bg-slate-50 transition-colors`}>
                     <td className="px-2 py-1.5 text-slate-400 font-mono text-center border-r border-slate-100">{itemNumber}</td>
                     <td className="px-3 py-1.5 font-medium text-slate-700 border-r border-slate-100">
                       <span className="text-[10px] text-slate-400 mr-1">{item.item_code}.</span>
                       {item.parameter_name}
                     </td>
-                    <td className="px-2 py-1.5 text-center text-slate-600 border-r border-slate-100">{item.calibration_result ?? '—'}</td>
+                    <td className="px-1 py-1 text-center border-r border-slate-100">
+                      {isCompleted ? (
+                        <span className="text-xs text-slate-700">{vals?.calibration_result || '—'}</span>
+                      ) : (
+                        <input
+                          type="text"
+                          value={vals?.calibration_result ?? ''}
+                          onChange={(e) => setItemField(item.id, 'calibration_result', e.target.value)}
+                          placeholder="—"
+                          title="Nilai default dari standar awal — boleh diedit jika ada kalibrasi ulang"
+                          className="w-full h-8 px-1.5 text-center text-xs rounded border border-slate-200 bg-white focus:ring-2 focus:ring-sky-400 focus:border-transparent focus:outline-none placeholder:text-slate-300"
+                        />
+                      )}
+                    </td>
                     <td className="px-2 py-1.5 text-center text-slate-600 border-r border-slate-100">{item.tolerance ?? '—'}</td>
 
                     {/* TX1 */}
