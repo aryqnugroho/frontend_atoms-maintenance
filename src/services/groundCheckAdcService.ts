@@ -90,4 +90,46 @@ export const groundCheckAdcService = {
     const res = await axios.delete(`${BASE}/${id}`, { headers: getAuthHeaders() });
     return res.data;
   },
+
+  // ─── Photos ──────────────────────────────────────────────────
+  async uploadPhoto(
+    id: number,
+    file: File,
+    caption?: string | null,
+  ): Promise<{ success: boolean; data: GroundCheckAdcRecordDetail; message: string }> {
+    const token = sessionStorage.getItem('auth_token');
+    const fd = new FormData();
+    fd.append('photo', file);
+    if (caption) fd.append('caption', caption);
+    const res = await axios.post(`${BASE}/${id}/photos`, fd, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // Let the browser set the multipart boundary automatically.
+      },
+    });
+    return res.data;
+  },
+
+  async updatePhotoCaption(
+    id: number,
+    photoId: number,
+    caption: string | null,
+  ): Promise<{ success: boolean; data: GroundCheckAdcRecordDetail; message: string }> {
+    const res = await axios.put(
+      `${BASE}/${id}/photos/${photoId}`,
+      { caption },
+      { headers: getAuthHeaders() },
+    );
+    return res.data;
+  },
+
+  async deletePhoto(
+    id: number,
+    photoId: number,
+  ): Promise<{ success: boolean; data: GroundCheckAdcRecordDetail; message: string }> {
+    const res = await axios.delete(`${BASE}/${id}/photos/${photoId}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.data;
+  },
 };

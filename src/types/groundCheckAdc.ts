@@ -29,11 +29,20 @@ export interface GroundCheckAdcTechnician {
   sort_order: number;
 }
 
+export type GroundCheckAdcInputType =
+  | 'numeric'
+  | 'dropdown_function'
+  | 'dropdown_quality'
+  | 'dropdown_clarity'
+  | 'text'
+  | 'header';
+
 export interface GroundCheckAdcItem {
   id: number;
   section_name: string;
   item_code: string | null;
   parameter_name: string;
+  input_type: GroundCheckAdcInputType;
   calibration_result: string | null;
   tolerance: string | null;
   tx1_hasil_pd: string | null;
@@ -45,6 +54,19 @@ export interface GroundCheckAdcItem {
   keterangan: string | null;
   is_header: boolean;
   sort_order: number;
+}
+
+export interface GroundCheckAdcPhoto {
+  id: number;
+  url: string | null;
+  caption: string | null;
+  original_name: string | null;
+  mime_type: string | null;
+  size_bytes: number;
+  uploaded_by_id: number | null;
+  uploaded_by_name: string | null;
+  sort_order: number;
+  uploaded_at: string | null;
 }
 
 export interface GroundCheckAdcRecordDetail {
@@ -75,6 +97,7 @@ export interface GroundCheckAdcRecordDetail {
   created_by_name: string | null;
   technicians: GroundCheckAdcTechnician[];
   items: GroundCheckAdcItem[];
+  photos: GroundCheckAdcPhoto[];
   created_at: string | null;
   updated_at: string | null;
 }
