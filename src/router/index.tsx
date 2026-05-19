@@ -78,6 +78,7 @@ import { LogbookPage } from '@/pages/logbook/LogbookPage';
 import { LogbookCnsd } from '@/pages/logbook/LogbookCnsd';
 import { LogbookTfp } from '@/pages/logbook/LogbookTfp';
 import { LogbookTfpDetail } from '@/pages/logbook/LogbookTfpDetail';
+import { LogbookTfpPrintView } from '@/pages/logbook/LogbookTfpPrintView';
 import { ComingSoonPage } from '@/pages/shared/ComingSoonPage';
 
 export const router = createBrowserRouter([
@@ -110,6 +111,7 @@ export const router = createBrowserRouter([
       { path: '/tfp/localizer/:id/print', element: <TfpLocalizerPrintView /> },
       { path: '/tfp/glidepath/:id/print', element: <TfpGlidepathPrintView /> },
       { path: '/ground-check/adc/:id/print', element: <GroundCheckAdcPrintView /> },
+      { path: '/logbooks/tfp/:id/print', element: <LogbookTfpPrintView /> },
       {
         element: <AppShell />,
         children: [
@@ -211,7 +213,6 @@ export const router = createBrowserRouter([
           { path: '/logbooks/cnsd', element: <LogbookCnsd /> },
           { path: '/logbooks/tfp', element: <LogbookTfp /> },
           { path: '/logbooks/tfp/:id', element: <LogbookTfpDetail /> },
-          { path: '/logbooks/tfp/:id/print', element: <ComingSoonPage /> },
 
           { path: '/admin/users', element: <ComingSoonPage /> },
 
