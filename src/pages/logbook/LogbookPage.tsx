@@ -10,8 +10,8 @@ import { PageHeader } from '@/components/common/PageHeader';
  *   1. Logbook Fasilitas CNSD  → /logbooks/cnsd
  *   2. Logbook Fasilitas TFP   → /logbooks/tfp
  *
- * Desain card mengikuti pola CnsdIndexPage (border tipis, rounded, soft shadow,
- * chevron kanan, hover lift).
+ * Desain card selaras dengan TfpIndexPage / CnsdIndexPage: border tipis,
+ * rounded, soft hover lift, accent kategori (sky untuk CNSD, emerald untuk TFP).
  */
 
 interface LogbookCard {
@@ -20,10 +20,12 @@ interface LogbookCard {
   description: string;
   route: string;
   icon: React.FC<{ size?: number; className?: string }>;
-  accentColor: string;   // Tailwind border/text color token
-  badgeColor: string;    // Tailwind badge bg/text classes
+  borderColor: string;
+  hoverTitleColor: string;
   iconBg: string;
   iconColor: string;
+  badgeColor: string;
+  focusRing: string;
 }
 
 const LOGBOOK_CARDS: LogbookCard[] = [
@@ -33,10 +35,12 @@ const LOGBOOK_CARDS: LogbookCard[] = [
     description: 'Pencatatan status peralatan dan aktivitas operasional harian CNSD.',
     route: '/logbooks/cnsd',
     icon: CheckSquare,
-    accentColor: 'border-sky-300',
-    badgeColor: 'bg-sky-50 text-sky-700',
+    borderColor: 'border-sky-200',
+    hoverTitleColor: 'group-hover:text-sky-700',
     iconBg: 'bg-sky-100',
     iconColor: 'text-sky-600',
+    badgeColor: 'bg-sky-50 text-sky-700 border-sky-200',
+    focusRing: 'focus-visible:ring-sky-400',
   },
   {
     id: 'tfp',
@@ -44,10 +48,12 @@ const LOGBOOK_CARDS: LogbookCard[] = [
     description: 'Pencatatan status peralatan dan aktivitas operasional harian TFP.',
     route: '/logbooks/tfp',
     icon: Activity,
-    accentColor: 'border-emerald-300',
-    badgeColor: 'bg-emerald-50 text-emerald-700',
+    borderColor: 'border-emerald-200',
+    hoverTitleColor: 'group-hover:text-emerald-700',
     iconBg: 'bg-emerald-100',
     iconColor: 'text-emerald-600',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    focusRing: 'focus-visible:ring-emerald-400',
   },
 ];
 
@@ -77,33 +83,32 @@ export const LogbookPage: React.FC = () => {
                   navigate(card.route);
                 }
               }}
-              className={`text-left rounded-2xl border-2 ${card.accentColor} bg-white p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400`}
+              className={`text-left rounded-2xl border ${card.borderColor} bg-white p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${card.focusRing}`}
             >
-              <div className="flex items-start justify-between gap-4">
-                {/* Left: icon + text */}
-                <div className="flex items-start gap-4 flex-1 min-w-0">
-                  <div className={`h-11 w-11 rounded-xl ${card.iconBg} flex items-center justify-center shrink-0`}>
-                    <Icon size={22} className={card.iconColor} aria-hidden="true" />
-                  </div>
-                  <div className="space-y-1 min-w-0">
-                    <h3 className="text-base font-semibold text-slate-800 group-hover:text-slate-900 transition-colors leading-tight">
-                      {card.title}
-                    </h3>
-                    <p className="text-sm text-slate-500 leading-snug">
-                      {card.description}
-                    </p>
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium mt-1 ${card.badgeColor}`}>
-                      Tersedia
-                    </span>
-                  </div>
+              <div className="flex items-start gap-4">
+                <div className={`h-11 w-11 rounded-xl ${card.iconBg} flex items-center justify-center shrink-0`}>
+                  <Icon size={22} className={card.iconColor} aria-hidden="true" />
                 </div>
 
-                {/* Right: chevron */}
-                <ChevronRight
-                  size={20}
-                  className="text-slate-400 group-hover:text-slate-600 transition-colors shrink-0 mt-1"
-                  aria-hidden="true"
-                />
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className={`text-sm font-semibold text-slate-800 ${card.hoverTitleColor} transition-colors leading-tight`}>
+                      {card.title}
+                    </h3>
+                    <ChevronRight
+                      size={18}
+                      className="text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0 mt-0.5"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    {card.description}
+                  </p>
+                  <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${card.badgeColor}`}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+                    Tersedia
+                  </span>
+                </div>
               </div>
             </button>
           );

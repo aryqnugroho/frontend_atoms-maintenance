@@ -155,27 +155,29 @@ const CategoryAccordion: React.FC<CategoryAccordionProps> = ({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
+    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+        className="w-full flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-slate-50 to-white hover:from-slate-100 hover:to-slate-50 transition-colors text-left border-b border-gray-100"
       >
         <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">{category}</span>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-slate-400">{items.length} item</span>
+          <span className="inline-flex items-center rounded-full bg-white border border-gray-200 text-[10px] font-semibold text-slate-500 px-2 py-0.5">
+            {items.length} item
+          </span>
           {open ? <ChevronDown size={15} className="text-slate-400" /> : <ChevronRight size={15} className="text-slate-400" />}
         </div>
       </button>
 
       {open && (
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-gray-50">
           {/* Sub-header */}
-          <div className="grid grid-cols-[1fr_auto] gap-2 px-4 py-2 bg-gray-50/50">
-            <span className="text-[10px] font-semibold text-slate-400 uppercase">Nama Peralatan</span>
+          <div className="grid grid-cols-[1fr_auto] gap-2 px-4 py-1.5 bg-gray-50/40">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Nama Peralatan</span>
             <div className="flex gap-2">
               {(['Pagi', 'Siang', 'Malam'] as const).map((s) => (
-                <span key={s} className="w-12 text-center text-[10px] font-semibold text-slate-400 uppercase">{s}</span>
+                <span key={s} className="w-12 text-center text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{s}</span>
               ))}
             </div>
           </div>
@@ -219,17 +221,34 @@ const CategoryAccordion: React.FC<CategoryAccordionProps> = ({
 };
 
 // ─── Personnel Block ───────────────────────────────────────
-const PersonnelBlock: React.FC<{ label: string; info: PersonnelShiftInfo | undefined }> = ({ label, info }) => {
+const SHIFT_ACCENT: Record<'pagi' | 'siang' | 'malam', { dot: string; ring: string; label: string }> = {
+  pagi: { dot: 'bg-amber-400', ring: 'ring-amber-100', label: 'text-amber-700' },
+  siang: { dot: 'bg-sky-400', ring: 'ring-sky-100', label: 'text-sky-700' },
+  malam: { dot: 'bg-indigo-400', ring: 'ring-indigo-100', label: 'text-indigo-700' },
+};
+
+const PersonnelBlock: React.FC<{
+  shiftKey: 'pagi' | 'siang' | 'malam';
+  label: string;
+  range: string;
+  info: PersonnelShiftInfo | undefined;
+}> = ({ shiftKey, label, range, info }) => {
   if (!info) return null;
   const all = [
     ...(info.manager ? [{ name: info.manager.name, role: 'Manager Teknik' }] : []),
     ...(info.supervisor ? [{ name: info.supervisor.name, role: 'Supervisor TFP' }] : []),
     ...info.technicians.map((t) => ({ name: t.name, role: 'Teknisi TFP' })),
   ];
+  const accent = SHIFT_ACCENT[shiftKey];
 
   return (
-    <div className="space-y-1">
-      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{label}</p>
+    <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className={`h-2 w-2 rounded-full ${accent.dot} ring-4 ${accent.ring}`} />
+        <p className={`text-[11px] font-bold uppercase tracking-wider ${accent.label}`}>{label}</p>
+        <span className="text-[10px] text-slate-400 font-medium ml-auto">{range}</span>
+      </div>
+
       {!info.roster_available ? (
         <p className="text-xs text-slate-400 italic">Roster belum dipublish</p>
       ) : all.length === 0 ? (
@@ -237,11 +256,15 @@ const PersonnelBlock: React.FC<{ label: string; info: PersonnelShiftInfo | undef
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {all.map((p, i) => (
-            <span key={i} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
-              p.role === 'Manager Teknik' ? 'bg-blue-50 text-blue-700' :
-              p.role === 'Supervisor TFP' ? 'bg-emerald-50 text-emerald-700' :
-              'bg-slate-100 text-slate-700'
-            }`}>
+            <span
+              key={i}
+              title={p.role}
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                p.role === 'Manager Teknik' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                p.role === 'Supervisor TFP' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                'bg-white text-slate-700 border-slate-200'
+              }`}
+            >
               {p.name}
             </span>
           ))}
@@ -689,13 +712,13 @@ export const LogbookTfpDetail: React.FC = () => {
       {record.personnel_on_duty && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
           <div className="flex items-center gap-2 mb-3">
-            <Users size={16} className="text-slate-500" />
-            <h3 className="text-sm font-bold text-slate-700">Personel On Duty</h3>
+            <Users size={15} className="text-slate-400" />
+            <h3 className="text-sm font-semibold text-slate-700">Personel On Duty</h3>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <PersonnelBlock label="Shift Pagi (07:00–13:00)" info={record.personnel_on_duty.pagi} />
-            <PersonnelBlock label="Shift Siang (13:00–19:00)" info={record.personnel_on_duty.siang} />
-            <PersonnelBlock label="Shift Malam (19:00–07:00)" info={record.personnel_on_duty.malam} />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <PersonnelBlock shiftKey="pagi" label="Shift Pagi" range="07:00–13:00" info={record.personnel_on_duty.pagi} />
+            <PersonnelBlock shiftKey="siang" label="Shift Siang" range="13:00–19:00" info={record.personnel_on_duty.siang} />
+            <PersonnelBlock shiftKey="malam" label="Shift Malam" range="19:00–07:00" info={record.personnel_on_duty.malam} />
           </div>
         </div>
       )}
@@ -705,17 +728,25 @@ export const LogbookTfpDetail: React.FC = () => {
 
         {/* ── LEFT: Checklist Peralatan ─────────────────────── */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-700">Status Peralatan</h3>
-            <div className="flex items-center gap-3 text-[11px] text-slate-500">
-              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-emerald-500" /> S = Serviceable</span>
-              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-red-500" /> U/S = Unserviceable</span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-700">Status Peralatan</h3>
+            <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2 py-1 text-[11px] text-slate-500 shadow-sm">
+              <span className="inline-flex items-center gap-1 pr-2 border-r border-gray-200">
+                <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500" />
+                <span className="font-semibold text-slate-700">S</span>
+                <span className="text-slate-400">Serviceable</span>
+              </span>
+              <span className="inline-flex items-center gap-1 pl-1">
+                <span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-500" />
+                <span className="font-semibold text-slate-700">U/S</span>
+                <span className="text-slate-400">Unserviceable</span>
+              </span>
             </div>
           </div>
 
           {canManageEquipment && !isSigned && (
-            <p className="text-[11px] text-slate-400">
-              Hover pada nama peralatan untuk edit/hapus. Klik "+ Tambah peralatan" di bawah kategori untuk menambah baris baru.
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Hover pada nama peralatan untuk edit/hapus. Klik <span className="text-slate-500 font-medium">+ Tambah peralatan</span> di bawah kategori untuk menambah baris baru.
             </p>
           )}
 
@@ -753,29 +784,28 @@ export const LogbookTfpDetail: React.FC = () => {
               <Plus size={13} /> Tambah peralatan ke kategori baru
             </button>
           )}
-
-          {!isSigned && (
-            <div className="flex justify-end pt-2">
-              <Button onClick={handleSave} isLoading={isSaving} className="gap-2">
-                <Save size={15} /> Simpan Perubahan
-              </Button>
-            </div>
-          )}
         </div>
 
         {/* ── RIGHT: Timeline Catatan ───────────────────────── */}
         <div className="space-y-3">
-          <h3 className="text-sm font-bold text-slate-700">Catatan Kegiatan</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-700">Catatan Kegiatan</h3>
+            {record.notes.length > 0 && (
+              <span className="text-[11px] text-slate-400">
+                {record.notes.length} entri
+              </span>
+            )}
+          </div>
 
           {!isSigned && (
             <form onSubmit={handleAddNote} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-500 mb-1">Shift</label>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase tracking-wide">Shift</label>
                   <select
                     value={noteShift}
                     onChange={(e) => setNoteShift(e.target.value as 'pagi' | 'siang' | 'malam')}
-                    className="w-full h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    className="w-full h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
                   >
                     <option value="pagi">Pagi</option>
                     <option value="siang">Siang</option>
@@ -783,23 +813,23 @@ export const LogbookTfpDetail: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-500 mb-1">Jam</label>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase tracking-wide">Jam</label>
                   <input
                     type="time"
                     value={noteTime}
                     onChange={(e) => setNoteTime(e.target.value)}
-                    className="w-full h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    className="w-full h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-1">Kegiatan / Catatan</label>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase tracking-wide">Kegiatan / Catatan</label>
                 <textarea
                   value={noteActivity}
                   onChange={(e) => setNoteActivity(e.target.value)}
                   rows={3}
                   placeholder="Tulis kegiatan atau catatan operasional..."
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent resize-none"
                 />
               </div>
               <div className="flex justify-end">
@@ -812,46 +842,56 @@ export const LogbookTfpDetail: React.FC = () => {
 
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             {record.notes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 text-center px-4">
-                <Clock size={24} className="text-slate-300 mb-2" />
-                <p className="text-sm text-slate-400">Belum ada catatan kegiatan.</p>
-                {!isSigned && <p className="text-xs text-slate-300 mt-1">Tambahkan catatan menggunakan form di atas.</p>}
+              <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
+                  <Clock size={20} className="text-slate-300" />
+                </div>
+                <p className="text-sm font-medium text-slate-500">Belum ada catatan kegiatan.</p>
+                {!isSigned && <p className="text-xs text-slate-400 mt-1">Tambahkan catatan menggunakan form di atas.</p>}
               </div>
             ) : (
-              <div className="divide-y divide-gray-50 max-h-[520px] overflow-y-auto">
+              <div className="max-h-[520px] overflow-y-auto">
                 {(['pagi', 'siang', 'malam'] as const).map((shift) => {
                   const notes = notesByShift[shift];
                   if (notes.length === 0) return null;
                   return (
                     <div key={shift}>
-                      <div className={`px-4 py-2 border-b border-gray-100 ${shiftColors[shift]}`}>
-                        <span className="text-[11px] font-bold uppercase tracking-wider capitalize">Shift {shift}</span>
+                      <div className={`sticky top-0 z-10 px-4 py-1.5 border-b border-gray-100 ${shiftColors[shift]} backdrop-blur-sm bg-opacity-95`}>
+                        <span className="text-[11px] font-bold uppercase tracking-wider capitalize">
+                          Shift {shift} · {notes.length} catatan
+                        </span>
                       </div>
-                      {notes.map((note) => (
-                        <div key={note.id} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50/50 group">
-                          <div className="flex flex-col items-center shrink-0 mt-1">
-                            <div className="h-2 w-2 rounded-full bg-slate-300 group-hover:bg-emerald-400 transition-colors" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            {note.time && (
-                              <span className="text-[11px] font-mono font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded mb-0.5 inline-block">
-                                {note.time}
-                              </span>
+                      <div className="relative pl-6 pr-3 py-2">
+                        {/* Timeline vertical line */}
+                        <div className="absolute left-[14px] top-3 bottom-3 w-px bg-gray-200" aria-hidden="true" />
+                        {notes.map((note) => (
+                          <div key={note.id} className="relative flex items-start gap-3 py-2 hover:bg-slate-50/50 rounded-lg -ml-3 pl-3 pr-2 group">
+                            {/* Timeline dot */}
+                            <div className="relative flex items-center justify-center shrink-0 mt-2">
+                              <div className="h-2.5 w-2.5 rounded-full bg-white border-2 border-emerald-400 group-hover:border-emerald-500 group-hover:scale-110 transition-all" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              {note.time && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-mono font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded mb-1">
+                                  <Clock size={10} className="text-slate-400" />
+                                  {note.time}
+                                </span>
+                              )}
+                              <p className="text-sm text-slate-700 leading-snug">{note.activity}</p>
+                            </div>
+                            {!isSigned && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteNote(note.id)}
+                                className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all shrink-0 mt-1"
+                                title="Hapus catatan"
+                              >
+                                <Trash2 size={13} />
+                              </button>
                             )}
-                            <p className="text-sm text-slate-700 leading-snug">{note.activity}</p>
                           </div>
-                          {!isSigned && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteNote(note.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all shrink-0"
-                              title="Hapus catatan"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   );
                 })}

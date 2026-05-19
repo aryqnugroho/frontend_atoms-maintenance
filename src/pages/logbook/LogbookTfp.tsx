@@ -268,7 +268,12 @@ export const LogbookTfp: React.FC = () => {
 
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-3">
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500 mr-1">
+            <Filter size={13} className="text-slate-400" />
+            <span className="hidden sm:inline">Filter</span>
+          </div>
+
           <select
             value={yearFilter}
             onChange={(e) => setYearFilter(e.target.value)}
@@ -310,19 +315,19 @@ export const LogbookTfp: React.FC = () => {
           )}
         </div>
 
-        {hasActiveFilters && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Filter size={13} className="text-slate-400 shrink-0" />
+        {hasActiveFilters && (yearFilter || signedFilter) && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-100">
+            <span className="text-[11px] text-slate-400 mr-1">Aktif:</span>
             {yearFilter && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium px-2.5 py-0.5">
-                Tahun: {yearFilter}
-                <button onClick={() => setYearFilter('')} className="ml-0.5 rounded-full hover:bg-blue-100"><X size={11} /></button>
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-medium px-2 py-0.5">
+                Tahun {yearFilter}
+                <button onClick={() => setYearFilter('')} className="ml-0.5 rounded-full hover:bg-blue-100"><X size={10} /></button>
               </span>
             )}
             {signedFilter && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium px-2.5 py-0.5">
-                TTD: {signedFilter === 'yes' ? 'Sudah' : 'Belum'}
-                <button onClick={() => setSignedFilter('')} className="ml-0.5 rounded-full hover:bg-blue-100"><X size={11} /></button>
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-medium px-2 py-0.5">
+                {signedFilter === 'yes' ? 'Sudah TTD' : 'Belum TTD'}
+                <button onClick={() => setSignedFilter('')} className="ml-0.5 rounded-full hover:bg-blue-100"><X size={10} /></button>
               </span>
             )}
           </div>
@@ -391,7 +396,7 @@ export const LogbookTfp: React.FC = () => {
                       onClick={() => navigate(`/logbooks/tfp/${lb.id}`)}
                       tabIndex={0}
                       role="button"
-                      className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary"
+                      className="border-b border-gray-50 hover:bg-emerald-50/30 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary"
                     >
                       {/* Tanggal */}
                       <td className="px-6 py-4">
@@ -403,19 +408,21 @@ export const LogbookTfp: React.FC = () => {
                       <td className="px-6 py-4">
                         {lb.is_signed && lb.manager_signed_by_name ? (
                           <div>
-                            <p className="text-xs font-medium text-slate-700">{lb.manager_signed_by_name}</p>
-                            <p className="text-[11px] text-slate-400 mt-0.5">Sudah TTD</p>
+                            <p className="text-xs font-semibold text-slate-700">{lb.manager_signed_by_name}</p>
+                            <p className="text-[11px] text-emerald-600 mt-0.5 font-medium">Sudah TTD</p>
                           </div>
                         ) : lb.created_by_name ? (
                           <div>
-                            <p className="text-xs text-slate-600">{lb.created_by_name}</p>
+                            <p className="text-xs text-slate-700">{lb.created_by_name}</p>
                             <p className="text-[11px] text-slate-400 mt-0.5">Dibuat oleh</p>
                           </div>
                         ) : (
                           <span className="text-slate-300 text-xs">—</span>
                         )}
                         {lb.notes_count > 0 && (
-                          <p className="text-[11px] text-slate-400 mt-1">{lb.notes_count} catatan</p>
+                          <p className="inline-flex items-center gap-1 mt-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium px-1.5 py-0.5">
+                            {lb.notes_count} catatan
+                          </p>
                         )}
                       </td>
 
