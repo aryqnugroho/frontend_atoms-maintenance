@@ -49,6 +49,9 @@ import { TfpGlidepathListPage } from '@/pages/tfp/TfpGlidepathListPage';
 import { TfpGlidepathDetailPage } from '@/pages/tfp/TfpGlidepathDetailPage';
 import { TfpGlidepathPrintView } from '@/pages/tfp/TfpGlidepathPrintView';
 import { GroundCheckIndexPage } from '@/pages/ground-check/GroundCheckIndexPage';
+import { GroundCheckAdcListPage } from '@/pages/ground-check/GroundCheckAdcListPage';
+import { GroundCheckAdcDetailPage } from '@/pages/ground-check/GroundCheckAdcDetailPage';
+import { GroundCheckAdcPrintView } from '@/pages/ground-check/GroundCheckAdcPrintView';
 import { LocalizerFormPage } from '@/pages/ground-check/LocalizerFormPage';
 import { GroundingIndexPage } from '@/pages/grounding/GroundingIndexPage';
 import { GroundingReportDetailPage } from '@/pages/grounding/GroundingReportDetailPage';
@@ -78,6 +81,7 @@ export const router = createBrowserRouter([
       { path: '/tfp/dvor/:id/print', element: <TfpDvorPrintView /> },
       { path: '/tfp/localizer/:id/print', element: <TfpLocalizerPrintView /> },
       { path: '/tfp/glidepath/:id/print', element: <TfpGlidepathPrintView /> },
+      { path: '/ground-check/adc/:id/print', element: <GroundCheckAdcPrintView /> },
       {
         element: <AppShell />,
         children: [
@@ -139,6 +143,8 @@ export const router = createBrowserRouter([
 
           // Ground Check
           { path: '/ground-check', element: <GroundCheckIndexPage /> },
+          { path: '/ground-check/adc', element: <GroundCheckAdcListPage /> },
+          { path: '/ground-check/adc/:id', element: <GroundCheckAdcDetailPage /> },
           { path: '/ground-check/localizer', element: <LocalizerFormPage /> },
           { path: '/ground-check/:code/coming-soon', element: <ComingSoonPage /> },
 
