@@ -18,6 +18,7 @@ const CNSD_ACTIVE_ROUTES: Record<string, string> = {
   'CNSD-003': '/cnsd/recorder-meter',     // Recorder Meter Reading (FORM C-3)
   'CNSD-004': '/cnsd/amsc-meter',         // AMSC Meter Reading
   'CNSD-005': '/cnsd/transmitter-meter',  // Transmitter Meter Reading (FORM C-1)
+  'CNSD-006': '/cnsd/receiver-meter',     // Receiver Meter Reading (FORM C-2)
 };
 
 /**
