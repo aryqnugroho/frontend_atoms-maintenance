@@ -26,6 +26,9 @@ import { CnsdTransmitterMeterPrintView } from '@/pages/cnsd/CnsdTransmitterMeter
 import { CnsdReceiverMeterListPage } from '@/pages/cnsd/CnsdReceiverMeterListPage';
 import { CnsdReceiverMeterDetailPage } from '@/pages/cnsd/CnsdReceiverMeterDetailPage';
 import { CnsdReceiverMeterPrintView } from '@/pages/cnsd/CnsdReceiverMeterPrintView';
+import { CnsdGlidepathMeterListPage } from '@/pages/cnsd/CnsdGlidepathMeterListPage';
+import { CnsdGlidepathMeterDetailPage } from '@/pages/cnsd/CnsdGlidepathMeterDetailPage';
+import { CnsdGlidepathMeterPrintView } from '@/pages/cnsd/CnsdGlidepathMeterPrintView';
 import { TfpIndexPage } from '@/pages/tfp/TfpIndexPage';
 import { TfpAobGroundListPage } from '@/pages/tfp/TfpAobGroundListPage';
 import { TfpAobGroundDetailPage } from '@/pages/tfp/TfpAobGroundDetailPage';
@@ -76,6 +79,7 @@ export const router = createBrowserRouter([
       { path: '/cnsd/amsc-meter/:id/print', element: <CnsdAmscMeterPrintView /> },
       { path: '/cnsd/transmitter-meter/:id/print', element: <CnsdTransmitterMeterPrintView /> },
       { path: '/cnsd/receiver-meter/:id/print', element: <CnsdReceiverMeterPrintView /> },
+      { path: '/cnsd/glidepath-meter/:id/print', element: <CnsdGlidepathMeterPrintView /> },
       { path: '/grounding/reports/:id/print', element: <GroundingReportPrintView /> },
       { path: '/tfp/aob-ground/:id/print', element: <TfpAobGroundPrintView /> },
       { path: '/tfp/aob-lt12/:id/print', element: <TfpAobLt12PrintView /> },
@@ -116,6 +120,9 @@ export const router = createBrowserRouter([
           // Active module 6: Receiver Meter Reading (FORM C-2)
           { path: '/cnsd/receiver-meter', element: <CnsdReceiverMeterListPage /> },
           { path: '/cnsd/receiver-meter/:id', element: <CnsdReceiverMeterDetailPage /> },
+          // Active module 7: Glide Path Meter Reading (ILS-GP)
+          { path: '/cnsd/glidepath-meter', element: <CnsdGlidepathMeterListPage /> },
+          { path: '/cnsd/glidepath-meter/:id', element: <CnsdGlidepathMeterDetailPage /> },
           // Backward-compat: legacy /cnsd/eq-1 link redirects to new list
           { path: '/cnsd/eq-1', element: <Navigate to="/cnsd/readiness" replace /> },
           { path: '/cnsd/:code/coming-soon', element: <ComingSoonPage /> },

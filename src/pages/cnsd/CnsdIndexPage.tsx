@@ -19,6 +19,7 @@ const CNSD_ACTIVE_ROUTES: Record<string, string> = {
   'CNSD-004': '/cnsd/amsc-meter',         // AMSC Meter Reading
   'CNSD-005': '/cnsd/transmitter-meter',  // Transmitter Meter Reading (FORM C-1)
   'CNSD-006': '/cnsd/receiver-meter',     // Receiver Meter Reading (FORM C-2)
+  'CNSD-007': '/cnsd/glidepath-meter',    // Glide Path Meter Reading (ILS-GP)
 };
 
 /**

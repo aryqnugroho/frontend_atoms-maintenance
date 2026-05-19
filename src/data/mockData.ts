@@ -207,7 +207,7 @@ export const mockCnsdCategories: CnsdCategory[] = [
   { id: 4, code: 'CNSD-004', name: 'AMSC', location: 'Ruang AMSC', is_active_mvp: true, sort_order: 4 },
   { id: 5, code: 'CNSD-005', name: 'Transmitter', location: 'Gedung Transmitter', is_active_mvp: true, sort_order: 5 },
   { id: 6, code: 'CNSD-006', name: 'Receiver', location: 'Gedung Transmitter', is_active_mvp: true, sort_order: 6 },
-  { id: 7, code: 'CNSD-007', name: 'Glide Path', location: 'Shelter Glide Path', is_active_mvp: false, sort_order: 7 },
+  { id: 7, code: 'CNSD-007', name: 'Glide Path', location: 'Shelter Glide Path', is_active_mvp: true, sort_order: 7 },
   { id: 8, code: 'CNSD-008', name: 'Localizer', location: 'Shelter Localizer', is_active_mvp: false, sort_order: 8 },
   { id: 9, code: 'CNSD-009', name: 'T-DME', location: 'Shelter Glide Path', is_active_mvp: false, sort_order: 9 },
   { id: 10, code: 'CNSD-010', name: 'DVOR', location: 'Shelter VOR', is_active_mvp: false, sort_order: 10 },
