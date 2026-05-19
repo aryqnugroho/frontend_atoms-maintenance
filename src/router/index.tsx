@@ -77,6 +77,7 @@ import { ReportingDamagePrintView } from '@/pages/reporting/ReportingDamagePrint
 import { LogbookPage } from '@/pages/logbook/LogbookPage';
 import { LogbookCnsd } from '@/pages/logbook/LogbookCnsd';
 import { LogbookTfp } from '@/pages/logbook/LogbookTfp';
+import { LogbookTfpDetail } from '@/pages/logbook/LogbookTfpDetail';
 import { ComingSoonPage } from '@/pages/shared/ComingSoonPage';
 
 export const router = createBrowserRouter([
@@ -209,7 +210,7 @@ export const router = createBrowserRouter([
           { path: '/logbooks', element: <LogbookPage /> },
           { path: '/logbooks/cnsd', element: <LogbookCnsd /> },
           { path: '/logbooks/tfp', element: <LogbookTfp /> },
-          { path: '/logbooks/tfp/:id', element: <ComingSoonPage /> },
+          { path: '/logbooks/tfp/:id', element: <LogbookTfpDetail /> },
 
           { path: '/admin/users', element: <ComingSoonPage /> },
 

@@ -70,6 +70,33 @@ export const logbookTfpService = {
     return response.data.data;
   },
 
+  async updateItems(
+    id: number,
+    items: Array<{ id: number; status_pagi: string | null; status_siang: string | null; status_malam: string | null }>,
+  ): Promise<LogbookTfpDetail> {
+    const response = await axios.put(`${API_URL}/v1/logbook/tfp/${id}/items`, { items }, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  async addNote(
+    id: number,
+    payload: { shift: string; time: string | null; activity: string },
+  ): Promise<LogbookTfpDetail> {
+    const response = await axios.post(`${API_URL}/v1/logbook/tfp/${id}/notes`, payload, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  async deleteNote(id: number, noteId: number): Promise<LogbookTfpDetail> {
+    const response = await axios.delete(`${API_URL}/v1/logbook/tfp/${id}/notes/${noteId}`, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
   async deleteLogbook(id: number): Promise<void> {
     await axios.delete(`${API_URL}/v1/logbook/tfp/${id}`, {
       headers: getAuthHeaders(),
