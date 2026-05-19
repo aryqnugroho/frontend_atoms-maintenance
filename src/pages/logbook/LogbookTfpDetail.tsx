@@ -8,12 +8,14 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Edit2,
   Lock,
   PenLine,
   Plus,
   Save,
   Trash2,
   Users,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -21,7 +23,11 @@ import { SignatureCanvas } from '@/components/shared/SignatureCanvas';
 import { SignatureDisplay } from '@/components/shared/SignatureDisplay';
 import { useAuth } from '@/hooks/useAuth';
 import { logbookTfpService } from '@/services/logbookTfpService';
-import type { LogbookTfpDetail as LogbookTfpDetailType, LogbookTfpItem, PersonnelShiftInfo } from '@/types/logbookTfp';
+import type {
+  LogbookTfpDetail as LogbookTfpDetailType,
+  LogbookTfpItem,
+  PersonnelShiftInfo,
+} from '@/types/logbookTfp';
 
 // ─── Helpers ──────────────────────────────────────────────
 const formatDateLong = (dateStr: string): string => {
@@ -82,29 +88,74 @@ const StatusToggle: React.FC<StatusToggleProps> = ({ value, onChange, disabled }
   );
 };
 
+// ─── Equipment Row ─────────────────────────────────────────
+interface EquipmentRowProps {
+  item: LogbookTfpItem;
+  localStatus: { status_pagi: ShiftStatus; status_siang: ShiftStatus; status_malam: ShiftStatus };
+  onStatusChange: (shift: 'status_pagi' | 'status_siang' | 'status_malam', value: ShiftStatus) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  canManage: boolean;
+  disabled: boolean;
+}
+
+const EquipmentRow: React.FC<EquipmentRowProps> = ({
+  item, localStatus, onStatusChange, onEdit, onDelete, canManage, disabled,
+}) => (
+  <div className="grid grid-cols-[1fr_auto] gap-2 items-center px-4 py-2.5 hover:bg-slate-50/50 transition-colors group">
+    <div className="flex items-center gap-2 min-w-0">
+      <span className="text-sm text-slate-700 leading-tight truncate">{item.equipment_name}</span>
+      {canManage && !disabled && (
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="p-1 rounded text-slate-300 hover:text-amber-500 hover:bg-amber-50 transition-colors"
+            title="Edit nama peralatan"
+          >
+            <Edit2 size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+            title="Hapus peralatan"
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+      )}
+    </div>
+    <div className="flex gap-2">
+      <StatusToggle value={localStatus.status_pagi} onChange={(v) => onStatusChange('status_pagi', v)} disabled={disabled} />
+      <StatusToggle value={localStatus.status_siang} onChange={(v) => onStatusChange('status_siang', v)} disabled={disabled} />
+      <StatusToggle value={localStatus.status_malam} onChange={(v) => onStatusChange('status_malam', v)} disabled={disabled} />
+    </div>
+  </div>
+);
+
 // ─── Accordion Category ────────────────────────────────────
 interface CategoryAccordionProps {
   category: string;
   items: LogbookTfpItem[];
   localItems: Record<number, { status_pagi: ShiftStatus; status_siang: ShiftStatus; status_malam: ShiftStatus }>;
   onStatusChange: (itemId: number, shift: 'status_pagi' | 'status_siang' | 'status_malam', value: ShiftStatus) => void;
+  onEditItem: (item: LogbookTfpItem) => void;
+  onDeleteItem: (itemId: number) => void;
+  onAddItem: (category: string) => void;
+  canManage: boolean;
   disabled: boolean;
   defaultOpen?: boolean;
 }
 
 const CategoryAccordion: React.FC<CategoryAccordionProps> = ({
-  category,
-  items,
-  localItems,
-  onStatusChange,
-  disabled,
-  defaultOpen = true,
+  category, items, localItems, onStatusChange, onEditItem, onDeleteItem, onAddItem,
+  canManage, disabled, defaultOpen = true,
 }) => {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden">
-      {/* Header */}
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -117,7 +168,6 @@ const CategoryAccordion: React.FC<CategoryAccordionProps> = ({
         </div>
       </button>
 
-      {/* Items */}
       {open && (
         <div className="divide-y divide-gray-100">
           {/* Sub-header */}
@@ -137,28 +187,31 @@ const CategoryAccordion: React.FC<CategoryAccordionProps> = ({
               status_malam: item.status_malam,
             };
             return (
-              <div key={item.id} className="grid grid-cols-[1fr_auto] gap-2 items-center px-4 py-2.5 hover:bg-slate-50/50 transition-colors">
-                <span className="text-sm text-slate-700 leading-tight">{item.equipment_name}</span>
-                <div className="flex gap-2">
-                  <StatusToggle
-                    value={local.status_pagi}
-                    onChange={(v) => onStatusChange(item.id, 'status_pagi', v)}
-                    disabled={disabled}
-                  />
-                  <StatusToggle
-                    value={local.status_siang}
-                    onChange={(v) => onStatusChange(item.id, 'status_siang', v)}
-                    disabled={disabled}
-                  />
-                  <StatusToggle
-                    value={local.status_malam}
-                    onChange={(v) => onStatusChange(item.id, 'status_malam', v)}
-                    disabled={disabled}
-                  />
-                </div>
-              </div>
+              <EquipmentRow
+                key={item.id}
+                item={item}
+                localStatus={local}
+                onStatusChange={(shift, v) => onStatusChange(item.id, shift, v)}
+                onEdit={() => onEditItem(item)}
+                onDelete={() => onDeleteItem(item.id)}
+                canManage={canManage}
+                disabled={disabled}
+              />
             );
           })}
+
+          {/* Add item button */}
+          {canManage && !disabled && (
+            <div className="px-4 py-2">
+              <button
+                type="button"
+                onClick={() => onAddItem(category)}
+                className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-emerald-600 transition-colors"
+              >
+                <Plus size={12} /> Tambah peralatan ke {category}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -184,12 +237,125 @@ const PersonnelBlock: React.FC<{ label: string; info: PersonnelShiftInfo | undef
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {all.map((p, i) => (
-            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
+            <span key={i} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
+              p.role === 'Manager Teknik' ? 'bg-blue-50 text-blue-700' :
+              p.role === 'Supervisor TFP' ? 'bg-emerald-50 text-emerald-700' :
+              'bg-slate-100 text-slate-700'
+            }`}>
               {p.name}
             </span>
           ))}
         </div>
       )}
+    </div>
+  );
+};
+
+// ─── Edit Equipment Modal ──────────────────────────────────
+interface EditEquipmentModalProps {
+  isOpen: boolean;
+  item: LogbookTfpItem | null;
+  onClose: () => void;
+  onSave: (name: string, category: string) => void;
+  isSaving: boolean;
+}
+
+const EditEquipmentModal: React.FC<EditEquipmentModalProps> = ({ isOpen, item, onClose, onSave, isSaving }) => {
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('');
+
+  useEffect(() => {
+    if (item) {
+      setName(item.equipment_name);
+      setCategory('');
+    }
+  }, [item]);
+
+  if (!isOpen || !item) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+      <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <h2 className="text-base font-semibold text-slate-800">Edit Peralatan</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-gray-100 transition-colors"><X size={18} /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Nama Peralatan</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>Batal</Button>
+            <Button type="button" isLoading={isSaving} onClick={() => onSave(name, category)} disabled={!name.trim()}>
+              Simpan
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Add Equipment Modal ───────────────────────────────────
+interface AddEquipmentModalProps {
+  isOpen: boolean;
+  defaultCategory: string;
+  onClose: () => void;
+  onAdd: (name: string, category: string) => void;
+  isSaving: boolean;
+}
+
+const AddEquipmentModal: React.FC<AddEquipmentModalProps> = ({ isOpen, defaultCategory, onClose, onAdd, isSaving }) => {
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState(defaultCategory);
+
+  useEffect(() => { setCategory(defaultCategory); setName(''); }, [defaultCategory, isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+      <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <h2 className="text-base font-semibold text-slate-800">Tambah Peralatan</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-gray-100 transition-colors"><X size={18} /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Kategori</label>
+            <input
+              type="text"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Nama Peralatan <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Contoh: UPS Baru"
+              className="w-full h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>Batal</Button>
+            <Button type="button" isLoading={isSaving} onClick={() => onAdd(name, category)} disabled={!name.trim() || !category.trim()} className="gap-1.5">
+              <Plus size={14} /> Tambah
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -208,6 +374,11 @@ export const LogbookTfpDetail: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Equipment management state
+  const [editingItem, setEditingItem] = useState<LogbookTfpItem | null>(null);
+  const [addingCategory, setAddingCategory] = useState<string | null>(null);
+  const [isEquipmentSaving, setIsEquipmentSaving] = useState(false);
+
   // Local item state (S/US toggles)
   const [localItems, setLocalItems] = useState<
     Record<number, { status_pagi: ShiftStatus; status_siang: ShiftStatus; status_malam: ShiftStatus }>
@@ -225,7 +396,6 @@ export const LogbookTfpDetail: React.FC = () => {
     try {
       const data = await logbookTfpService.getLogbook(Number(id));
       setRecord(data);
-      // Initialize local items from API data
       const init: typeof localItems = {};
       Object.values(data.items_by_category).flat().forEach((item) => {
         init[item.id] = {
@@ -247,6 +417,12 @@ export const LogbookTfpDetail: React.FC = () => {
 
   const isSigned = !!record?.is_signed;
   const canSign = user?.role === 'Manager Teknik';
+  // Equipment management: Manager Teknik + Supervisor TFP/CNSD + Admin
+  const canManageEquipment =
+    user?.role === 'Manager Teknik' ||
+    user?.role === 'Supervisor TFP' ||
+    user?.role === 'Supervisor CNSD' ||
+    user?.role === 'Admin';
 
   const handleStatusChange = (
     itemId: number,
@@ -323,6 +499,80 @@ export const LogbookTfpDetail: React.FC = () => {
     }
   };
 
+  // ── Equipment management ───────────────────────────────
+  const handleEditEquipment = async (name: string, _category: string) => {
+    if (!record || !editingItem) return;
+    setIsEquipmentSaving(true);
+    try {
+      const updated = await logbookTfpService.editEquipment(record.id, editingItem.id, { name });
+      setRecord(updated);
+      // Re-init local items for new item ids
+      const init: typeof localItems = { ...localItems };
+      Object.values(updated.items_by_category).flat().forEach((item) => {
+        if (!init[item.id]) {
+          init[item.id] = { status_pagi: item.status_pagi, status_siang: item.status_siang, status_malam: item.status_malam };
+        }
+      });
+      setLocalItems(init);
+      setEditingItem(null);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response) {
+        const data = err.response.data as { message?: string };
+        setErrorMessage(data.message ?? 'Gagal mengubah peralatan.');
+      } else {
+        setErrorMessage('Gagal mengubah peralatan.');
+      }
+    } finally {
+      setIsEquipmentSaving(false);
+    }
+  };
+
+  const handleDeleteEquipment = async (itemId: number) => {
+    if (!record || !confirm('Hapus peralatan ini dari logbook?')) return;
+    try {
+      const updated = await logbookTfpService.removeEquipment(record.id, itemId);
+      setRecord(updated);
+      setLocalItems((prev) => {
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
+      });
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response) {
+        const data = err.response.data as { message?: string };
+        setErrorMessage(data.message ?? 'Gagal menghapus peralatan.');
+      } else {
+        setErrorMessage('Gagal menghapus peralatan.');
+      }
+    }
+  };
+
+  const handleAddEquipment = async (name: string, category: string) => {
+    if (!record) return;
+    setIsEquipmentSaving(true);
+    try {
+      const updated = await logbookTfpService.addEquipment(record.id, name, category);
+      setRecord(updated);
+      const init: typeof localItems = { ...localItems };
+      Object.values(updated.items_by_category).flat().forEach((item) => {
+        if (!init[item.id]) {
+          init[item.id] = { status_pagi: item.status_pagi, status_siang: item.status_siang, status_malam: item.status_malam };
+        }
+      });
+      setLocalItems(init);
+      setAddingCategory(null);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response) {
+        const data = err.response.data as { message?: string };
+        setErrorMessage(data.message ?? 'Gagal menambah peralatan.');
+      } else {
+        setErrorMessage('Gagal menambah peralatan.');
+      }
+    } finally {
+      setIsEquipmentSaving(false);
+    }
+  };
+
   const handleSign = async (base64: string) => {
     if (!record) return;
     setIsSigning(true);
@@ -368,7 +618,6 @@ export const LogbookTfpDetail: React.FC = () => {
 
   const categories = Object.keys(record.items_by_category);
 
-  // Group notes by shift for timeline display
   const notesByShift = {
     pagi: record.notes.filter((n) => n.shift === 'pagi'),
     siang: record.notes.filter((n) => n.shift === 'siang'),
@@ -380,6 +629,17 @@ export const LogbookTfpDetail: React.FC = () => {
     siang: 'bg-sky-50 border-sky-200 text-sky-700',
     malam: 'bg-indigo-50 border-indigo-200 text-indigo-700',
   };
+
+  // Collect all unique managers from all 3 shifts for signature block
+  const managersOnDuty: Array<{ name: string; user_id: number; shift: string }> = [];
+  if (record.personnel_on_duty) {
+    (['pagi', 'siang', 'malam'] as const).forEach((shift) => {
+      const mgr = record.personnel_on_duty?.[shift]?.manager;
+      if (mgr && !managersOnDuty.find((m) => m.user_id === mgr.user_id)) {
+        managersOnDuty.push({ ...mgr, shift });
+      }
+    });
+  }
 
   return (
     <div className="space-y-5 animate-fade-in max-w-7xl mx-auto">
@@ -453,6 +713,12 @@ export const LogbookTfpDetail: React.FC = () => {
             </div>
           </div>
 
+          {canManageEquipment && !isSigned && (
+            <p className="text-[11px] text-slate-400">
+              Hover pada nama peralatan untuk edit/hapus. Klik "+ Tambah peralatan" di bawah kategori untuk menambah baris baru.
+            </p>
+          )}
+
           {categories.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center text-slate-400 text-sm">
               Tidak ada data peralatan.
@@ -466,6 +732,10 @@ export const LogbookTfpDetail: React.FC = () => {
                   items={record.items_by_category[cat]}
                   localItems={localItems}
                   onStatusChange={handleStatusChange}
+                  onEditItem={setEditingItem}
+                  onDeleteItem={handleDeleteEquipment}
+                  onAddItem={setAddingCategory}
+                  canManage={canManageEquipment}
                   disabled={isSigned}
                   defaultOpen={idx === 0}
                 />
@@ -473,7 +743,17 @@ export const LogbookTfpDetail: React.FC = () => {
             </div>
           )}
 
-          {/* Save button (bottom of left panel) */}
+          {/* Add to new category */}
+          {canManageEquipment && !isSigned && (
+            <button
+              type="button"
+              onClick={() => setAddingCategory('')}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-600 transition-colors px-1"
+            >
+              <Plus size={13} /> Tambah peralatan ke kategori baru
+            </button>
+          )}
+
           {!isSigned && (
             <div className="flex justify-end pt-2">
               <Button onClick={handleSave} isLoading={isSaving} className="gap-2">
@@ -487,11 +767,9 @@ export const LogbookTfpDetail: React.FC = () => {
         <div className="space-y-3">
           <h3 className="text-sm font-bold text-slate-700">Catatan Kegiatan</h3>
 
-          {/* Add note form */}
           {!isSigned && (
             <form onSubmit={handleAddNote} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-3">
               <div className="grid grid-cols-2 gap-2">
-                {/* Shift selector */}
                 <div>
                   <label className="block text-[11px] font-medium text-slate-500 mb-1">Shift</label>
                   <select
@@ -504,7 +782,6 @@ export const LogbookTfpDetail: React.FC = () => {
                     <option value="malam">Malam</option>
                   </select>
                 </div>
-                {/* Time input */}
                 <div>
                   <label className="block text-[11px] font-medium text-slate-500 mb-1">Jam</label>
                   <input
@@ -515,7 +792,6 @@ export const LogbookTfpDetail: React.FC = () => {
                   />
                 </div>
               </div>
-              {/* Activity textarea */}
               <div>
                 <label className="block text-[11px] font-medium text-slate-500 mb-1">Kegiatan / Catatan</label>
                 <textarea
@@ -534,7 +810,6 @@ export const LogbookTfpDetail: React.FC = () => {
             </form>
           )}
 
-          {/* Timeline */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             {record.notes.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center px-4">
@@ -549,31 +824,22 @@ export const LogbookTfpDetail: React.FC = () => {
                   if (notes.length === 0) return null;
                   return (
                     <div key={shift}>
-                      {/* Shift header */}
                       <div className={`px-4 py-2 border-b border-gray-100 ${shiftColors[shift]}`}>
-                        <span className="text-[11px] font-bold uppercase tracking-wider capitalize">
-                          Shift {shift}
-                        </span>
+                        <span className="text-[11px] font-bold uppercase tracking-wider capitalize">Shift {shift}</span>
                       </div>
-                      {/* Notes */}
                       {notes.map((note) => (
                         <div key={note.id} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50/50 group">
-                          {/* Timeline dot */}
                           <div className="flex flex-col items-center shrink-0 mt-1">
                             <div className="h-2 w-2 rounded-full bg-slate-300 group-hover:bg-emerald-400 transition-colors" />
                           </div>
-                          {/* Content */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              {note.time && (
-                                <span className="text-[11px] font-mono font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                                  {note.time}
-                                </span>
-                              )}
-                            </div>
+                            {note.time && (
+                              <span className="text-[11px] font-mono font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded mb-0.5 inline-block">
+                                {note.time}
+                              </span>
+                            )}
                             <p className="text-sm text-slate-700 leading-snug">{note.activity}</p>
                           </div>
-                          {/* Delete */}
                           {!isSigned && (
                             <button
                               type="button"
@@ -595,9 +861,9 @@ export const LogbookTfpDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Signature Block ───────────────────────────────── */}
+      {/* ── Signature Block — semua Manager Teknik on duty ─── */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-        <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="flex items-start justify-between gap-4 mb-5">
           <div>
             <h3 className="text-base font-bold text-slate-800">Tanda Tangan Manager Teknik</h3>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -611,58 +877,118 @@ export const LogbookTfpDetail: React.FC = () => {
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row items-start gap-6">
-          {/* Signature display */}
-          <div className="w-full sm:w-64 shrink-0">
-            <SignatureDisplay
-              signerName={record.manager_signed_by_name ?? 'Manager Teknik'}
-              signedAt={record.manager_signed_at}
-              signatureImage={record.manager_signature}
-              role="Manager Teknik"
-              isPending={!isSigned}
-              isNotRequired={false}
-            />
-          </div>
-
-          {/* Sign button or locked note */}
-          <div className="flex-1">
-            {isSigned ? (
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-emerald-700">
-                  Ditandatangani oleh: {record.manager_signed_by_name}
+        {/* If already signed — show who signed */}
+        {isSigned ? (
+          <div className="flex flex-col sm:flex-row items-start gap-6">
+            <div className="w-full sm:w-64 shrink-0">
+              <SignatureDisplay
+                signerName={record.manager_signed_by_name ?? 'Manager Teknik'}
+                signedAt={record.manager_signed_at}
+                signatureImage={record.manager_signature}
+                role="Manager Teknik"
+                isPending={false}
+                isNotRequired={false}
+              />
+            </div>
+            <div className="flex-1 space-y-1">
+              <p className="text-sm font-semibold text-emerald-700">
+                Ditandatangani oleh: {record.manager_signed_by_name}
+              </p>
+              {record.manager_signed_at && (
+                <p className="text-xs text-slate-500">
+                  {new Date(record.manager_signed_at).toLocaleString('id-ID', {
+                    day: '2-digit', month: 'short', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit',
+                  })}
                 </p>
-                {record.manager_signed_at && (
-                  <p className="text-xs text-slate-500">
-                    {new Date(record.manager_signed_at).toLocaleString('id-ID', {
-                      day: '2-digit', month: 'short', year: 'numeric',
-                      hour: '2-digit', minute: '2-digit',
-                    })}
+              )}
+            </div>
+          </div>
+        ) : managersOnDuty.length > 0 ? (
+          /* Show all managers on duty — each can sign */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {managersOnDuty.map((mgr) => {
+              const isCurrentUser = user?.name?.trim().toLowerCase() === mgr.name.trim().toLowerCase();
+              return (
+                <div key={mgr.user_id} className="space-y-3">
+                  <SignatureDisplay
+                    signerName={mgr.name}
+                    signedAt={null}
+                    signatureImage={null}
+                    role={`Manager Teknik — Shift ${mgr.shift.charAt(0).toUpperCase() + mgr.shift.slice(1)}`}
+                    isPending={true}
+                    isNotRequired={false}
+                  />
+                  {canSign && isCurrentUser ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="w-full gap-2"
+                      onClick={() => setShowSignCanvas(true)}
+                    >
+                      <PenLine size={15} /> Tanda Tangan
+                    </Button>
+                  ) : canSign ? (
+                    <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-600">
+                      <Lock size={12} className="mt-0.5 text-slate-400 shrink-0" />
+                      <span>Hanya dapat ditandatangani oleh <span className="font-semibold text-slate-800">{mgr.name}</span></span>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* No roster data — fallback single sign block */
+          <div className="flex flex-col sm:flex-row items-start gap-6">
+            <div className="w-full sm:w-64 shrink-0">
+              <SignatureDisplay
+                signerName="Manager Teknik"
+                signedAt={null}
+                signatureImage={null}
+                role="Manager Teknik"
+                isPending={true}
+                isNotRequired={false}
+              />
+            </div>
+            <div className="flex-1">
+              {canSign ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-slate-600">
+                    Klik tombol di bawah untuk menandatangani logbook ini sebagai Manager Teknik.
                   </p>
-                )}
-              </div>
-            ) : canSign ? (
-              <div className="space-y-2">
-                <p className="text-sm text-slate-600">
-                  Klik tombol di bawah untuk menandatangani logbook ini sebagai Manager Teknik.
-                </p>
-                <Button
-                  onClick={() => setShowSignCanvas(true)}
-                  className="gap-2"
-                >
-                  <PenLine size={15} /> Tanda Tangan
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-                <Lock size={14} className="text-slate-400 mt-0.5 shrink-0" />
-                <p className="text-sm text-slate-500">
-                  Hanya dapat ditandatangani oleh <span className="font-semibold text-slate-700">Manager Teknik</span>.
-                </p>
-              </div>
-            )}
+                  <Button onClick={() => setShowSignCanvas(true)} className="gap-2">
+                    <PenLine size={15} /> Tanda Tangan
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                  <Lock size={14} className="text-slate-400 mt-0.5 shrink-0" />
+                  <p className="text-sm text-slate-500">
+                    Hanya dapat ditandatangani oleh <span className="font-semibold text-slate-700">Manager Teknik</span>.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
+
+      {/* Equipment modals */}
+      <EditEquipmentModal
+        isOpen={!!editingItem}
+        item={editingItem}
+        onClose={() => setEditingItem(null)}
+        onSave={handleEditEquipment}
+        isSaving={isEquipmentSaving}
+      />
+      <AddEquipmentModal
+        isOpen={addingCategory !== null}
+        defaultCategory={addingCategory ?? ''}
+        onClose={() => setAddingCategory(null)}
+        onAdd={handleAddEquipment}
+        isSaving={isEquipmentSaving}
+      />
 
       {/* Signature Canvas Modal */}
       <SignatureCanvas

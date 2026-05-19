@@ -97,6 +97,27 @@ export const logbookTfpService = {
     return response.data.data;
   },
 
+  async addEquipment(id: number, name: string, category: string): Promise<LogbookTfpDetail> {
+    const response = await axios.post(`${API_URL}/v1/logbook/tfp/${id}/equipments`, { name, category }, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  async editEquipment(id: number, itemId: number, data: { name?: string; category?: string }): Promise<LogbookTfpDetail> {
+    const response = await axios.put(`${API_URL}/v1/logbook/tfp/${id}/equipments/${itemId}`, data, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  async removeEquipment(id: number, itemId: number): Promise<LogbookTfpDetail> {
+    const response = await axios.delete(`${API_URL}/v1/logbook/tfp/${id}/equipments/${itemId}`, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
   async deleteLogbook(id: number): Promise<void> {
     await axios.delete(`${API_URL}/v1/logbook/tfp/${id}`, {
       headers: getAuthHeaders(),

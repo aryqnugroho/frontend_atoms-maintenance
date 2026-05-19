@@ -5,15 +5,16 @@ import {
   Activity,
   ArrowLeft,
   Calendar,
-  CheckCircle2,
-  Clock3,
+  Edit2,
   Filter,
   Plus,
+  Printer,
   Trash2,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { PageHeader } from '@/components/common/PageHeader';
+import { StatusBadge } from '@/components/common/StatusBadge';
 import { useAuth } from '@/hooks/useAuth';
 import { logbookTfpService } from '@/services/logbookTfpService';
 import type { LogbookTfpSummary } from '@/types/logbookTfp';
@@ -370,83 +371,96 @@ export const LogbookTfp: React.FC = () => {
                     <span className="flex items-center gap-1.5"><Calendar size={13} /> Tanggal</span>
                   </th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">
-                    Personel On Duty
+                    Manager Teknik On Duty
                   </th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">
-                    Status TTD Manager
+                    Status
                   </th>
-                  <th className="text-center text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80 w-24">
+                  <th className="text-center text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80 w-32">
                     Aksi
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {logbooks.map((lb) => (
-                  <tr
-                    key={lb.id}
-                    onClick={() => navigate(`/logbooks/tfp/${lb.id}`)}
-                    tabIndex={0}
-                    role="button"
-                    className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary"
-                  >
-                    {/* Tanggal */}
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-semibold text-slate-800">{formatDateShort(lb.date)}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">{formatDate(lb.date).split(',')[0]}</p>
-                    </td>
+                {logbooks.map((lb) => {
+                  // Derive status: completed = signed, on_hold = not signed but has notes, ongoing = fresh
+                  const status = lb.is_signed ? 'completed' : lb.notes_count > 0 ? 'on_hold' : 'ongoing';
+                  return (
+                    <tr
+                      key={lb.id}
+                      onClick={() => navigate(`/logbooks/tfp/${lb.id}`)}
+                      tabIndex={0}
+                      role="button"
+                      className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary"
+                    >
+                      {/* Tanggal */}
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-semibold text-slate-800">{formatDateShort(lb.date)}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{formatDate(lb.date).split(',')[0]}</p>
+                      </td>
 
-                    {/* Personel On Duty — shown from detail; list only shows creator */}
-                    <td className="px-6 py-4">
-                      <p className="text-xs text-slate-500">
-                        {lb.created_by_name
-                          ? <span>Dibuat oleh: <span className="font-medium text-slate-700">{lb.created_by_name}</span></span>
-                          : <span className="text-slate-300">—</span>
-                        }
-                      </p>
-                      {lb.notes_count > 0 && (
-                        <p className="text-[11px] text-slate-400 mt-0.5">{lb.notes_count} catatan</p>
-                      )}
-                    </td>
-
-                    {/* Status TTD */}
-                    <td className="px-6 py-4">
-                      {lb.is_signed ? (
-                        <div className="flex items-center gap-1.5">
-                          <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                      {/* Manager Teknik On Duty */}
+                      <td className="px-6 py-4">
+                        {lb.is_signed && lb.manager_signed_by_name ? (
                           <div>
-                            <p className="text-xs font-semibold text-emerald-700">Sudah TTD</p>
-                            {lb.manager_signed_by_name && (
-                              <p className="text-[11px] text-slate-400">{lb.manager_signed_by_name}</p>
-                            )}
+                            <p className="text-xs font-medium text-slate-700">{lb.manager_signed_by_name}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Sudah TTD</p>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          <Clock3 size={15} className="text-amber-500 shrink-0" />
-                          <p className="text-xs font-medium text-amber-600">Belum TTD</p>
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Aksi */}
-                    <td className="px-6 py-4 text-center">
-                      <div
-                        className="flex items-center justify-center gap-2"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {canDelete && !lb.is_signed && (
-                          <button
-                            onClick={() => handleDelete(lb.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Hapus"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                        ) : lb.created_by_name ? (
+                          <div>
+                            <p className="text-xs text-slate-600">{lb.created_by_name}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Dibuat oleh</p>
+                          </div>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        {lb.notes_count > 0 && (
+                          <p className="text-[11px] text-slate-400 mt-1">{lb.notes_count} catatan</p>
+                        )}
+                      </td>
+
+                      {/* Status — menggunakan StatusBadge standar */}
+                      <td className="px-6 py-4">
+                        <StatusBadge status={status} variant="pill" />
+                      </td>
+
+                      {/* Aksi */}
+                      <td className="px-6 py-4 text-center">
+                        <div
+                          className="flex items-center justify-center gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* Edit */}
+                          <button
+                            onClick={() => navigate(`/logbooks/tfp/${lb.id}`)}
+                            className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="Edit / Detail"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          {/* Print */}
+                          <button
+                            onClick={() => navigate(`/logbooks/tfp/${lb.id}/print`)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="Print PDF"
+                          >
+                            <Printer size={16} />
+                          </button>
+                          {/* Delete */}
+                          {canDelete && !lb.is_signed && (
+                            <button
+                              onClick={() => handleDelete(lb.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Hapus"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

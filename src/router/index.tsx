@@ -211,6 +211,7 @@ export const router = createBrowserRouter([
           { path: '/logbooks/cnsd', element: <LogbookCnsd /> },
           { path: '/logbooks/tfp', element: <LogbookTfp /> },
           { path: '/logbooks/tfp/:id', element: <LogbookTfpDetail /> },
+          { path: '/logbooks/tfp/:id/print', element: <ComingSoonPage /> },
 
           { path: '/admin/users', element: <ComingSoonPage /> },
 
