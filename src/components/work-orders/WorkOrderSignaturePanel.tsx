@@ -28,13 +28,6 @@ const roleLabels: Record<WorkOrderSignatureRole, string> = {
   technician: 'Teknisi',
 };
 
-const getCurrentUserSignatureRole = (role?: string): WorkOrderSignatureRole | null => {
-  if (role === 'Manager Teknik') return 'mt';
-  if (role === 'Supervisor CNSD' || role === 'Supervisor TFP') return 'supervisor';
-  if (role === 'Teknisi CNSD' || role === 'Teknisi TFP') return 'technician';
-  return null;
-};
-
 /**
  * Tolerant name comparison that mirrors the backend WorkOrderService::namesMatch.
  * Trim, collapse whitespace, case-insensitive.
@@ -67,7 +60,6 @@ export const WorkOrderSignaturePanel: React.FC<WorkOrderSignaturePanelProps> = (
   const [isSigning, setIsSigning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const currentUserSignatureRole = getCurrentUserSignatureRole(user?.role);
   const pendingSignatures = workOrder.pending_signatures ?? [];
 
   const columns = useMemo<SignatureColumn[]>(() => [
@@ -100,13 +92,34 @@ export const WorkOrderSignaturePanel: React.FC<WorkOrderSignaturePanelProps> = (
    * For Teknisi (shift WOs), the user is also authorized when their name matches
    * any person listed in workOrder.personnel.
    */
+  /**
+   * Role-based delegation authorization.
+   * - Manager Teknik: can sign mt (own), supervisor (all), technician (all)
+   * - Supervisor: can sign supervisor (own), technician (all)
+   * - Teknisi: can sign technician (all)
+   */
   const isAuthorizedSigner = (column: SignatureColumn) => {
-    if (currentUserSignatureRole !== column.role) return false;
-    if (!user?.name) return false;
-    if (namesMatch(column.signerName, user.name)) return true;
-    if (column.role === 'technician') {
-      return workOrder.personnel.some((p) => namesMatch(p.name, user.name));
+    if (!user?.name || !user?.role) return false;
+
+    const slotRole = column.role; // 'mt' | 'supervisor' | 'technician'
+
+    if (user.role === 'Manager Teknik') {
+      // Manager can sign all slots; mt slot requires own name match
+      if (slotRole === 'mt') return namesMatch(column.signerName, user.name);
+      return true; // supervisor + technician: delegation allowed
     }
+
+    if (user.role === 'Supervisor CNSD' || user.role === 'Supervisor TFP') {
+      if (slotRole === 'mt') return false;
+      if (slotRole === 'supervisor') return namesMatch(column.signerName, user.name);
+      return true; // technician: delegation allowed
+    }
+
+    if (user.role === 'Teknisi CNSD' || user.role === 'Teknisi TFP') {
+      if (slotRole !== 'technician') return false;
+      return true; // any technician slot
+    }
+
     return false;
   };
 

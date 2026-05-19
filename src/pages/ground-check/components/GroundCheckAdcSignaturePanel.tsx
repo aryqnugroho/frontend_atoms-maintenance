@@ -108,10 +108,12 @@ export const GroundCheckAdcSignaturePanel: React.FC<Props> = ({ record, onSignSu
   const canSignManager = userRole === 'Manager Teknik' || userRole === 'Admin';
   const canSignSupervisor =
     userRole === 'Supervisor CNSD' ||
+    userRole === 'Manager Teknik' ||
     userRole === 'Admin';
   const canSignTechnician =
     userRole === 'Teknisi CNSD' ||
     userRole === 'Supervisor CNSD' ||
+    userRole === 'Manager Teknik' ||
     userRole === 'Admin';
 
   const handleSign = async (signature: string) => {
@@ -146,7 +148,9 @@ export const GroundCheckAdcSignaturePanel: React.FC<Props> = ({ record, onSignSu
         const expectedName = col.name ?? '';
         const isSigned = !!col.signature;
         const requiredRoleOk = col.kind === 'manager' ? canSignManager : canSignSupervisor;
-        const isAuthorized = !!expectedName && namesMatch(expectedName, userName) && requiredRoleOk;
+        const isAuthorized = col.kind === 'manager'
+              ? (!!expectedName && namesMatch(expectedName, userName) && requiredRoleOk)
+              : (!!expectedName && requiredRoleOk); // Supervisor slot: Manager can delegate
         const showLockedNote = !isSigned && !isCompleted && !!expectedName && !isAuthorized;
 
         return (
@@ -188,7 +192,7 @@ export const GroundCheckAdcSignaturePanel: React.FC<Props> = ({ record, onSignSu
       case 'technician': {
         const row = col.row;
         const isSigned = !!row.technician_signature;
-        const isAuthorized = canSignTechnician && namesMatch(row.technician_name, userName);
+        const isAuthorized = canSignTechnician; // Role-based delegation: any authorized role can sign any tech row
         const showLockedNote = !isSigned && !isCompleted && !isAuthorized;
 
         return (
