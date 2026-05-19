@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Radio,
@@ -104,6 +104,19 @@ export const CnsdReceiverMeterDetailPage: React.FC = () => {
     setLocalItems(updated.items);
   };
 
+  // Compute grouped items for section 1 — must be called unconditionally (Rules of Hooks)
+  const groupedItems = useMemo(() => {
+    if (activeTab !== '1') return null;
+    const groups: Map<number, CnsdReceiverMeterItem[]> = new Map();
+    const section1 = localItems.filter((it) => it.section_code === '1');
+    for (const item of section1) {
+      const gn = item.group_number ?? 0;
+      if (!groups.has(gn)) groups.set(gn, []);
+      groups.get(gn)!.push(item);
+    }
+    return groups;
+  }, [activeTab, localItems]);
+
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto space-y-4 animate-fade-in">
@@ -127,18 +140,6 @@ export const CnsdReceiverMeterDetailPage: React.FC = () => {
 
   const isCompleted = record.status === 'completed';
   const sectionItems = localItems.filter((it) => it.section_code === activeTab);
-
-  // Group items by group_number for section 1
-  const groupedItems = React.useMemo(() => {
-    if (activeTab !== '1') return null;
-    const groups: Map<number, CnsdReceiverMeterItem[]> = new Map();
-    for (const item of sectionItems) {
-      const gn = item.group_number ?? 0;
-      if (!groups.has(gn)) groups.set(gn, []);
-      groups.get(gn)!.push(item);
-    }
-    return groups;
-  }, [activeTab, sectionItems]);
 
   return (
     <div className="space-y-5 animate-fade-in max-w-7xl mx-auto">
