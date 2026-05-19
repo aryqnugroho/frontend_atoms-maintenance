@@ -76,6 +76,8 @@ import { ReportingDamageFormPage } from '@/pages/reporting/ReportingDamageFormPa
 import { ReportingDamagePrintView } from '@/pages/reporting/ReportingDamagePrintView';
 import { LogbookPage } from '@/pages/logbook/LogbookPage';
 import { LogbookCnsd } from '@/pages/logbook/LogbookCnsd';
+import { LogbookCnsdDetail } from '@/pages/logbook/LogbookCnsdDetail';
+import { LogbookCnsdPrintView } from '@/pages/logbook/LogbookCnsdPrintView';
 import { LogbookTfp } from '@/pages/logbook/LogbookTfp';
 import { LogbookTfpDetail } from '@/pages/logbook/LogbookTfpDetail';
 import { LogbookTfpPrintView } from '@/pages/logbook/LogbookTfpPrintView';
@@ -112,6 +114,7 @@ export const router = createBrowserRouter([
       { path: '/tfp/glidepath/:id/print', element: <TfpGlidepathPrintView /> },
       { path: '/ground-check/adc/:id/print', element: <GroundCheckAdcPrintView /> },
       { path: '/logbooks/tfp/:id/print', element: <LogbookTfpPrintView /> },
+      { path: '/logbooks/cnsd/:id/print', element: <LogbookCnsdPrintView /> },
       {
         element: <AppShell />,
         children: [
@@ -211,6 +214,7 @@ export const router = createBrowserRouter([
           // Logbook
           { path: '/logbooks', element: <LogbookPage /> },
           { path: '/logbooks/cnsd', element: <LogbookCnsd /> },
+          { path: '/logbooks/cnsd/:id', element: <LogbookCnsdDetail /> },
           { path: '/logbooks/tfp', element: <LogbookTfp /> },
           { path: '/logbooks/tfp/:id', element: <LogbookTfpDetail /> },
 
