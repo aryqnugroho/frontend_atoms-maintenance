@@ -62,6 +62,7 @@ export const ReportingDamageSignaturePanel: React.FC<Props> = ({ record, onUpdat
     userRole === 'Teknisi TFP' ||
     userRole === 'Supervisor CNSD' ||
     userRole === 'Supervisor TFP' ||
+    userRole === 'Manager Teknik' ||
     userRole === 'Admin';
 
   const handleSign = async (signature: string) => {
@@ -138,9 +139,7 @@ export const ReportingDamageSignaturePanel: React.FC<Props> = ({ record, onUpdat
     // repairer
     const row = (col as { kind: 'repairer'; label: string; row: ReportingDamageRepairer }).row;
     const isSigned = !!row.signature;
-    const idMatches = !!(row.person_id && userId && row.person_id === userId);
-    const nameMatches = namesMatch(row.person_name, userName);
-    const isAuthorized = canSignRepairer && (idMatches || nameMatches);
+    const isAuthorized = canSignRepairer; // Role-based delegation: any authorized role can sign
     const showLockedNote = !isSigned && !isCompleted && !isAuthorized;
 
     return (

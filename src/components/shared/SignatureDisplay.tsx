@@ -9,6 +9,8 @@ interface SignatureDisplayProps {
   role: string;
   isPending: boolean;
   isNotRequired?: boolean;
+  /** If the signature was delegated, show the actual signer's name */
+  delegatedByName?: string | null;
 }
 
 const formatSignedAt = (value: string | null) => {
@@ -30,6 +32,7 @@ export const SignatureDisplay: React.FC<SignatureDisplayProps> = ({
   role,
   isPending,
   isNotRequired = false,
+  delegatedByName,
 }) => {
   const signedTime = formatSignedAt(signedAt);
 
@@ -82,6 +85,11 @@ export const SignatureDisplay: React.FC<SignatureDisplayProps> = ({
       <p className="mt-3 text-xs text-slate-500">
         {signedTime ? `Ditandatangani ${signedTime}` : 'Belum ditandatangani'}
       </p>
+      {delegatedByName && signatureImage && (
+        <p className="mt-1 text-[11px] text-amber-600 font-medium">
+          Diwakili oleh {delegatedByName}
+        </p>
+      )}
     </div>
   );
 };
