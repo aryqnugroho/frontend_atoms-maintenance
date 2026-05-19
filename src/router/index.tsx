@@ -75,6 +75,8 @@ import { ReportingListPage } from '@/pages/reporting/ReportingListPage';
 import { ReportingDamageFormPage } from '@/pages/reporting/ReportingDamageFormPage';
 import { ReportingDamagePrintView } from '@/pages/reporting/ReportingDamagePrintView';
 import { LogbookPage } from '@/pages/logbook/LogbookPage';
+import { LogbookCnsd } from '@/pages/logbook/LogbookCnsd';
+import { LogbookTfp } from '@/pages/logbook/LogbookTfp';
 import { ComingSoonPage } from '@/pages/shared/ComingSoonPage';
 
 export const router = createBrowserRouter([
@@ -205,6 +207,8 @@ export const router = createBrowserRouter([
 
           // Logbook
           { path: '/logbooks', element: <LogbookPage /> },
+          { path: '/logbooks/cnsd', element: <LogbookCnsd /> },
+          { path: '/logbooks/tfp', element: <LogbookTfp /> },
 
           { path: '/admin/users', element: <ComingSoonPage /> },
 
