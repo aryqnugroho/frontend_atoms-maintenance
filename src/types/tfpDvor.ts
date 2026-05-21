@@ -1,3 +1,9 @@
+// ─── TFP Performance Check Gedung DVOR ───────────────────────────────────
+//
+// Cells are dynamic: the record carries a `columns_config` defining panels
+// and sub-columns; each item stores values + is_disabled_map + merge_map keyed
+// by composite "panelId.subKey" (e.g. "panel_ats_d06.input").
+
 import type { ShiftType } from '@/types';
 
 export type TfpDvorStatus  = 'ongoing' | 'on_hold' | 'completed';
@@ -21,18 +27,28 @@ export interface TfpDvorTechnicianRow {
   sort_order: number;
 }
 
+export interface TfpDvorSubColumn {
+  key: string;
+  label: string;
+}
+
+export interface TfpDvorPanel {
+  id: string;
+  label: string;
+  sub_columns: TfpDvorSubColumn[];
+}
+
+export type TfpDvorColumnsConfig = TfpDvorPanel[];
+export type TfpDvorCellKey = string;
+
 export interface TfpDvorItem {
   id: number;
   parameter_number: string | null;
   parameter_name: string;
   unit: string | null;
-  panel_d01: string | null;
-  panel_d03: string | null;
-  panel_d04: string | null;
-  panel_d05: string | null;
-  panel_ats_d06_input: string | null;
-  panel_ats_d06_output: string | null;
-  is_disabled_map: Record<string, boolean> | null;
+  values: Record<TfpDvorCellKey, string>;
+  is_disabled_map: Record<TfpDvorCellKey, boolean>;
+  merge_map: Record<TfpDvorCellKey, number>;
   sort_order: number;
 }
 
@@ -70,6 +86,7 @@ export interface TfpDvorRecordDetail {
   time_filled: string | null;
   shift_type: ShiftType;
   location: string;
+  columns_config: TfpDvorColumnsConfig;
   status: TfpDvorStatus;
   manager: TfpDvorSignerInfo | null;
   supervisor: TfpDvorSignerInfo | null;
@@ -91,18 +108,23 @@ export interface TfpDvorListParams {
 }
 
 export interface TfpDvorUpdatePayload {
+  time_filled?: string | null;
   items: Array<{
     id: number;
-    panel_d01?: string | null;
-    panel_d03?: string | null;
-    panel_d04?: string | null;
-    panel_d05?: string | null;
-    panel_ats_d06_input?: string | null;
-    panel_ats_d06_output?: string | null;
+    values?: Record<TfpDvorCellKey, string | null>;
   }>;
   facilities?: Array<{
     id: number;
     kondisi?: string | null;
     keterangan?: string | null;
+  }>;
+}
+
+export interface TfpDvorSaveStructurePayload {
+  columns_config: TfpDvorColumnsConfig;
+  items: Array<{
+    id: number;
+    is_disabled_map?: Record<TfpDvorCellKey, boolean>;
+    merge_map?: Record<TfpDvorCellKey, number>;
   }>;
 }
