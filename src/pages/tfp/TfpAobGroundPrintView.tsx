@@ -111,9 +111,11 @@ export const TfpAobGroundPrintView: React.FC = () => {
     <div className="min-h-screen w-full bg-slate-100 p-4 text-black print:bg-white print:p-0">
       <style>{`
         @media print {
-          @page { size: A4 landscape; margin: 8mm 8mm; }
+          @page { size: A4 landscape; margin: 6mm 8mm; }
           body { background: white !important; }
           .print-hide { display: none !important; }
+          /* Keep the signature footer together so it never splits across pages */
+          .sig-footer { break-inside: avoid; page-break-inside: avoid; }
         }
       `}</style>
 
@@ -291,83 +293,75 @@ export const TfpAobGroundPrintView: React.FC = () => {
           </tbody>
         </table>
 
-        {/* Signature footer */}
-        <div className="mt-0 border border-black border-t-0">
+        {/* Signature footer — compact grid layout (no table) so it stays on 1 page */}
+        <div className="sig-footer mt-0 border border-black border-t-0">
           <div className="flex">
-            <div className="flex-1 border-r border-black p-2">
-              <div className="text-[10px] font-black text-center uppercase mb-2">Teknisi</div>
-              <table className="w-full border-collapse text-[9px]">
-                <thead>
-                  <tr className="bg-blue-100">
-                    <th className="border border-black px-1 py-1 w-7 text-center">No</th>
-                    <th className="border border-black px-1 py-1 text-left">Nama</th>
-                    <th className="border border-black px-1 py-1 w-24 text-center">Paraf</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {record.technicians.length > 0 ? (
-                    record.technicians.map((tech, idx) => (
-                      <tr key={tech.id}>
-                        <td className="border border-black px-1 py-1 text-center">{idx + 1}</td>
-                        <td className="border border-black px-1 py-1">{tech.technician_name}</td>
-                        <td className="border border-black px-1 py-1 text-center align-middle h-10">
+            {/* Teknisi — 2-column grid, no internal table headers */}
+            <div className="flex-1 border-r border-black px-2 py-1.5">
+              <div className="text-[10px] font-black text-center uppercase mb-1">Teknisi</div>
+              {record.technicians.length > 0 ? (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                  {record.technicians.map((tech, idx) => (
+                    <div key={tech.id} className="flex items-center gap-1.5">
+                      <span className="text-[9px] text-slate-500 w-3 shrink-0">{idx + 1}.</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[9px] font-semibold truncate leading-tight">{tech.technician_name}</div>
+                        <div className="h-7 flex items-center">
                           {tech.signature ? (
                             <img src={tech.signature} alt={`TTD ${tech.technician_name}`}
-                              className="mx-auto max-h-9 max-w-[90px] object-contain" />
+                              className="max-h-6 max-w-[95px] object-contain" />
                           ) : (
-                            <span className="text-[9px] text-gray-400 italic">Belum TTD</span>
+                            <span className="text-[8px] text-gray-400 italic">Belum TTD</span>
                           )}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className="border border-black px-1 py-2 text-center text-gray-400">
-                        Tidak ada teknisi
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-[9px] text-gray-400 py-2">Tidak ada teknisi</div>
+              )}
             </div>
 
-            <div className="flex w-[24%] flex-col items-center border-r border-black p-2 text-center min-h-[140px]">
-              <div className="text-[10px] font-black uppercase mb-1">Supervisor</div>
-              <div className="flex flex-1 items-center justify-center w-full mt-1">
+            {/* Supervisor */}
+            <div className="flex w-[22%] flex-col items-center border-r border-black px-2 py-1.5 text-center">
+              <div className="text-[10px] font-black uppercase">Supervisor</div>
+              <div className="flex flex-1 items-center justify-center w-full">
                 {record.supervisor ? (
                   record.supervisor.signature ? (
                     <img src={record.supervisor.signature} alt="TTD Supervisor"
-                      className="max-h-16 max-w-[130px] object-contain" />
+                      className="max-h-10 max-w-[110px] object-contain" />
                   ) : (
-                    <div className="h-16 w-28 border border-dashed border-gray-400" />
+                    <div className="h-10 w-24 border border-dashed border-gray-400" />
                   )
                 ) : (
-                  <span className="text-[9px] text-gray-400 italic">Tidak ada supervisor pada shift ini</span>
+                  <span className="text-[8px] text-gray-400 italic">Tidak ada supervisor pada shift ini</span>
                 )}
               </div>
-              <div className="mt-auto text-[10px] font-semibold">{record.supervisor?.name ?? '—'}</div>
+              <div className="text-[9px] font-semibold leading-tight">{record.supervisor?.name ?? '—'}</div>
             </div>
 
-            <div className="flex w-[24%] flex-col items-center p-2 text-center min-h-[140px]">
-              <div className="text-[10px] font-black uppercase mb-1">Manager Teknik</div>
-              <div className="flex flex-1 items-center justify-center w-full mt-1">
+            {/* Manager Teknik */}
+            <div className="flex w-[22%] flex-col items-center px-2 py-1.5 text-center">
+              <div className="text-[10px] font-black uppercase">Manager Teknik</div>
+              <div className="flex flex-1 items-center justify-center w-full">
                 {record.manager ? (
                   record.manager.signature ? (
                     <img src={record.manager.signature} alt="TTD Manager Teknik"
-                      className="max-h-16 max-w-[130px] object-contain" />
+                      className="max-h-10 max-w-[110px] object-contain" />
                   ) : (
-                    <div className="h-16 w-28 border border-dashed border-gray-400" />
+                    <div className="h-10 w-24 border border-dashed border-gray-400" />
                   )
                 ) : (
-                  <span className="text-[9px] text-gray-400 italic">Manager Teknik tidak ditugaskan</span>
+                  <span className="text-[8px] text-gray-400 italic">Manager Teknik tidak ditugaskan</span>
                 )}
               </div>
-              <div className="mt-auto text-[10px] font-semibold">{record.manager?.name ?? '—'}</div>
+              <div className="text-[9px] font-semibold leading-tight">{record.manager?.name ?? '—'}</div>
             </div>
           </div>
         </div>
 
-        <div className="mt-1 flex justify-between text-[8px] text-slate-700 px-1 pb-3">
+        <div className="mt-0.5 flex justify-between text-[8px] text-slate-700 px-1 pb-2">
           <span>(*) Coret yang tidak perlu</span>
           <span>Kondisi : (√) Baik / Normal</span>
         </div>
