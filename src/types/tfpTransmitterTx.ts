@@ -1,3 +1,9 @@
+// ─── TFP Performance Check Gedung (Transmitter) TX ───────────────────────
+//
+// Cells are dynamic: the record carries a `columns_config` defining panels
+// and sub-columns; each item stores values + is_disabled_map + merge_map keyed
+// by composite "panelId.subKey" (e.g. "panel_cos_tx03.input").
+
 import type { ShiftType } from '@/types';
 
 export type TfpTransmitterTxStatus  = 'ongoing' | 'on_hold' | 'completed';
@@ -21,23 +27,30 @@ export interface TfpTransmitterTxTechnicianRow {
   sort_order: number;
 }
 
+// ─── Dynamic columns ─────────────────────────────────────────────────────
+
+export interface TfpTransmitterTxSubColumn {
+  key: string;
+  label: string;
+}
+
+export interface TfpTransmitterTxPanel {
+  id: string;
+  label: string;
+  sub_columns: TfpTransmitterTxSubColumn[];
+}
+
+export type TfpTransmitterTxColumnsConfig = TfpTransmitterTxPanel[];
+export type TfpTransmitterTxCellKey = string;
+
 export interface TfpTransmitterTxItem {
   id: number;
   parameter_number: string | null;
   parameter_name: string;
   unit: string | null;
-  panel_tx01: string | null;
-  panel_tx02: string | null;
-  panel_cos_tx03_input: string | null;
-  panel_cos_tx03_output: string | null;
-  panel_output_ups_tx04: string | null;
-  panel_ups_tx07_input: string | null;
-  panel_ups_tx07_output: string | null;
-  panel_ac_tx06: string | null;
-  ups_piller_input: string | null;
-  ups_piller_output: string | null;
-  panel_milat_ru11: string | null;
-  is_disabled_map: Record<string, boolean> | null;
+  values: Record<TfpTransmitterTxCellKey, string>;
+  is_disabled_map: Record<TfpTransmitterTxCellKey, boolean>;
+  merge_map: Record<TfpTransmitterTxCellKey, number>;
   sort_order: number;
 }
 
@@ -75,6 +88,7 @@ export interface TfpTransmitterTxRecordDetail {
   time_filled: string | null;
   shift_type: ShiftType;
   location: string;
+  columns_config: TfpTransmitterTxColumnsConfig;
   status: TfpTransmitterTxStatus;
   manager: TfpTransmitterTxSignerInfo | null;
   supervisor: TfpTransmitterTxSignerInfo | null;
@@ -96,23 +110,23 @@ export interface TfpTransmitterTxListParams {
 }
 
 export interface TfpTransmitterTxUpdatePayload {
+  time_filled?: string | null;
   items: Array<{
     id: number;
-    panel_tx01?: string | null;
-    panel_tx02?: string | null;
-    panel_cos_tx03_input?: string | null;
-    panel_cos_tx03_output?: string | null;
-    panel_output_ups_tx04?: string | null;
-    panel_ups_tx07_input?: string | null;
-    panel_ups_tx07_output?: string | null;
-    panel_ac_tx06?: string | null;
-    ups_piller_input?: string | null;
-    ups_piller_output?: string | null;
-    panel_milat_ru11?: string | null;
+    values?: Record<TfpTransmitterTxCellKey, string | null>;
   }>;
   facilities?: Array<{
     id: number;
     kondisi?: string | null;
     keterangan?: string | null;
+  }>;
+}
+
+export interface TfpTransmitterTxSaveStructurePayload {
+  columns_config: TfpTransmitterTxColumnsConfig;
+  items: Array<{
+    id: number;
+    is_disabled_map?: Record<TfpTransmitterTxCellKey, boolean>;
+    merge_map?: Record<TfpTransmitterTxCellKey, number>;
   }>;
 }
