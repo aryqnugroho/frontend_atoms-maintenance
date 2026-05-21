@@ -63,8 +63,9 @@ export const logbookTfpService = {
     return response.data.data;
   },
 
-  async signLogbook(id: number, signature: string): Promise<LogbookTfpDetail> {
-    const response = await axios.post(`${API_URL}/v1/logbook/tfp/${id}/sign`, { signature }, {
+  /** Sign one shift's slot. Backend validates signer is the assigned manager for that shift. */
+  async signLogbook(id: number, shift: 'pagi' | 'siang' | 'malam', signature: string): Promise<LogbookTfpDetail> {
+    const response = await axios.post(`${API_URL}/v1/logbook/tfp/${id}/sign`, { shift, signature }, {
       headers: getAuthHeaders(),
     });
     return response.data.data;
@@ -72,9 +73,26 @@ export const logbookTfpService = {
 
   async updateItems(
     id: number,
-    items: Array<{ id: number; status_pagi: string | null; status_siang: string | null; status_malam: string | null }>,
+    items: Array<{ id: number; status_pagi?: string | null; status_siang?: string | null; status_malam?: string | null }>,
   ): Promise<LogbookTfpDetail> {
     const response = await axios.put(`${API_URL}/v1/logbook/tfp/${id}/items`, { items }, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Bulk-mark one shift column for ALL items at once.
+   *   status='S'  → mark all as Serviceable
+   *   status='US' → mark all as Unserviceable
+   *   status=null → reset all to empty
+   *   overwrite=false → only fill items that are currently null (skip already-marked)
+   */
+  async bulkSetShiftStatus(
+    id: number,
+    payload: { shift: 'pagi' | 'siang' | 'malam'; status: 'S' | 'US' | null; overwrite?: boolean },
+  ): Promise<LogbookTfpDetail> {
+    const response = await axios.post(`${API_URL}/v1/logbook/tfp/${id}/bulk-status`, payload, {
       headers: getAuthHeaders(),
     });
     return response.data.data;

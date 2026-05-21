@@ -165,14 +165,14 @@ export const WorkOrderDetailPage: React.FC = () => {
           </div>
 
           <div>
-            <p className="text-xs text-gray-500 mb-0.5">Deskripsi Perintah</p>
-            <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 border border-gray-100">
+            <p className="text-xs text-slate-500 mb-0.5">Deskripsi Perintah</p>
+            <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 border border-slate-200 whitespace-pre-wrap">
               {wo.description}
             </div>
           </div>
 
           <div>
-            <p className="text-xs text-gray-500 mb-1.5">Output Yang Diharapkan</p>
+            <p className="text-xs text-slate-500 mb-1.5">Output Yang Diharapkan</p>
             <div className="flex flex-wrap gap-2">
               {wo.output_types.map((ot) => (
                 <Badge key={ot} variant="default">{outputLabels[ot] || ot}</Badge>
@@ -193,17 +193,17 @@ export const WorkOrderDetailPage: React.FC = () => {
       />
 
       {/* Section 2: Pelaksanaan (if any) */}
-      {(wo.start_time || wo.completion_status || wo.notes_kendala) && (
+      {(wo.start_time || wo.completion_status || wo.notes_kendala || wo.notes_usulan || wo.notes_pemberi_tugas) && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base text-maintenance-wo">Bagian Bawah — Pelaksanaan / Catatan Pelaksana</CardTitle>
+            <CardTitle className="text-base text-brand-primary">Bagian Bawah — Pelaksanaan / Catatan Pelaksana</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {wo.start_time && (
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Jam Mulai</p>
-                  <p className="text-sm flex items-center gap-1.5">
+                  <p className="text-xs text-slate-500 mb-0.5">Jam Mulai</p>
+                  <p className="text-sm flex items-center gap-1.5 text-slate-800">
                     <Clock size={14} className="text-slate-400" />
                     {wo.start_time}
                   </p>
@@ -211,8 +211,8 @@ export const WorkOrderDetailPage: React.FC = () => {
               )}
               {wo.end_time && (
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Jam Selesai</p>
-                  <p className="text-sm flex items-center gap-1.5">
+                  <p className="text-xs text-slate-500 mb-0.5">Jam Selesai</p>
+                  <p className="text-sm flex items-center gap-1.5 text-slate-800">
                     <Clock size={14} className="text-slate-400" />
                     {wo.end_time}
                   </p>
@@ -220,7 +220,7 @@ export const WorkOrderDetailPage: React.FC = () => {
               )}
               {wo.completion_status && (
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Hasil Pelaksanaan</p>
+                  <p className="text-xs text-slate-500 mb-0.5">Hasil Pelaksanaan</p>
                   <StatusBadge
                     status={wo.completion_status === 'selesai' ? 'completed' : wo.completion_status === 'belum_selesai_dilanjut' ? 'on_hold' : 'abnormal'}
                     variant="pill"
@@ -231,24 +231,24 @@ export const WorkOrderDetailPage: React.FC = () => {
 
             {wo.notes_kendala && (
               <div>
-                <p className="text-xs text-gray-500 mb-0.5">Catatan / Kendala</p>
-                <div className="bg-amber-50 rounded-lg p-3 text-sm text-slate-700 border border-amber-100">
+                <p className="text-xs text-slate-500 mb-0.5">Catatan / Kendala</p>
+                <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 border border-slate-200 whitespace-pre-wrap">
                   {wo.notes_kendala}
                 </div>
               </div>
             )}
             {wo.notes_usulan && (
               <div>
-                <p className="text-xs text-gray-500 mb-0.5">Usulan</p>
-                <div className="bg-blue-50 rounded-lg p-3 text-sm text-slate-700 border border-blue-100">
+                <p className="text-xs text-slate-500 mb-0.5">Usulan</p>
+                <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 border border-slate-200 whitespace-pre-wrap">
                   {wo.notes_usulan}
                 </div>
               </div>
             )}
             {wo.notes_pemberi_tugas && (
               <div>
-                <p className="text-xs text-gray-500 mb-0.5">Catatan Pemberi Tugas</p>
-                <div className="bg-green-50 rounded-lg p-3 text-sm text-slate-700 border border-green-100">
+                <p className="text-xs text-slate-500 mb-0.5">Catatan Pemberi Tugas</p>
+                <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 border border-slate-200 whitespace-pre-wrap">
                   {wo.notes_pemberi_tugas}
                 </div>
               </div>
@@ -259,9 +259,9 @@ export const WorkOrderDetailPage: React.FC = () => {
 
       {/* Section 2.5: Technician Feedback Form (only for technicians) */}
       {isTechnician && wo.status !== 'completed' && (
-        <Card className="border-2 border-blue-200">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base text-blue-600">Form Feedback Teknisi</CardTitle>
+            <CardTitle className="text-base text-brand-primary">Form Feedback Teknisi</CardTitle>
             <p className="text-xs text-slate-500 mt-1">
               Isi form ini untuk memberikan feedback tentang pelaksanaan work order
             </p>

@@ -20,8 +20,11 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 import { useAuth } from '@/hooks/useAuth';
 import { reportingDamageReportService } from '@/services/reportingDamageReportService';
 import {
+  DAMAGE_CATEGORY_LABELS,
+  DAMAGE_CATEGORY_ORDER,
   OBSTACLE_CODE_LABELS,
   OBSTACLE_CODE_ORDER,
+  normalizeDamageCategory,
 } from '@/types/reporting';
 import type {
   ReportingDamageReportSummary,
@@ -295,9 +298,11 @@ export const ReportingListPage: React.FC = () => {
             aria-label="Filter kategori kerusakan"
           >
             <option value="">Semua Kerusakan</option>
-            <option value="Ringan">Ringan</option>
-            <option value="Sedang">Sedang</option>
-            <option value="Berat">Berat</option>
+            {DAMAGE_CATEGORY_ORDER.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
           </select>
           <select
             value={obstacleCodeFilter}
@@ -539,16 +544,18 @@ const Th: React.FC<{
 
 const DamageBadge: React.FC<{ category: string }> = ({ category }) => {
   const map: Record<string, string> = {
-    Ringan: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    Sedang: 'bg-amber-50 text-amber-700 border-amber-200',
-    Berat: 'bg-red-50 text-red-700 border-red-200',
+    '1': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    '2': 'bg-amber-50 text-amber-700 border-amber-200',
+    '3': 'bg-red-50 text-red-700 border-red-200',
   };
-  const cls = map[category] ?? 'bg-slate-50 text-slate-700 border-slate-200';
+  const normalized = normalizeDamageCategory(category);
+  const cls = map[normalized] ?? 'bg-slate-50 text-slate-700 border-slate-200';
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${cls}`}
+      title={DAMAGE_CATEGORY_LABELS[normalized]}
     >
-      {category}
+      {normalized}
     </span>
   );
 };

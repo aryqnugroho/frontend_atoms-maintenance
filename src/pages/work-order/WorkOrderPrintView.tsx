@@ -4,20 +4,8 @@ import { ArrowLeft, Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { mockWorkOrders } from '@/data/mockData';
 import { workOrderService } from '@/services/workOrderService';
-import type { WorkOrder, WorkOrderSignatureInfo, WorkOrderSignatureRole } from '@/types';
-
-const outputLabels: Record<string, string> = {
-  meter_reading: 'Lembar Meter Reading',
-  status_peralatan: 'Status Peralatan',
-  logbook: 'Pencatatan Logbook',
-  other: 'Lainnya',
-};
-
-const roleLabels: Record<WorkOrderSignatureRole, string> = {
-  mt: 'MANAGER TEKNIK',
-  supervisor: 'SUPERVISOR',
-  technician: 'TEKNISI',
-};
+import { getShiftLabel } from '@/lib/shiftUtils';
+import type { WorkOrder, WorkOrderSignatureInfo, WorkOrderSignatureRole, ShiftType } from '@/types';
 
 const formatDate = (value?: string) => {
   if (!value) return '-';
@@ -26,6 +14,23 @@ const formatDate = (value?: string) => {
     month: 'long',
     year: 'numeric',
   });
+};
+
+const formatShiftRange = (shift?: ShiftType | string) => {
+  if (!shift) return '-';
+  const s = shift as ShiftType;
+  if (s !== 'pagi' && s !== 'siang' && s !== 'malam') return String(shift).toUpperCase();
+  const { start, end } = getShiftLabel(s);
+  return `${s.toUpperCase()} (${start} - ${end})`;
+};
+
+/** Get shift start/end times */
+const getShiftTimes = (shift?: ShiftType | string) => {
+  if (!shift) return { start: '..............', end: '..............' };
+  const s = shift as ShiftType;
+  if (s !== 'pagi' && s !== 'siang' && s !== 'malam') return { start: '..............', end: '..............' };
+  const info = getShiftLabel(s);
+  return { start: info.start, end: info.end };
 };
 
 const formatDateTime = (value?: string | null) => {
@@ -52,20 +57,40 @@ const SignaturePrintColumn: React.FC<SignaturePrintColumnProps> = ({
   signature,
   isNotRequired = false,
 }) => (
-  <div className="flex min-h-[130px] flex-1 flex-col items-center border-r border-black p-2 text-center last:border-r-0">
-    <div className="text-[11px] font-bold">{label}</div>
-    <div className="mt-2 flex h-16 w-full items-center justify-center">
-      {isNotRequired ? (
-        <span className="text-[10px] text-slate-500">Tidak Ada</span>
-      ) : signature?.signature ? (
-        <img src={signature.signature} alt={`Tanda tangan ${label}`} className="max-h-16 max-w-full object-contain" />
-      ) : (
-        <div className="h-14 w-28 border border-dashed border-slate-400" />
+  <td className="wo-cell align-top" style={{ width: '33.33%', verticalAlign: 'top', padding: '8px 6px' }}>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
+      <div style={{ height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '4px' }}>
+        {isNotRequired ? (
+          <span style={{ fontSize: '10px', fontStyle: 'italic', color: '#64748b' }}>Tidak Ada</span>
+        ) : signature?.signature ? (
+          <img src={signature.signature} alt={`TTD ${label}`} style={{ maxHeight: '56px', maxWidth: '100%', objectFit: 'contain' }} />
+        ) : (
+          <div style={{ width: '96px', height: '48px', border: '1px dashed #94a3b8' }} />
+        )}
+      </div>
+      <div style={{ fontSize: '11px', fontWeight: 600, marginTop: '4px' }}>
+        ({isNotRequired ? 'Tidak Ada' : signerName || '....................'})
+      </div>
+      {signature?.signed_at && (
+        <div style={{ fontSize: '9px', color: '#64748b' }}>{formatDateTime(signature.signed_at)}</div>
       )}
     </div>
-    <div className="mt-auto text-[11px] font-semibold">{isNotRequired ? 'Tidak Ada' : signerName || '-'}</div>
-    <div className="text-[10px] text-slate-600">{formatDateTime(signature?.signed_at)}</div>
-  </div>
+  </td>
+);
+
+interface CheckboxInlineProps {
+  checked: boolean;
+  label: string;
+}
+
+const CheckboxInline: React.FC<CheckboxInlineProps> = ({ checked, label }) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+    <span style={{ display: 'inline-flex', width: '12px', height: '12px', border: '1px solid #000', alignItems: 'center', justifyContent: 'center', fontSize: '9px', lineHeight: 1 }}>
+      {checked ? '✓' : ''}
+    </span>
+    <span>{label}</span>
+  </span>
 );
 
 export const WorkOrderPrintView: React.FC = () => {
@@ -90,25 +115,55 @@ export const WorkOrderPrintView: React.FC = () => {
   }, [id]);
 
   const signatures = useMemo(() => workOrder?.signatures ?? {}, [workOrder]);
-  const signatureColumns = useMemo(() => {
+
+  const signatureColumns = useMemo<
+    Array<{
+      role: WorkOrderSignatureRole;
+      label: string;
+      signerName: string;
+      isNotRequired?: boolean;
+    }>
+  >(() => {
     if (!workOrder) return [];
 
     return [
       {
-        role: 'mt' as const,
-        signerName: signatures.mt?.name ?? workOrder.mt_name ?? workOrder.manager_name_snapshot ?? 'Manager Teknik',
+        role: 'technician',
+        label: 'PELAKSANA',
+        signerName:
+          signatures.technician?.name ??
+          workOrder.technician_name ??
+          workOrder.personnel[0]?.name ??
+          'Teknisi',
       },
       {
-        role: 'supervisor' as const,
-        signerName: signatures.supervisor?.name ?? workOrder.supervisor_name ?? workOrder.supervisor_name_snapshot ?? 'Supervisor',
+        role: 'supervisor',
+        label: 'SUPERVISOR',
+        signerName:
+          signatures.supervisor?.name ??
+          workOrder.supervisor_name ??
+          workOrder.supervisor_name_snapshot ??
+          'Supervisor',
         isNotRequired: workOrder.has_supervisor === false,
       },
       {
-        role: 'technician' as const,
-        signerName: signatures.technician?.name ?? workOrder.technician_name ?? workOrder.personnel[0]?.name ?? 'Teknisi',
+        role: 'mt',
+        label: 'MANAGER TEKNIK',
+        signerName:
+          signatures.mt?.name ?? workOrder.mt_name ?? workOrder.manager_name_snapshot ?? 'Manager Teknik',
       },
     ];
   }, [signatures, workOrder]);
+
+  const personnelRows = useMemo(() => {
+    const rows = workOrder?.personnel?.slice(0, 6) ?? [];
+    while (rows.length < 6) {
+      rows.push({ user_id: -rows.length - 1, name: '', role_label: '', signature_url: undefined } as never);
+    }
+    const left = rows.slice(0, 3);
+    const right = rows.slice(3, 6);
+    return { left, right };
+  }, [workOrder]);
 
   if (isLoading) {
     return (
@@ -127,16 +182,44 @@ export const WorkOrderPrintView: React.FC = () => {
     );
   }
 
+  const shiftTimes = getShiftTimes(workOrder.shift_type);
+
+  const renderSignatureBlock = () => (
+    <table className="wo-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <tbody>
+        <tr>
+          {signatureColumns.map((column) => (
+            <SignaturePrintColumn
+              key={column.role}
+              label={column.label}
+              signerName={column.signerName}
+              signature={signatures[column.role]}
+              isNotRequired={column.isNotRequired}
+            />
+          ))}
+        </tr>
+      </tbody>
+    </table>
+  );
+
   return (
     <div className="min-h-screen w-full bg-slate-100 p-4 text-black print:bg-white print:p-0">
       <style>
-        {`@media print {
-          @page { size: A4; margin: 10mm; }
-          body { background: white !important; }
-        }`}
+        {`
+          @media print {
+            @page { size: A4; margin: 8mm; }
+            body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-hide { display: none !important; }
+          }
+          .wo-table { border-collapse: collapse; width: 100%; }
+          .wo-cell { border: 1px solid #000 !important; }
+          @media print {
+            .wo-cell { border: 1px solid #000 !important; }
+          }
+        `}
       </style>
 
-      <div className="mx-auto mb-4 flex max-w-[210mm] items-center justify-between print:hidden">
+      <div className="print-hide mx-auto mb-4 flex max-w-[210mm] items-center justify-between">
         <Button variant="outline" className="gap-2" onClick={() => navigate('/work-orders')}>
           <ArrowLeft size={16} />
           Kembali
@@ -147,142 +230,194 @@ export const WorkOrderPrintView: React.FC = () => {
         </Button>
       </div>
 
-      <div className="mx-auto max-w-[210mm] border border-black bg-white font-sans text-sm print:mx-0 print:w-full print:max-w-none print:border-0">
-        <div className="flex border-b border-black">
-          <div className="flex w-[30%] items-center justify-center border-r border-black p-4">
-            <img src="/assets/icon/logoairnav.svg" alt="AirNav" className="h-16" />
-            <div className="ml-2 text-[10px] font-bold leading-tight">
-              <div>PERUM LPPNPI</div>
-              <div>Cabang Surabaya</div>
-            </div>
-          </div>
-          <div className="flex w-[70%] flex-col items-center justify-center px-4 text-center">
-            <h1 className="text-lg font-bold uppercase tracking-wide">Maintenance Request & Work Order</h1>
-            <p className="mt-1 text-xs font-semibold">{workOrder.wo_number}</p>
-          </div>
-        </div>
-
-        <div className="border-b border-black bg-gray-200 py-1 text-center text-xs font-bold">
-          Tertuju: {workOrder.division}
-        </div>
-
-        <div className="grid grid-cols-[60%_40%] border-b border-black text-xs">
-          <div className="border-r border-black p-2">
-            <div className="font-bold">Shift Dinas: {workOrder.shift_type.toUpperCase()}</div>
-            <div className="mt-2 font-bold">Personel Shift:</div>
-            <table className="mt-1 w-full border border-black text-[11px]">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="w-10 border-r border-black px-1 py-1">No</th>
-                  <th className="px-1 py-1 text-left">Nama</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrder.personnel.length > 0 ? workOrder.personnel.map((person, index) => (
-                  <tr key={`${person.user_id}-${index}`}>
-                    <td className="border-r border-t border-black px-1 py-1 text-center">{index + 1}</td>
-                    <td className="border-t border-black px-1 py-1">{person.name}</td>
-                  </tr>
-                )) : (
+      {/* Main form — using inline table with explicit borders for print reliability */}
+      <table className="wo-table" style={{ maxWidth: '210mm', margin: '0 auto', backgroundColor: '#fff', fontFamily: 'sans-serif', fontSize: '12px', color: '#000' }}>
+        <tbody>
+          {/* Header: Logo + Title */}
+          <tr>
+            <td className="wo-cell" colSpan={2} style={{ padding: 0 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <tbody>
                   <tr>
-                    <td className="border-r border-t border-black px-1 py-1 text-center">1</td>
-                    <td className="border-t border-black px-1 py-1">-</td>
+                    <td className="wo-cell" style={{ width: '35%', padding: '12px', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <img src="/assets/icon/logoairnav.svg" alt="AirNav" style={{ height: '48px', width: '48px', objectFit: 'contain' }} />
+                        <div style={{ fontSize: '10px', fontWeight: 'bold', lineHeight: 1.3 }}>
+                          <div>PERUM LPPNPI</div>
+                          <div>Cabang Surabaya</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="wo-cell" style={{ width: '65%', textAlign: 'center', verticalAlign: 'middle', padding: '12px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                        MAINTENANCE REQUEST &amp; WORK ORDER
+                      </div>
+                    </td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="p-2 font-bold">
-            <div className="grid grid-cols-[82px_1fr] gap-1">
-              <div>Tanggal</div>
-              <div>: {formatDate(workOrder.shift_date)}</div>
-            </div>
-            <div className="grid grid-cols-[82px_1fr] gap-1">
-              <div>Jam Mulai</div>
-              <div>: {workOrder.start_time || '.......'}</div>
-            </div>
-            <div className="grid grid-cols-[82px_1fr] gap-1">
-              <div>Jam Selesai</div>
-              <div>: {workOrder.end_time || '.......'}</div>
-            </div>
-            <div className="grid grid-cols-[82px_1fr] gap-1">
-              <div>Status</div>
-              <div>: {workOrder.status}</div>
-            </div>
-          </div>
-        </div>
+                </tbody>
+              </table>
+            </td>
+          </tr>
 
-        <div className="border-b border-black p-2">
-          <div className="text-xs font-bold">Deskripsi Perintah:</div>
-          <div className="mt-2 min-h-[130px] whitespace-pre-wrap px-2 text-sm">{workOrder.description}</div>
-        </div>
+          {/* Tertuju bar */}
+          <tr>
+            <td className="wo-cell" colSpan={2} style={{ textAlign: 'center', fontSize: '11px', fontWeight: 'bold', padding: '4px 12px', backgroundColor: '#e5e7eb' }}>
+              Tertuju : {workOrder.division}
+            </td>
+          </tr>
 
-        <div className="border-b border-black p-2 text-xs">
-          <div className="font-bold">Output:</div>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {Object.entries(outputLabels).map(([key, label]) => (
-              <div key={key} className="flex items-center gap-2">
-                <span className="flex h-3 w-3 items-center justify-center border border-black text-[10px] leading-none">
-                  {workOrder.output_types.includes(key as never) ? '✓' : ''}
-                </span>
-                <span>{key === 'other' && workOrder.output_other ? workOrder.output_other : label}</span>
+          {/* Top section: Shift + Personel | Tanggal + Jam */}
+          <tr>
+            <td className="wo-cell" style={{ width: '60%', padding: '8px', verticalAlign: 'top', fontSize: '11px' }}>
+              <div>
+                <span style={{ fontWeight: 600 }}>Shift Dinas : </span>
+                <span style={{ fontWeight: 700 }}>{workOrder.shift_type?.toUpperCase() || '-'}</span>
               </div>
-            ))}
-          </div>
-        </div>
+              <div style={{ fontWeight: 600, marginTop: '4px' }}>Nama Personel :</div>
+              <table style={{ width: '100%', marginTop: '4px', borderCollapse: 'collapse', fontSize: '11px' }}>
+                <tbody>
+                  {[0, 1, 2].map((rowIdx) => (
+                    <tr key={rowIdx}>
+                      <td style={{ padding: '2px 0', width: '50%' }}>
+                        <span style={{ display: 'inline-block', width: '16px', textAlign: 'right' }}>{rowIdx + 1}.</span>{' '}
+                        <span style={{ borderBottom: '1px dotted #64748b', display: 'inline-block', minWidth: '120px' }}>
+                          {personnelRows.left[rowIdx]?.name || '\u00A0'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '2px 0', width: '50%' }}>
+                        <span style={{ display: 'inline-block', width: '16px', textAlign: 'right' }}>{rowIdx + 4}.</span>{' '}
+                        <span style={{ borderBottom: '1px dotted #64748b', display: 'inline-block', minWidth: '120px' }}>
+                          {personnelRows.right[rowIdx]?.name || '\u00A0'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </td>
+            <td className="wo-cell" style={{ width: '40%', padding: '8px', verticalAlign: 'top', fontSize: '11px' }}>
+              <div>
+                <span style={{ fontWeight: 600 }}>Tanggal</span>
+                <span style={{ marginLeft: '12px' }}>: {formatDate(workOrder.shift_date)}</span>
+              </div>
+              <div style={{ marginTop: '4px' }}>
+                <span style={{ fontWeight: 600 }}>Jam</span>
+                <span style={{ marginLeft: '32px' }}>: {formatShiftRange(workOrder.shift_type)}</span>
+              </div>
+            </td>
+          </tr>
 
-        <div className="border-b border-black bg-gray-200 py-1 text-center text-xs font-bold">
-          Pelaksanaan
-        </div>
+          {/* Deskripsi Perintah */}
+          <tr>
+            <td className="wo-cell" colSpan={2} style={{ padding: '8px', verticalAlign: 'top' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600 }}>Diskripsi Perintah :</div>
+              <div style={{ marginTop: '4px', minHeight: '110px', whiteSpace: 'pre-wrap', fontSize: '12px', lineHeight: 1.5, paddingLeft: '4px' }}>
+                {workOrder.description}
+              </div>
+            </td>
+          </tr>
 
-        <div className="grid grid-cols-3 border-b border-black text-xs font-bold">
-          <div className="border-r border-black p-2 flex items-center gap-2">
-            <span className="flex h-3 w-3 items-center justify-center border border-black text-[10px] leading-none">
-              {workOrder.completion_status === 'selesai' ? '✓' : ''}
-            </span>
-            <span>Selesai</span>
-          </div>
-          <div className="border-r border-black p-2 flex items-center gap-2">
-            <span className="flex h-3 w-3 items-center justify-center border border-black text-[10px] leading-none">
-              {workOrder.completion_status === 'belum_selesai_dilanjut' ? '✓' : ''}
-            </span>
-            <span>Dilanjutkan</span>
-          </div>
-          <div className="p-2 flex items-center gap-2">
-            <span className="flex h-3 w-3 items-center justify-center border border-black text-[10px] leading-none">
-              {workOrder.completion_status === 'tidak_bisa' ? '✓' : ''}
-            </span>
-            <span>Tidak Bisa</span>
-          </div>
-        </div>
+          {/* Output row */}
+          <tr>
+            <td className="wo-cell" colSpan={2} style={{ padding: '8px', fontSize: '11px' }}>
+              <div style={{ fontWeight: 600 }}>Output :</div>
+              <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '20px' }}>
+                <CheckboxInline checked={workOrder.output_types?.includes('meter_reading' as never)} label="Lembar Meter Reading" />
+                <CheckboxInline checked={workOrder.output_types?.includes('status_peralatan' as never)} label="Status Peralatan" />
+                <CheckboxInline checked={workOrder.output_types?.includes('logbook' as never)} label="Pencatatan Logbook" />
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ display: 'inline-flex', width: '12px', height: '12px', border: '1px solid #000', alignItems: 'center', justifyContent: 'center', fontSize: '9px', lineHeight: 1 }}>
+                    {workOrder.output_types?.includes('other' as never) ? '✓' : ''}
+                  </span>
+                  <span>{workOrder.output_other || '..........................................'}</span>
+                </span>
+              </div>
+            </td>
+          </tr>
 
-        <div className="border-b border-black p-2">
-          <div className="text-xs font-bold">Catatan/Kendala:</div>
-          <div className="mt-1 min-h-[70px] whitespace-pre-wrap px-2 text-sm">{workOrder.notes_kendala || ''}</div>
-        </div>
+          {/* FIRST SIGNATURE BLOCK */}
+          <tr>
+            <td className="wo-cell" colSpan={2} style={{ padding: 0 }}>
+              {renderSignatureBlock()}
+            </td>
+          </tr>
 
-        <div className="border-b border-black p-2">
-          <div className="text-xs font-bold">Usulan:</div>
-          <div className="mt-1 min-h-[55px] whitespace-pre-wrap px-2 text-sm">{workOrder.notes_usulan || ''}</div>
-        </div>
+          {/* Pelaksanaan bar */}
+          <tr>
+            <td className="wo-cell" colSpan={2} style={{ textAlign: 'center', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', padding: '4px 12px', backgroundColor: '#e5e7eb' }}>
+              PELAKSANAAN
+            </td>
+          </tr>
 
-        <div className="border-b border-black p-2">
-          <div className="text-xs font-bold">Catatan Pemberi Tugas:</div>
-          <div className="mt-1 min-h-[55px] whitespace-pre-wrap px-2 text-sm">{workOrder.notes_pemberi_tugas || ''}</div>
-        </div>
+          {/* Jam Mulai / Jam Selesai */}
+          <tr>
+            <td className="wo-cell" colSpan={2} style={{ padding: 0 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <tbody>
+                  <tr>
+                    <td className="wo-cell" style={{ width: '50%', padding: '6px 8px', fontSize: '11px' }}>
+                      <span style={{ fontWeight: 600 }}>Jam Mulai : </span>
+                      <span>{shiftTimes.start}</span>
+                    </td>
+                    <td className="wo-cell" style={{ width: '50%', padding: '6px 8px', fontSize: '11px' }}>
+                      <span style={{ fontWeight: 600 }}>Jam Selesai : </span>
+                      <span>{shiftTimes.end}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
 
-        <div className="flex">
-          {signatureColumns.map((column) => (
-            <SignaturePrintColumn
-              key={column.role}
-              label={roleLabels[column.role]}
-              signerName={column.signerName}
-              signature={signatures[column.role]}
-              isNotRequired={column.isNotRequired}
-            />
-          ))}
-        </div>
-      </div>
+          {/* Completion status checkboxes */}
+          <tr>
+            <td className="wo-cell" colSpan={2} style={{ padding: '6px 8px', fontSize: '11px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '20px' }}>
+                <CheckboxInline checked={workOrder.completion_status === 'selesai'} label="Selesai" />
+                <CheckboxInline checked={workOrder.completion_status === 'belum_selesai_dilanjut'} label="Belum Selesai dilanjut shift berikutnya" />
+                <CheckboxInline checked={workOrder.completion_status === 'tidak_bisa'} label="Tidak bisa dilaksanakan" />
+              </div>
+            </td>
+          </tr>
+
+          {/* Catatan/Kendala */}
+          <tr>
+            <td className="wo-cell" colSpan={2} style={{ padding: '8px', verticalAlign: 'top' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600 }}>Catatan/Kendala :</div>
+              <div style={{ marginTop: '4px', minHeight: '60px', whiteSpace: 'pre-wrap', fontSize: '12px', lineHeight: 1.5, paddingLeft: '4px' }}>
+                {workOrder.notes_kendala || ''}
+              </div>
+            </td>
+          </tr>
+
+          {/* Usulan */}
+          <tr>
+            <td className="wo-cell" colSpan={2} style={{ padding: '8px', verticalAlign: 'top' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600 }}>Usulan :</div>
+              <div style={{ marginTop: '4px', minHeight: '50px', whiteSpace: 'pre-wrap', fontSize: '12px', lineHeight: 1.5, paddingLeft: '4px' }}>
+                {workOrder.notes_usulan || ''}
+              </div>
+            </td>
+          </tr>
+
+          {/* Catatan Pemberi Tugas */}
+          <tr>
+            <td className="wo-cell" colSpan={2} style={{ padding: '8px', verticalAlign: 'top' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600 }}>Catatan Pemberi Tugas :</div>
+              <div style={{ marginTop: '4px', minHeight: '50px', whiteSpace: 'pre-wrap', fontSize: '12px', lineHeight: 1.5, paddingLeft: '4px' }}>
+                {workOrder.notes_pemberi_tugas || ''}
+              </div>
+            </td>
+          </tr>
+
+          {/* SECOND SIGNATURE BLOCK */}
+          <tr>
+            <td className="wo-cell" colSpan={2} style={{ padding: 0 }}>
+              {renderSignatureBlock()}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 };

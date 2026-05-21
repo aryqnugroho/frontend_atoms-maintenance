@@ -1,6 +1,9 @@
 /**
  * Type definitions for Logbook CNSD (CNS & Automation) module.
+ * Mirror dari logbookTfp.ts dengan tambahan field measurement (value_*).
  */
+
+export type ShiftKey = 'pagi' | 'siang' | 'malam';
 
 export interface CnsdEquipment {
   id: number;
@@ -12,7 +15,7 @@ export interface CnsdEquipment {
 }
 
 export interface ManagerOnDutyEntry {
-  shift: 'pagi' | 'siang' | 'malam';
+  shift: ShiftKey;
   name: string;
   user_id: number;
 }
@@ -20,13 +23,14 @@ export interface ManagerOnDutyEntry {
 export interface LogbookCnsdSummary {
   id: number;
   date: string;
-  is_signed: boolean;
-  manager_signed_by_name: string | null;
-  manager_signed_at: string | null;
+  is_signed_pagi: boolean;
+  is_signed_siang: boolean;
+  is_signed_malam: boolean;
+  is_fully_signed: boolean;
+  signed_count: number;
   notes_count: number;
   created_by_name: string | null;
   created_at: string;
-  /** Manager Teknik on duty, sorted pagi → siang → malam. */
   managers_on_duty: ManagerOnDutyEntry[];
 }
 
@@ -35,7 +39,6 @@ export interface LogbookCnsdItem {
   equipment_id: number;
   equipment_name: string;
   equipment_order: number;
-  /** true → item uses numeric value input (e.g. °C) instead of S/US toggle. */
   is_measurement: boolean;
   unit: string | null;
   status_pagi: 'S' | 'US' | null;
@@ -48,7 +51,7 @@ export interface LogbookCnsdItem {
 
 export interface LogbookCnsdNote {
   id: number;
-  shift: 'pagi' | 'siang' | 'malam';
+  shift: ShiftKey;
   time: string | null;
   activity: string;
 }
@@ -60,15 +63,22 @@ export interface PersonnelShiftInfo {
   technicians: Array<{ name: string; user_id: number }>;
 }
 
+export interface ManagerShiftSignature {
+  signature: string | null;
+  signed_by_id: number | null;
+  signed_by_name: string | null;
+  signed_by_role: string | null;
+  signed_at: string | null;
+}
+
 export interface LogbookCnsdDetail {
   id: number;
   date: string;
-  is_signed: boolean;
-  manager_signature: string | null;
-  manager_signed_by_id: number | null;
-  manager_signed_by_name: string | null;
-  manager_signed_by_role: string | null;
-  manager_signed_at: string | null;
+  is_signed_pagi: boolean;
+  is_signed_siang: boolean;
+  is_signed_malam: boolean;
+  is_fully_signed: boolean;
+  manager_signatures: Record<ShiftKey, ManagerShiftSignature>;
   created_by: { id: number; name: string } | null;
   created_at: string;
   items_by_category: Record<string, LogbookCnsdItem[]>;

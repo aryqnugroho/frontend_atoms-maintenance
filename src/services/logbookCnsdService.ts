@@ -73,8 +73,9 @@ export const logbookCnsdService = {
     return response.data.data;
   },
 
-  async signLogbook(id: number, signature: string): Promise<LogbookCnsdDetail> {
-    const response = await axios.post(`${API_URL}/v1/logbook/cnsd/${id}/sign`, { signature }, {
+  /** Sign one shift's slot. Backend validates signer is the assigned manager for that shift. */
+  async signLogbook(id: number, shift: 'pagi' | 'siang' | 'malam', signature: string): Promise<LogbookCnsdDetail> {
+    const response = await axios.post(`${API_URL}/v1/logbook/cnsd/${id}/sign`, { shift, signature }, {
       headers: getAuthHeaders(),
     });
     return response.data.data;
@@ -82,6 +83,17 @@ export const logbookCnsdService = {
 
   async updateItems(id: number, items: UpdateItemPayload[]): Promise<LogbookCnsdDetail> {
     const response = await axios.put(`${API_URL}/v1/logbook/cnsd/${id}/items`, { items }, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  /** Bulk-mark one shift for all items. status=null → reset. overwrite=false → skip already-marked. */
+  async bulkSetShiftStatus(
+    id: number,
+    payload: { shift: 'pagi' | 'siang' | 'malam'; status: 'S' | 'US' | null; overwrite?: boolean },
+  ): Promise<LogbookCnsdDetail> {
+    const response = await axios.post(`${API_URL}/v1/logbook/cnsd/${id}/bulk-status`, payload, {
       headers: getAuthHeaders(),
     });
     return response.data.data;

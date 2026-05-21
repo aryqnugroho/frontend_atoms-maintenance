@@ -6,7 +6,7 @@
  * Pelaksana Perbaikan dipilih manual oleh user dari personel database.
  */
 
-export type DamageCategory = 'Ringan' | 'Sedang' | 'Berat';
+export type DamageCategory = '1' | '2' | '3';
 export type RepairByType = 'lokasi' | 'pusat';
 export type ReportingStatus = 'ongoing' | 'on_hold' | 'completed';
 export type ObstacleCode =
@@ -27,6 +27,22 @@ export const OBSTACLE_CODE_LABELS: Record<ObstacleCode, string> = {
 export const OBSTACLE_CODE_ORDER: ObstacleCode[] = [
   'AU', 'PK', 'TT', 'SC', 'TR', 'ST', 'PC', 'AL', 'TH',
 ];
+
+export const DAMAGE_CATEGORY_LABELS: Record<DamageCategory, string> = {
+  '1': 'Ringan',
+  '2': 'Sedang',
+  '3': 'Berat',
+};
+
+export const DAMAGE_CATEGORY_ORDER: DamageCategory[] = ['1', '2', '3'];
+
+export const normalizeDamageCategory = (value: string | null | undefined): DamageCategory => {
+  if (value === '1' || value === '2' || value === '3') return value;
+  if (value === 'Ringan') return '1';
+  if (value === 'Sedang') return '2';
+  if (value === 'Berat') return '3';
+  return '1';
+};
 
 export interface ReportingPerson {
   id: number;

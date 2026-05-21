@@ -11,12 +11,28 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { useAuth } from '@/hooks/useAuth';
 import { groundingReportService } from '@/services/groundingReportService';
+import { reportingDamageReportService } from '@/services/reportingDamageReportService';
 import { getCurrentShiftDate, getCurrentShiftType } from '@/lib/shiftUtils';
 import type { GroundingReportSummary } from '@/types/grounding';
+import type { ReportingPerson } from '@/types/reporting';
 import type { ShiftType } from '@/types';
 
 const SHIFT_LABELS: Record<string, string> = { pagi: 'Shift Pagi', siang: 'Shift Siang', malam: 'Shift Malam' };
 const STATUS_LABELS: Record<string, string> = { ongoing: 'Ongoing', on_hold: 'On Hold', completed: 'Completed' };
+const WORK_UNITS = [
+  'Cabang Surabaya',
+  'Cabang Kediri',
+  'Cabang Malang',
+  'Cabang Sumenep',
+  'Cabang Jember',
+  'Cabang Banyuwangi',
+  'Cabang Bawean',
+] as const;
+
+const getCurrentTimeValue = (): string => {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+};
 
 const namesMatch = (a?: string | null, b?: string | null): boolean => {
   if (!a || !b) return false;
@@ -46,10 +62,73 @@ interface CreateModalProps {
 }
 
 const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onClose, onCreated }) => {
+  const [workUnit, setWorkUnit] = useState<string>(WORK_UNITS[0]);
+  const [timeFilled, setTimeFilled] = useState(getCurrentTimeValue);
   const [equipmentName, setEquipmentName] = useState('');
   const [equipmentLocation, setEquipmentLocation] = useState('');
+  const [managers, setManagers] = useState<ReportingPerson[]>([]);
+  const [tfpPersonnel, setTfpPersonnel] = useState<ReportingPerson[]>([]);
+  const [managerId, setManagerId] = useState('');
+  const [supervisorId, setSupervisorId] = useState('');
+  const [technicianIds, setTechnicianIds] = useState<string[]>(['']);
+  const [isLoadingPersonnel, setIsLoadingPersonnel] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isManualSignerMode = workUnit !== WORK_UNITS[0];
+  const supervisorOptions = tfpPersonnel.filter((person) => person.role === 'Supervisor TFP');
+  const technicianOptions = tfpPersonnel.filter((person) => (
+    person.role === 'Teknisi TFP' || person.role === 'Supervisor TFP'
+  ));
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setWorkUnit(WORK_UNITS[0]);
+    setTimeFilled(getCurrentTimeValue());
+    setEquipmentName('');
+    setEquipmentLocation('');
+    setManagerId('');
+    setSupervisorId('');
+    setTechnicianIds(['']);
+    setError(null);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !isManualSignerMode) return;
+
+    let isActive = true;
+    setIsLoadingPersonnel(true);
+    Promise.all([
+      reportingDamageReportService.getManagers(),
+      reportingDamageReportService.getRepairers(undefined, 'TFP'),
+    ])
+      .then(([managerRows, personnelRows]) => {
+        if (!isActive) return;
+        setManagers(managerRows);
+        setTfpPersonnel(personnelRows);
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setError('Gagal memuat daftar penanggung jawab TFP.');
+      })
+      .finally(() => {
+        if (isActive) setIsLoadingPersonnel(false);
+      });
+
+    return () => { isActive = false; };
+  }, [isManualSignerMode, isOpen]);
+
+  const updateTechnician = (index: number, value: string) => {
+    setTechnicianIds((prev) => prev.map((id, rowIndex) => (rowIndex === index ? value : id)));
+  };
+
+  const addTechnician = () => {
+    setTechnicianIds((prev) => [...prev, '']);
+  };
+
+  const removeTechnician = (index: number) => {
+    setTechnicianIds((prev) => (prev.length === 1 ? prev : prev.filter((_, rowIndex) => rowIndex !== index)));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +136,34 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onClose, onCreated })
       setError('Nama Peralatan dan Lokasi Peralatan wajib diisi.');
       return;
     }
+    if (!timeFilled) {
+      setError('Jam laporan wajib diisi.');
+      return;
+    }
+
+    const selectedTechnicians = technicianIds
+      .filter((id) => id !== '')
+      .map((id) => Number(id));
+
+    if (isManualSignerMode) {
+      if (!managerId || !supervisorId) {
+        setError('Manager Teknik dan Supervisor TFP harus dipilih untuk cabang non-Surabaya.');
+        return;
+      }
+      if (selectedTechnicians.length === 0) {
+        setError('Minimal satu pelaksana teknisi harus dipilih.');
+        return;
+      }
+      if (new Set(selectedTechnicians).size !== selectedTechnicians.length) {
+        setError('Pelaksana teknisi yang sama tidak boleh dipilih lebih dari sekali.');
+        return;
+      }
+      if (selectedTechnicians.includes(Number(supervisorId))) {
+        setError('Supervisor TFP tidak dapat dipilih lagi sebagai pelaksana teknisi.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setError(null);
     try {
@@ -65,7 +172,13 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onClose, onCreated })
         shift_type: getCurrentShiftType() as ShiftType,
         equipment_name: equipmentName.trim(),
         equipment_location: equipmentLocation.trim(),
-        work_unit: 'Cabang Surabaya',
+        work_unit: workUnit,
+        time_filled: timeFilled,
+        ...(isManualSignerMode ? {
+          manager_id: Number(managerId),
+          supervisor_id: Number(supervisorId),
+          technician_ids: selectedTechnicians,
+        } : {}),
       });
       onCreated(record.id);
     } catch (err) {
@@ -84,20 +197,33 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onClose, onCreated })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <h2 className="text-base font-semibold text-slate-800">Tambah Laporan Grounding</h2>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-gray-100 hover:text-slate-600 transition-colors" aria-label="Tutup">
             <X size={18} />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Work Unit — readonly */}
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto p-6">
+          {/* Work Unit */}
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Kantor Unit Kerja</label>
-            <div className="h-10 rounded-xl border border-gray-200 bg-gray-50 px-3 flex items-center text-sm text-slate-600">
-              Cabang Surabaya
-            </div>
+            <label className="mb-1 block text-xs font-medium text-slate-700">Kantor Unit Kerja</label>
+            <select
+              value={workUnit}
+              onChange={(e) => setWorkUnit(e.target.value)}
+              className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            >
+              {WORK_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-700">Jam Laporan <span className="text-red-500">*</span></label>
+            <input
+              type="time"
+              value={timeFilled}
+              onChange={(e) => setTimeFilled(e.target.value)}
+              className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
           </div>
           {/* Equipment Name */}
           <div>
@@ -122,6 +248,72 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onClose, onCreated })
               className="w-full h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
             />
           </div>
+          {isManualSignerMode && (
+            <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Penanggung Jawab TTD</p>
+                <p className="text-xs text-slate-500">Dipilih manual untuk kantor unit kerja selain Cabang Surabaya.</p>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">Manager Teknik <span className="text-red-500">*</span></label>
+                <select
+                  value={managerId}
+                  onChange={(e) => setManagerId(e.target.value)}
+                  disabled={isLoadingPersonnel}
+                  className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100"
+                >
+                  <option value="">{isLoadingPersonnel ? 'Memuat daftar manager...' : 'Pilih Manager Teknik'}</option>
+                  {managers.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">Supervisor TFP <span className="text-red-500">*</span></label>
+                <select
+                  value={supervisorId}
+                  onChange={(e) => setSupervisorId(e.target.value)}
+                  disabled={isLoadingPersonnel}
+                  className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100"
+                >
+                  <option value="">{isLoadingPersonnel ? 'Memuat daftar supervisor...' : 'Pilih Supervisor TFP'}</option>
+                  {supervisorOptions.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="block text-xs font-medium text-slate-700">Pelaksana Teknisi <span className="text-red-500">*</span></label>
+                  <button type="button" onClick={addTechnician} className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-gray-100">
+                    <Plus size={12} /> Tambah
+                  </button>
+                </div>
+                {technicianIds.map((technicianId, index) => (
+                  <div key={`technician-${index}`} className="flex items-center gap-2">
+                    <select
+                      value={technicianId}
+                      onChange={(e) => updateTechnician(index, e.target.value)}
+                      disabled={isLoadingPersonnel}
+                      className="h-10 min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-3 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100"
+                    >
+                      <option value="">{isLoadingPersonnel ? 'Memuat daftar teknisi...' : `Pilih Pelaksana ${index + 1}`}</option>
+                      {technicianOptions
+                        .filter((person) => person.id !== Number(supervisorId))
+                        .map((person) => (
+                          <option key={person.id} value={person.id}>{person.name} - {person.role}</option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => removeTechnician(index)}
+                      disabled={technicianIds.length === 1}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-300 bg-white text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-slate-300"
+                      aria-label={`Hapus pelaksana ${index + 1}`}
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>Batal</Button>

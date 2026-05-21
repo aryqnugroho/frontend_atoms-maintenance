@@ -396,7 +396,42 @@ export const LogbookCnsdPrintView: React.FC = () => {
           </table>
         </div>
 
-        {/* MANAGER TEKNIK TTD */}
+        {/* CATATAN KEGIATAN */}
+        {record.notes.length > 0 && (
+          <div className="border-t border-black">
+            <div className="text-center py-1 text-[9px] font-bold border-b border-black">
+              Catatan Kegiatan
+            </div>
+            <table className="w-full border-collapse text-[9px]">
+              <thead>
+                <tr>
+                  <td className="border border-black px-2 py-1 font-bold w-[12%] text-center">SHIFT</td>
+                  <td className="border border-black px-2 py-1 font-bold w-[10%] text-center">JAM</td>
+                  <td className="border border-black px-2 py-1 font-bold">KEGIATAN / CATATAN</td>
+                </tr>
+              </thead>
+              <tbody>
+                {(['pagi', 'siang', 'malam'] as const).flatMap((shift) => {
+                  const notes = record.notes.filter((n) => n.shift === shift);
+                  if (notes.length === 0) return [];
+                  return notes.map((note, idx) => (
+                    <tr key={note.id}>
+                      {idx === 0 && (
+                        <td rowSpan={notes.length} className="border border-black px-2 py-1 font-semibold text-center align-middle uppercase">
+                          {shift}
+                        </td>
+                      )}
+                      <td className="border border-black px-2 py-1 font-mono text-center align-top">{note.time ?? ''}</td>
+                      <td className="border border-black px-2 py-1 align-top">{note.activity}</td>
+                    </tr>
+                  ));
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* MANAGER TEKNIK TTD — per shift */}
         <div className="border-t border-black">
           <table className="w-full border-collapse text-[9px]">
             <thead>
@@ -408,31 +443,31 @@ export const LogbookCnsdPrintView: React.FC = () => {
             <tbody>
               <tr>
                 <td className="border border-black px-2 py-2 h-10">
-                  1. Duty Pagi : <span className="font-medium">{managerPagi || ''}</span>
+                  1. Duty Pagi : <span className="font-medium">{record.manager_signatures.pagi.signed_by_name || managerPagi || ''}</span>
                 </td>
                 <td className="border border-black px-2 py-2 h-10 text-center align-middle">
-                  {record.is_signed && record.manager_signature ? (
-                    <img src={record.manager_signature} alt="TTD Manager" className="mx-auto max-h-8 max-w-[100px] object-contain" />
+                  {record.manager_signatures.pagi.signature ? (
+                    <img src={record.manager_signatures.pagi.signature} alt="TTD Manager Pagi" className="mx-auto max-h-8 max-w-[100px] object-contain" />
                   ) : ''}
                 </td>
               </tr>
               <tr>
                 <td className="border border-black px-2 py-2 h-10">
-                  2. Duty Siang : <span className="font-medium">{managerSiang || ''}</span>
+                  2. Duty Siang : <span className="font-medium">{record.manager_signatures.siang.signed_by_name || managerSiang || ''}</span>
                 </td>
                 <td className="border border-black px-2 py-2 h-10 text-center align-middle">
-                  {record.is_signed && record.manager_signature ? (
-                    <img src={record.manager_signature} alt="TTD Manager" className="mx-auto max-h-8 max-w-[100px] object-contain" />
+                  {record.manager_signatures.siang.signature ? (
+                    <img src={record.manager_signatures.siang.signature} alt="TTD Manager Siang" className="mx-auto max-h-8 max-w-[100px] object-contain" />
                   ) : ''}
                 </td>
               </tr>
               <tr>
                 <td className="border border-black px-2 py-2 h-10">
-                  3. Duty Malam : <span className="font-medium">{managerMalam || ''}</span>
+                  3. Duty Malam : <span className="font-medium">{record.manager_signatures.malam.signed_by_name || managerMalam || ''}</span>
                 </td>
                 <td className="border border-black px-2 py-2 h-10 text-center align-middle">
-                  {record.is_signed && record.manager_signature ? (
-                    <img src={record.manager_signature} alt="TTD Manager" className="mx-auto max-h-8 max-w-[100px] object-contain" />
+                  {record.manager_signatures.malam.signature ? (
+                    <img src={record.manager_signatures.malam.signature} alt="TTD Manager Malam" className="mx-auto max-h-8 max-w-[100px] object-contain" />
                   ) : ''}
                 </td>
               </tr>

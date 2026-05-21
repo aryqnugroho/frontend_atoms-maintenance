@@ -28,7 +28,14 @@ import type {
   LogbookCnsdDetail as LogbookCnsdDetailType,
   LogbookCnsdItem,
   PersonnelShiftInfo,
+  ShiftKey,
 } from '@/types/logbookCnsd';
+
+const namesMatch = (a?: string | null, b?: string | null): boolean => {
+  if (!a || !b) return false;
+  const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+  return norm(a) !== '' && norm(a) === norm(b);
+};
 
 // ─── Helpers ──────────────────────────────────────────────
 const formatDateLong = (dateStr: string): string => {
@@ -135,10 +142,11 @@ interface EquipmentRowProps {
   onDelete: () => void;
   canManage: boolean;
   disabled: boolean;
+  shiftLocked: { pagi: boolean; siang: boolean; malam: boolean };
 }
 
 const EquipmentRow: React.FC<EquipmentRowProps> = ({
-  item, localState, onStatusChange, onValueChange, onEdit, onDelete, canManage, disabled,
+  item, localState, onStatusChange, onValueChange, onEdit, onDelete, canManage, disabled, shiftLocked,
 }) => (
   <div className="grid grid-cols-[1fr_auto] gap-2 items-center px-4 py-2.5 hover:bg-slate-50/50 transition-colors group">
     <div className="flex items-center gap-2 min-w-0">
@@ -170,15 +178,15 @@ const EquipmentRow: React.FC<EquipmentRowProps> = ({
     <div className="flex gap-2">
       {item.is_measurement ? (
         <>
-          <MeasurementInput value={localState.value_pagi} unit={item.unit} onChange={(v) => onValueChange('value_pagi', v)} disabled={disabled} />
-          <MeasurementInput value={localState.value_siang} unit={item.unit} onChange={(v) => onValueChange('value_siang', v)} disabled={disabled} />
-          <MeasurementInput value={localState.value_malam} unit={item.unit} onChange={(v) => onValueChange('value_malam', v)} disabled={disabled} />
+          <MeasurementInput value={localState.value_pagi}  unit={item.unit} onChange={(v) => onValueChange('value_pagi', v)}  disabled={disabled || shiftLocked.pagi} />
+          <MeasurementInput value={localState.value_siang} unit={item.unit} onChange={(v) => onValueChange('value_siang', v)} disabled={disabled || shiftLocked.siang} />
+          <MeasurementInput value={localState.value_malam} unit={item.unit} onChange={(v) => onValueChange('value_malam', v)} disabled={disabled || shiftLocked.malam} />
         </>
       ) : (
         <>
-          <StatusToggle value={localState.status_pagi} onChange={(v) => onStatusChange('status_pagi', v)} disabled={disabled} />
-          <StatusToggle value={localState.status_siang} onChange={(v) => onStatusChange('status_siang', v)} disabled={disabled} />
-          <StatusToggle value={localState.status_malam} onChange={(v) => onStatusChange('status_malam', v)} disabled={disabled} />
+          <StatusToggle value={localState.status_pagi}  onChange={(v) => onStatusChange('status_pagi', v)}  disabled={disabled || shiftLocked.pagi} />
+          <StatusToggle value={localState.status_siang} onChange={(v) => onStatusChange('status_siang', v)} disabled={disabled || shiftLocked.siang} />
+          <StatusToggle value={localState.status_malam} onChange={(v) => onStatusChange('status_malam', v)} disabled={disabled || shiftLocked.malam} />
         </>
       )}
     </div>
@@ -197,12 +205,13 @@ interface CategoryAccordionProps {
   onAddItem: (category: string) => void;
   canManage: boolean;
   disabled: boolean;
+  shiftLocked: { pagi: boolean; siang: boolean; malam: boolean };
   defaultOpen?: boolean;
 }
 
 const CategoryAccordion: React.FC<CategoryAccordionProps> = ({
   category, items, localItems, onStatusChange, onValueChange, onEditItem, onDeleteItem, onAddItem,
-  canManage, disabled, defaultOpen = true,
+  canManage, disabled, shiftLocked, defaultOpen = true,
 }) => {
   const [open, setOpen] = useState(defaultOpen);
   const isMeasurementGroup = items.length > 0 && items.every((i) => i.is_measurement);
@@ -258,6 +267,7 @@ const CategoryAccordion: React.FC<CategoryAccordionProps> = ({
                 onDelete={() => onDeleteItem(item.id)}
                 canManage={canManage}
                 disabled={disabled}
+                shiftLocked={shiftLocked}
               />
             );
           })}
@@ -447,9 +457,11 @@ export const LogbookCnsdDetail: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
-  const [showSignCanvas, setShowSignCanvas] = useState(false);
+  const [signShift, setSignShift] = useState<ShiftKey | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [bulkPendingShift, setBulkPendingShift] = useState<ShiftKey | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [editingItem, setEditingItem] = useState<LogbookCnsdItem | null>(null);
   const [addingCategory, setAddingCategory] = useState<string | null>(null);
@@ -490,8 +502,14 @@ export const LogbookCnsdDetail: React.FC = () => {
 
   useEffect(() => { void loadRecord(); }, [loadRecord]);
 
-  const isSigned = !!record?.is_signed;
+  const isFullySigned = !!record?.is_fully_signed;
+  const shiftLocked = {
+    pagi: !!record?.is_signed_pagi,
+    siang: !!record?.is_signed_siang,
+    malam: !!record?.is_signed_malam,
+  };
   const canSign = user?.role === 'Manager Teknik';
+  const canDelete = user?.role === 'Manager Teknik' || user?.role === 'Admin';
   const canManageEquipment =
     user?.role === 'Manager Teknik' ||
     user?.role === 'Supervisor TFP' ||
@@ -666,13 +684,13 @@ export const LogbookCnsdDetail: React.FC = () => {
   };
 
   const handleSign = async (base64: string) => {
-    if (!record) return;
+    if (!record || !signShift) return;
     setIsSigning(true);
     setErrorMessage(null);
     try {
-      const updated = await logbookCnsdService.signLogbook(record.id, base64);
+      const updated = await logbookCnsdService.signLogbook(record.id, signShift, base64);
       setRecord(updated);
-      setSuccessMessage('Logbook berhasil ditandatangani.');
+      setSuccessMessage(`Tanda tangan shift ${signShift} berhasil disimpan.`);
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
@@ -683,7 +701,81 @@ export const LogbookCnsdDetail: React.FC = () => {
       }
     } finally {
       setIsSigning(false);
-      setShowSignCanvas(false);
+      setSignShift(null);
+    }
+  };
+
+  const handleBulkMarkS = async (shift: ShiftKey) => {
+    if (!record || shiftLocked[shift]) return;
+    setBulkPendingShift(shift);
+    setErrorMessage(null);
+    try {
+      const updated = await logbookCnsdService.bulkSetShiftStatus(record.id, { shift, status: 'S', overwrite: true });
+      setRecord(updated);
+      const next: Record<number, LocalItemState> = {};
+      Object.values(updated.items_by_category).flat().forEach((item) => {
+        next[item.id] = {
+          status_pagi: item.status_pagi, status_siang: item.status_siang, status_malam: item.status_malam,
+          value_pagi: item.value_pagi, value_siang: item.value_siang, value_malam: item.value_malam,
+        };
+      });
+      setLocalItems(next);
+      setSuccessMessage(`Semua peralatan shift ${shift} diset Serviceable.`);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response) {
+        const data = err.response.data as { message?: string };
+        setErrorMessage(data.message ?? 'Gagal menerapkan auto-fill.');
+      } else {
+        setErrorMessage('Gagal menerapkan auto-fill.');
+      }
+    } finally {
+      setBulkPendingShift(null);
+    }
+  };
+
+  const handleBulkReset = async (shift: ShiftKey) => {
+    if (!record || shiftLocked[shift]) return;
+    if (!confirm(`Reset semua status peralatan shift ${shift}?`)) return;
+    setBulkPendingShift(shift);
+    try {
+      const updated = await logbookCnsdService.bulkSetShiftStatus(record.id, { shift, status: null, overwrite: true });
+      setRecord(updated);
+      const next: Record<number, LocalItemState> = {};
+      Object.values(updated.items_by_category).flat().forEach((item) => {
+        next[item.id] = {
+          status_pagi: item.status_pagi, status_siang: item.status_siang, status_malam: item.status_malam,
+          value_pagi: item.value_pagi, value_siang: item.value_siang, value_malam: item.value_malam,
+        };
+      });
+      setLocalItems(next);
+    } catch {
+      setErrorMessage('Gagal mereset shift.');
+    } finally {
+      setBulkPendingShift(null);
+    }
+  };
+
+  const handleDeleteLogbook = async () => {
+    if (!record) return;
+    const wasSigned = record.is_signed_pagi || record.is_signed_siang || record.is_signed_malam;
+    const message = wasSigned
+      ? `Logbook tanggal ${record.date} sudah memiliki tanda tangan. Hapus logbook ini dan SEMUA tanda tangan?\n\nIni tidak dapat dibatalkan, namun Anda bisa membuat ulang logbook pada tanggal yang sama.`
+      : `Hapus logbook tanggal ${record.date}?`;
+    if (!confirm(message)) return;
+    setIsDeleting(true);
+    try {
+      await logbookCnsdService.deleteLogbook(record.id);
+      navigate('/logbooks/cnsd');
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response) {
+        const data = err.response.data as { message?: string };
+        setErrorMessage(data.message ?? 'Gagal menghapus logbook.');
+      } else {
+        setErrorMessage('Gagal menghapus logbook.');
+      }
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -721,15 +813,14 @@ export const LogbookCnsdDetail: React.FC = () => {
     malam: 'bg-indigo-50 border-indigo-200 text-indigo-700',
   };
 
-  const managersOnDuty: Array<{ name: string; user_id: number; shift: string }> = [];
-  if (record.personnel_on_duty) {
-    (['pagi', 'siang', 'malam'] as const).forEach((shift) => {
-      const mgr = record.personnel_on_duty?.[shift]?.manager;
-      if (mgr && !managersOnDuty.find((m) => m.user_id === mgr.user_id)) {
-        managersOnDuty.push({ ...mgr, shift });
-      }
-    });
-  }
+  const shiftManagers: Record<ShiftKey, { name: string; user_id: number } | null> = {
+    pagi:  record.personnel_on_duty?.pagi?.manager ?? null,
+    siang: record.personnel_on_duty?.siang?.manager ?? null,
+    malam: record.personnel_on_duty?.malam?.manager ?? null,
+  };
+
+  const SHIFT_LABEL: Record<ShiftKey, string> = { pagi: 'Pagi', siang: 'Siang', malam: 'Malam' };
+  const SHIFT_RANGE: Record<ShiftKey, string> = { pagi: '07:00–13:00', siang: '13:00–19:00', malam: '19:00–07:00' };
 
   return (
     <div className="space-y-5 animate-fade-in max-w-7xl mx-auto">
@@ -751,15 +842,25 @@ export const LogbookCnsdDetail: React.FC = () => {
         title={`Logbook CNSD — ${formatDateLong(record.date)}`}
         subtitle="Log Book CNS & Automation"
         actions={
-          <div className="flex items-center gap-2">
-            {isSigned && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-3 py-1.5">
-                <CheckCircle2 size={13} /> Sudah TTD
-              </span>
-            )}
-            {!isSigned && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex items-center gap-1.5 rounded-full text-xs font-semibold px-3 py-1.5 border ${
+              isFullySigned
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : (record.is_signed_pagi || record.is_signed_siang || record.is_signed_malam)
+                  ? 'bg-amber-50 border-amber-200 text-amber-700'
+                  : 'bg-slate-50 border-slate-200 text-slate-500'
+            }`}>
+              <CheckCircle2 size={13} />
+              {isFullySigned ? 'Semua Shift Sudah TTD' : `${[record.is_signed_pagi, record.is_signed_siang, record.is_signed_malam].filter(Boolean).length}/3 Shift TTD`}
+            </span>
+            {!isFullySigned && (
               <Button onClick={handleSave} isLoading={isSaving} className="gap-2">
                 <Save size={15} /> Simpan Perubahan
+              </Button>
+            )}
+            {canDelete && (
+              <Button variant="outline" onClick={handleDeleteLogbook} isLoading={isDeleting} className="gap-2 text-red-600 border-red-200 hover:bg-red-50">
+                <Trash2 size={15} /> Hapus Logbook
               </Button>
             )}
           </div>
@@ -812,10 +913,40 @@ export const LogbookCnsdDetail: React.FC = () => {
             </div>
           </div>
 
-          {canManageEquipment && !isSigned && (
+          {canManageEquipment && !isFullySigned && (
             <p className="text-[11px] text-slate-400 leading-relaxed">
               Hover pada nama peralatan untuk edit/hapus. Klik <span className="text-slate-500 font-medium">+ Tambah peralatan</span> di bawah kategori untuk menambah baris baru.
             </p>
+          )}
+
+          {/* Mark-all-S quick action bar */}
+          {!isFullySigned && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mr-1">Auto-fill:</span>
+              {(['pagi', 'siang', 'malam'] as ShiftKey[]).map((shift) => (
+                <div key={shift} className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkMarkS(shift)}
+                    disabled={shiftLocked[shift] || bulkPendingShift === shift}
+                    className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 text-[11px] font-semibold px-2 py-1 hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={shiftLocked[shift] ? `Shift ${shift} sudah TTD` : `Tandai semua peralatan shift ${shift} sebagai Serviceable`}
+                  >
+                    <CheckSquare size={12} /> Semua S — {SHIFT_LABEL[shift]}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkReset(shift)}
+                    disabled={shiftLocked[shift] || bulkPendingShift === shift}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white text-slate-500 text-[11px] font-medium px-1.5 py-1 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={`Reset shift ${shift}`}
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+              <span className="text-[10px] text-slate-400 italic ml-auto">Bulk hanya berlaku untuk peralatan status S/U-S (bukan measurement).</span>
+            </div>
           )}
 
           {categories.length === 0 ? (
@@ -836,14 +967,15 @@ export const LogbookCnsdDetail: React.FC = () => {
                   onDeleteItem={handleDeleteEquipment}
                   onAddItem={setAddingCategory}
                   canManage={canManageEquipment}
-                  disabled={isSigned}
+                  disabled={isFullySigned}
+                  shiftLocked={shiftLocked}
                   defaultOpen={idx === 0}
                 />
               ))}
             </div>
           )}
 
-          {canManageEquipment && !isSigned && (
+          {canManageEquipment && !isFullySigned && (
             <button
               type="button"
               onClick={() => setAddingCategory('')}
@@ -865,7 +997,7 @@ export const LogbookCnsdDetail: React.FC = () => {
             )}
           </div>
 
-          {!isSigned && (
+          {!shiftLocked[noteShift] && (
             <form onSubmit={handleAddNote} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -915,7 +1047,7 @@ export const LogbookCnsdDetail: React.FC = () => {
                   <Clock size={20} className="text-slate-300" />
                 </div>
                 <p className="text-sm font-medium text-slate-500">Belum ada catatan kegiatan.</p>
-                {!isSigned && <p className="text-xs text-slate-400 mt-1">Tambahkan catatan menggunakan form di atas.</p>}
+                {!isFullySigned && <p className="text-xs text-slate-400 mt-1">Tambahkan catatan menggunakan form di atas.</p>}
               </div>
             ) : (
               <div className="max-h-[520px] overflow-y-auto">
@@ -945,7 +1077,7 @@ export const LogbookCnsdDetail: React.FC = () => {
                               )}
                               <p className="text-sm text-slate-700 leading-snug">{note.activity}</p>
                             </div>
-                            {!isSigned && (
+                            {!shiftLocked[note.shift] && (
                               <button
                                 type="button"
                                 onClick={() => handleDeleteNote(note.id)}
@@ -967,114 +1099,66 @@ export const LogbookCnsdDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* Signature Block */}
+      {/* ── Signature Block — 3 slot per shift ──────────────── */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
             <h3 className="text-base font-bold text-slate-800">Tanda Tangan Manager Teknik</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Tanda tangan bersifat permanen dan tidak dapat diubah setelah disimpan.
+              Tiap shift punya slot tanda tangan tersendiri. Hanya Manager Teknik yang bertugas pada shift tersebut yang dapat menandatangani.
             </p>
           </div>
-          {isSigned && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-3 py-1">
-              <CheckCircle2 size={13} /> Sudah TTD
-            </span>
-          )}
         </div>
 
-        {isSigned ? (
-          <div className="flex flex-col sm:flex-row items-start gap-6">
-            <div className="w-full sm:w-64 shrink-0">
-              <SignatureDisplay
-                signerName={record.manager_signed_by_name ?? 'Manager Teknik'}
-                signedAt={record.manager_signed_at}
-                signatureImage={record.manager_signature}
-                role="Manager Teknik"
-                isPending={false}
-                isNotRequired={false}
-              />
-            </div>
-            <div className="flex-1 space-y-1">
-              <p className="text-sm font-semibold text-emerald-700">
-                Ditandatangani oleh: {record.manager_signed_by_name}
-              </p>
-              {record.manager_signed_at && (
-                <p className="text-xs text-slate-500">
-                  {new Date(record.manager_signed_at).toLocaleString('id-ID', {
-                    day: '2-digit', month: 'short', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit',
-                  })}
-                </p>
-              )}
-            </div>
-          </div>
-        ) : managersOnDuty.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {managersOnDuty.map((mgr) => {
-              const isCurrentUser = user?.name?.trim().toLowerCase() === mgr.name.trim().toLowerCase();
-              return (
-                <div key={mgr.user_id} className="space-y-3">
-                  <SignatureDisplay
-                    signerName={mgr.name}
-                    signedAt={null}
-                    signatureImage={null}
-                    role={`Manager Teknik — Shift ${mgr.shift.charAt(0).toUpperCase() + mgr.shift.slice(1)}`}
-                    isPending={true}
-                    isNotRequired={false}
-                  />
-                  {canSign && isCurrentUser ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="w-full gap-2"
-                      onClick={() => setShowSignCanvas(true)}
-                    >
-                      <PenLine size={15} /> Tanda Tangan
-                    </Button>
-                  ) : canSign ? (
-                    <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-600">
-                      <Lock size={12} className="mt-0.5 text-slate-400 shrink-0" />
-                      <span>Hanya dapat ditandatangani oleh <span className="font-semibold text-slate-800">{mgr.name}</span></span>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row items-start gap-6">
-            <div className="w-full sm:w-64 shrink-0">
-              <SignatureDisplay
-                signerName="Manager Teknik"
-                signedAt={null}
-                signatureImage={null}
-                role="Manager Teknik"
-                isPending={true}
-                isNotRequired={false}
-              />
-            </div>
-            <div className="flex-1">
-              {canSign ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-slate-600">
-                    Klik tombol di bawah untuk menandatangani logbook ini sebagai Manager Teknik.
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {(['pagi', 'siang', 'malam'] as ShiftKey[]).map((shift) => {
+            const sig = record.manager_signatures[shift];
+            const assignedMgr = shiftManagers[shift];
+            const isSigned = !!sig?.signature;
+            const isCurrentUser = canSign && assignedMgr && namesMatch(user?.name, assignedMgr.name);
+            const showLockedNote = !isSigned && !!assignedMgr && !isCurrentUser;
+
+            return (
+              <div key={shift} className="space-y-3 border border-gray-100 rounded-xl p-3 bg-slate-50/40">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                    Shift {SHIFT_LABEL[shift]}
                   </p>
-                  <Button onClick={() => setShowSignCanvas(true)} className="gap-2">
+                  <span className="text-[10px] text-slate-400 font-medium">{SHIFT_RANGE[shift]}</span>
+                </div>
+
+                <SignatureDisplay
+                  signerName={sig?.signed_by_name ?? assignedMgr?.name ?? 'Belum ditugaskan'}
+                  signedAt={sig?.signed_at ?? null}
+                  signatureImage={sig?.signature ?? null}
+                  role={`Manager Teknik — ${SHIFT_LABEL[shift]}`}
+                  isPending={!isSigned && !!assignedMgr}
+                  isNotRequired={!assignedMgr}
+                />
+
+                {!isSigned && isCurrentUser && (
+                  <Button type="button" size="sm" className="w-full gap-2" onClick={() => setSignShift(shift)}>
                     <PenLine size={15} /> Tanda Tangan
                   </Button>
-                </div>
-              ) : (
-                <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-                  <Lock size={14} className="text-slate-400 mt-0.5 shrink-0" />
-                  <p className="text-sm text-slate-500">
-                    Hanya dapat ditandatangani oleh <span className="font-semibold text-slate-700">Manager Teknik</span>.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+                )}
+
+                {showLockedNote && (
+                  <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-600">
+                    <Lock size={12} className="mt-0.5 text-slate-400 shrink-0" />
+                    <span>Hanya dapat ditandatangani oleh <span className="font-semibold text-slate-800">{assignedMgr?.name}</span></span>
+                  </div>
+                )}
+
+                {!isSigned && !assignedMgr && (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-700">
+                    <Lock size={12} className="mt-0.5 shrink-0" />
+                    <span>Manager Teknik shift ini belum ditugaskan di roster.</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <EditEquipmentModal
@@ -1093,11 +1177,11 @@ export const LogbookCnsdDetail: React.FC = () => {
       />
 
       <SignatureCanvas
-        isOpen={showSignCanvas}
-        onClose={() => { if (!isSigning) setShowSignCanvas(false); }}
+        isOpen={!!signShift}
+        onClose={() => { if (!isSigning) setSignShift(null); }}
         onConfirm={(base64) => void handleSign(base64)}
         signerName={user?.name ?? 'Manager Teknik'}
-        role="Manager Teknik"
+        role={signShift ? `Manager Teknik — Shift ${SHIFT_LABEL[signShift]}` : 'Manager Teknik'}
         isLoading={isSigning}
       />
     </div>

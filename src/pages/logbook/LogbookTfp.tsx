@@ -220,10 +220,14 @@ export const LogbookTfp: React.FC = () => {
     setSignedFilter('');
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Hapus logbook ini?')) return;
+  const handleDelete = async (lb: LogbookTfpSummary) => {
+    const wasSigned = lb.signed_count > 0;
+    const message = wasSigned
+      ? `Logbook tanggal ${lb.date} sudah memiliki ${lb.signed_count}/3 tanda tangan. Hapus logbook ini dan SEMUA tanda tangan?\n\nIni tidak dapat dibatalkan, namun Anda bisa membuat ulang logbook pada tanggal yang sama.`
+      : `Hapus logbook tanggal ${lb.date}?`;
+    if (!confirm(message)) return;
     try {
-      await logbookTfpService.deleteLogbook(id);
+      await logbookTfpService.deleteLogbook(lb.id);
       void fetchLogbooks();
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
@@ -401,8 +405,12 @@ export const LogbookTfp: React.FC = () => {
               </thead>
               <tbody>
                 {logbooks.map((lb) => {
-                  // Derive status: completed = signed, on_hold = not signed but has notes, ongoing = fresh
-                  const status = lb.is_signed ? 'completed' : lb.notes_count > 0 ? 'on_hold' : 'ongoing';
+                  // Derive status: completed = all shifts signed, on_hold = partially signed or has notes, ongoing = fresh
+                  const status = lb.is_fully_signed
+                    ? 'completed'
+                    : (lb.signed_count > 0 || lb.notes_count > 0)
+                      ? 'on_hold'
+                      : 'ongoing';
                   return (
                     <tr
                       key={lb.id}
@@ -445,9 +453,14 @@ export const LogbookTfp: React.FC = () => {
                         )}
                       </td>
 
-                      {/* Status — menggunakan StatusBadge standar */}
+                      {/* Status — gabungan StatusBadge + counter shift TTD */}
                       <td className="px-6 py-4">
-                        <StatusBadge status={status} variant="pill" />
+                        <div className="flex flex-col items-start gap-1">
+                          <StatusBadge status={status} variant="pill" />
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            {lb.signed_count}/3 shift TTD
+                          </span>
+                        </div>
                       </td>
 
                       {/* Aksi */}
@@ -472,12 +485,12 @@ export const LogbookTfp: React.FC = () => {
                           >
                             <Printer size={16} />
                           </button>
-                          {/* Delete */}
-                          {canDelete && !lb.is_signed && (
+                          {/* Delete — diizinkan walau sudah TTD; user akan diingatkan via confirm dialog */}
+                          {canDelete && (
                             <button
-                              onClick={() => handleDelete(lb.id)}
+                              onClick={() => handleDelete(lb)}
                               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Hapus"
+                              title={lb.signed_count > 0 ? `Hapus (akan menghapus ${lb.signed_count} TTD)` : 'Hapus'}
                             >
                               <Trash2 size={16} />
                             </button>

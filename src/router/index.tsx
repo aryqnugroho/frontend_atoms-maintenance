@@ -38,6 +38,15 @@ import { CnsdTdmeMeterPrintView } from '@/pages/cnsd/CnsdTdmeMeterPrintView';
 import { CnsdDvorMeterListPage } from '@/pages/cnsd/CnsdDvorMeterListPage';
 import { CnsdDvorMeterDetailPage } from '@/pages/cnsd/CnsdDvorMeterDetailPage';
 import { CnsdDvorMeterPrintView } from '@/pages/cnsd/CnsdDvorMeterPrintView';
+import { CnsdDmeMeterListPage } from '@/pages/cnsd/CnsdDmeMeterListPage';
+import { CnsdDmeMeterDetailPage } from '@/pages/cnsd/CnsdDmeMeterDetailPage';
+import { CnsdDmeMeterPrintView } from '@/pages/cnsd/CnsdDmeMeterPrintView';
+import { CnsdAtisMeterListPage } from '@/pages/cnsd/CnsdAtisMeterListPage';
+import { CnsdAtisMeterDetailPage } from '@/pages/cnsd/CnsdAtisMeterDetailPage';
+import { CnsdAtisMeterPrintView } from '@/pages/cnsd/CnsdAtisMeterPrintView';
+import { CnsdAtcSystemMeterListPage } from '@/pages/cnsd/CnsdAtcSystemMeterListPage';
+import { CnsdAtcSystemMeterDetailPage } from '@/pages/cnsd/CnsdAtcSystemMeterDetailPage';
+import { CnsdAtcSystemMeterPrintView } from '@/pages/cnsd/CnsdAtcSystemMeterPrintView';
 import { TfpIndexPage } from '@/pages/tfp/TfpIndexPage';
 import { TfpAobGroundListPage } from '@/pages/tfp/TfpAobGroundListPage';
 import { TfpAobGroundDetailPage } from '@/pages/tfp/TfpAobGroundDetailPage';
@@ -67,7 +76,18 @@ import { GroundCheckIndexPage } from '@/pages/ground-check/GroundCheckIndexPage'
 import { GroundCheckAdcListPage } from '@/pages/ground-check/GroundCheckAdcListPage';
 import { GroundCheckAdcDetailPage } from '@/pages/ground-check/GroundCheckAdcDetailPage';
 import { GroundCheckAdcPrintView } from '@/pages/ground-check/GroundCheckAdcPrintView';
-import { LocalizerFormPage } from '@/pages/ground-check/LocalizerFormPage';
+import { GroundCheckVhfListPage } from '@/pages/ground-check/GroundCheckVhfListPage';
+import { GroundCheckVhfDetailPage } from '@/pages/ground-check/GroundCheckVhfDetailPage';
+import { GroundCheckVhfPrintView } from '@/pages/ground-check/GroundCheckVhfPrintView';
+import { GroundCheckLlzListPage } from '@/pages/ground-check/GroundCheckLlzListPage';
+import { GroundCheckLlzDetailPage } from '@/pages/ground-check/GroundCheckLlzDetailPage';
+import { GroundCheckLlzPrintView } from '@/pages/ground-check/GroundCheckLlzPrintView';
+import { GroundCheckGpListPage } from '@/pages/ground-check/GroundCheckGpListPage';
+import { GroundCheckGpDetailPage } from '@/pages/ground-check/GroundCheckGpDetailPage';
+import { GroundCheckGpPrintView } from '@/pages/ground-check/GroundCheckGpPrintView';
+import { GroundCheckDvorListPage } from '@/pages/ground-check/GroundCheckDvorListPage';
+import { GroundCheckDvorDetailPage } from '@/pages/ground-check/GroundCheckDvorDetailPage';
+import { GroundCheckDvorPrintView } from '@/pages/ground-check/GroundCheckDvorPrintView';
 import { GroundingIndexPage } from '@/pages/grounding/GroundingIndexPage';
 import { GroundingReportDetailPage } from '@/pages/grounding/GroundingReportDetailPage';
 import { GroundingReportPrintView } from '@/pages/grounding/GroundingReportPrintView';
@@ -102,6 +122,9 @@ export const router = createBrowserRouter([
       { path: '/cnsd/localizer-meter/:id/print', element: <CnsdLocalizerMeterPrintView /> },
       { path: '/cnsd/tdme-meter/:id/print', element: <CnsdTdmeMeterPrintView /> },
       { path: '/cnsd/dvor-meter/:id/print', element: <CnsdDvorMeterPrintView /> },
+      { path: '/cnsd/dme-meter/:id/print', element: <CnsdDmeMeterPrintView /> },
+      { path: '/cnsd/atis-meter/:id/print', element: <CnsdAtisMeterPrintView /> },
+      { path: '/cnsd/atc-system-meter/:id/print', element: <CnsdAtcSystemMeterPrintView /> },
       { path: '/grounding/reports/:id/print', element: <GroundingReportPrintView /> },
       { path: '/reporting/damage-reports/:id/print', element: <ReportingDamagePrintView /> },
       { path: '/tfp/aob-ground/:id/print', element: <TfpAobGroundPrintView /> },
@@ -113,6 +136,10 @@ export const router = createBrowserRouter([
       { path: '/tfp/localizer/:id/print', element: <TfpLocalizerPrintView /> },
       { path: '/tfp/glidepath/:id/print', element: <TfpGlidepathPrintView /> },
       { path: '/ground-check/adc/:id/print', element: <GroundCheckAdcPrintView /> },
+      { path: '/ground-check/vhf/:id/print', element: <GroundCheckVhfPrintView /> },
+      { path: '/ground-check/llz/:id/print', element: <GroundCheckLlzPrintView /> },
+      { path: '/ground-check/gp/:id/print', element: <GroundCheckGpPrintView /> },
+      { path: '/ground-check/dvor/:id/print', element: <GroundCheckDvorPrintView /> },
       { path: '/logbooks/tfp/:id/print', element: <LogbookTfpPrintView /> },
       { path: '/logbooks/cnsd/:id/print', element: <LogbookCnsdPrintView /> },
       {
@@ -157,6 +184,15 @@ export const router = createBrowserRouter([
           // Active module 10: DVOR Meter Reading (FORM N-5)
           { path: '/cnsd/dvor-meter', element: <CnsdDvorMeterListPage /> },
           { path: '/cnsd/dvor-meter/:id', element: <CnsdDvorMeterDetailPage /> },
+          // Active module 11: DME Meter Reading (FORM N-5)
+          { path: '/cnsd/dme-meter', element: <CnsdDmeMeterListPage /> },
+          { path: '/cnsd/dme-meter/:id', element: <CnsdDmeMeterDetailPage /> },
+          // Active module 13: ATIS Meter Reading (Reproducer ATIS)
+          { path: '/cnsd/atis-meter', element: <CnsdAtisMeterListPage /> },
+          { path: '/cnsd/atis-meter/:id', element: <CnsdAtisMeterDetailPage /> },
+          // Active module 14: ATC SYSTEM Meter Reading (Approach System / Tern ATS System)
+          { path: '/cnsd/atc-system-meter', element: <CnsdAtcSystemMeterListPage /> },
+          { path: '/cnsd/atc-system-meter/:id', element: <CnsdAtcSystemMeterDetailPage /> },
           // Backward-compat: legacy /cnsd/eq-1 link redirects to new list
           { path: '/cnsd/eq-1', element: <Navigate to="/cnsd/readiness" replace /> },
           { path: '/cnsd/:code/coming-soon', element: <ComingSoonPage /> },
@@ -193,7 +229,14 @@ export const router = createBrowserRouter([
           { path: '/ground-check', element: <GroundCheckIndexPage /> },
           { path: '/ground-check/adc', element: <GroundCheckAdcListPage /> },
           { path: '/ground-check/adc/:id', element: <GroundCheckAdcDetailPage /> },
-          { path: '/ground-check/localizer', element: <LocalizerFormPage /> },
+          { path: '/ground-check/vhf', element: <GroundCheckVhfListPage /> },
+          { path: '/ground-check/vhf/:id', element: <GroundCheckVhfDetailPage /> },
+          { path: '/ground-check/llz', element: <GroundCheckLlzListPage /> },
+          { path: '/ground-check/llz/:id', element: <GroundCheckLlzDetailPage /> },
+          { path: '/ground-check/gp', element: <GroundCheckGpListPage /> },
+          { path: '/ground-check/gp/:id', element: <GroundCheckGpDetailPage /> },
+          { path: '/ground-check/dvor', element: <GroundCheckDvorListPage /> },
+          { path: '/ground-check/dvor/:id', element: <GroundCheckDvorDetailPage /> },
           { path: '/ground-check/:code/coming-soon', element: <ComingSoonPage /> },
 
           // Grounding

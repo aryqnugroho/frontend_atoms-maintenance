@@ -3,7 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { reportingDamageReportService } from '@/services/reportingDamageReportService';
-import { OBSTACLE_CODE_LABELS, OBSTACLE_CODE_ORDER } from '@/types/reporting';
+import {
+  DAMAGE_CATEGORY_LABELS,
+  OBSTACLE_CODE_LABELS,
+  OBSTACLE_CODE_ORDER,
+  normalizeDamageCategory,
+} from '@/types/reporting';
 import type { ReportingDamageReportDetail } from '@/types/reporting';
 
 const formatDate = (v?: string | null): string => {
@@ -35,6 +40,11 @@ const formatDateTime = (v?: string | null): string => {
 };
 
 const val = (v: string | null | undefined): string => (v == null || v === '' ? '-' : v);
+
+const formatDamageCategory = (value?: string | null): string => {
+  const category = normalizeDamageCategory(value);
+  return `${category} - ${DAMAGE_CATEGORY_LABELS[category]}`;
+};
 
 /**
  * ReportingDamagePrintView — Laporan Kerusakan formal print layout.
@@ -101,7 +111,7 @@ export const ReportingDamagePrintView: React.FC = () => {
       </style>
 
       {/* Toolbar (screen only) */}
-      <div className="print-hide mx-auto mb-4 flex max-w-[210mm] items-center justify-between">
+      <div className="print-hide mx-auto mb-4 flex max-w-[190mm] items-center justify-between">
         <Button
           variant="outline"
           className="gap-2"
@@ -117,50 +127,54 @@ export const ReportingDamagePrintView: React.FC = () => {
       </div>
 
       {/* A4 paper */}
-      <div className="mx-auto max-w-[210mm] border border-black bg-white font-sans text-[11px] print:mx-0 print:w-full print:max-w-none print:border-0">
+      <div className="mx-auto max-w-[190mm] bg-white font-sans text-[9px] print:mx-0 print:w-full print:max-w-none">
         {/* Kop */}
-        <div className="flex border-b border-black">
-          {/* Left: AirNav logo */}
-          <div className="flex w-[35%] items-center gap-2 border-r border-black p-3">
-            <img
-              src="/assets/icon/logoairnav.svg"
-              alt="AirNav Indonesia"
-              className="h-12 w-auto"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-            <div className="leading-tight">
-              <div className="text-[12px] font-black">AirNav Indonesia</div>
-              <div className="text-[9px] font-semibold text-gray-600">PERUM LPPNPI</div>
-              <div className="text-[9px] font-semibold text-gray-600">Cabang Surabaya</div>
-            </div>
-          </div>
-
-          {/* Center: title */}
-          <div className="flex flex-1 flex-col items-center justify-center border-r border-black px-2 py-3 text-center">
-            <div className="text-[16px] font-black uppercase tracking-wide">
-              Laporan Kerusakan
-            </div>
-            <div className="mt-1 text-[10px] font-semibold text-gray-600 uppercase">
-              Damage Report
-            </div>
-          </div>
-
-          {/* Right: form identity */}
-          <div className="flex w-[28%] flex-col items-center justify-center px-2 py-3 text-center">
-            <div className="text-[9px] font-semibold text-gray-500 uppercase">No. Surat</div>
-            <div className="text-[14px] font-black break-all">{record.report_number}</div>
-            <div className="text-[8px] text-gray-500 mt-0.5 capitalize">{record.status}</div>
-          </div>
-        </div>
+        <table className="w-full table-fixed border-collapse border border-black">
+          <colgroup>
+            <col className="w-[8%]" />
+            <col className="w-[34%]" />
+            <col />
+          </colgroup>
+          <tbody>
+            <tr>
+              <td colSpan={2} className="border border-black px-2 py-2 align-middle">
+                <div className="flex items-center gap-2">
+                  <img
+                    src="/assets/icon/logoairnav.svg"
+                    alt="AirNav Indonesia"
+                    className="h-11 w-auto"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                  <div className="leading-tight">
+                    <div className="text-[11px] font-black">AirNav Indonesia</div>
+                    <div className="text-[8px] font-semibold">PERUM LPPNPI</div>
+                    <div className="text-[8px] font-semibold">Cabang Surabaya</div>
+                  </div>
+                </div>
+              </td>
+              <td className="border border-black px-2 py-2 text-center align-middle">
+                <div className="text-[15px] font-black uppercase">Laporan Kerusakan</div>
+                <div className="mt-0.5 text-[8px] font-semibold uppercase text-gray-600">
+                  Damage Report
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
         {/* Body table */}
-        <table className="w-full border-collapse text-[11px]">
+        <table className="-mt-px w-full table-fixed border-collapse text-[9px]">
+          <colgroup>
+            <col className="w-[8%]" />
+            <col className="w-[34%]" />
+            <col />
+          </colgroup>
           <thead>
             <tr className="bg-gray-100 text-[10px] font-bold uppercase">
-              <th className="border border-black px-2 py-1 w-10 text-center">No.</th>
-              <th className="border border-black px-2 py-1 w-[35%] text-left">Uraian</th>
+              <th className="border border-black px-2 py-1 text-center">No.</th>
+              <th className="border border-black px-2 py-1 text-left">Uraian</th>
               <th className="border border-black px-2 py-1 text-left">Data</th>
             </tr>
           </thead>
@@ -176,7 +190,7 @@ export const ReportingDamagePrintView: React.FC = () => {
             <BodyRow no={4} label="Nama Peralatan">{val(record.equipment_name)}</BodyRow>
             <BodyRow no={5} label="Bagian/Modul Peralatan">{val(record.equipment_module)}</BodyRow>
             <BodyRow no={6} label="Kategori Kerusakan">
-              <span className="font-semibold">{record.damage_category}</span>
+              <span className="font-semibold">{formatDamageCategory(record.damage_category)}</span>
             </BodyRow>
             <BodyRow no={7} label="Uraian Kerusakan">
               <span className="whitespace-pre-line">{val(record.damage_description)}</span>
@@ -220,12 +234,12 @@ export const ReportingDamagePrintView: React.FC = () => {
         </table>
 
         {/* Footer signatures */}
-        <div className="border-t border-black">
-          <div className="flex">
+        <div className="-mt-px border border-black">
+          <div className="grid grid-cols-[42%_58%]">
             {/* Left: Manager Teknik */}
-            <div className="flex w-1/2 flex-col items-center border-r border-black p-3 text-center min-h-[180px]">
-              <div className="text-[10px] font-bold mb-1">Mengetahui,</div>
-              <div className="text-[10px] font-black uppercase mb-2">Manager Teknik</div>
+            <div className="flex min-h-[145px] flex-col items-center border-r border-black p-0 text-center">
+              <div className="pt-2 text-[10px] font-bold">Mengetahui,</div>
+              <div className="mb-2 w-full border-b border-black pb-1 text-[10px] font-black uppercase">Manager Teknik</div>
 
               <div className="flex flex-1 items-center justify-center w-full">
                 {record.manager ? (
@@ -236,7 +250,7 @@ export const ReportingDamagePrintView: React.FC = () => {
                       className="max-h-20 max-w-[160px] object-contain"
                     />
                   ) : (
-                    <div className="h-16 w-32 border border-dashed border-gray-400 flex items-center justify-center text-[9px] text-gray-400 italic">
+                    <div className="flex h-14 w-28 items-center justify-center border border-dashed border-gray-400 text-[8px] italic text-gray-400">
                       Belum TTD
                     </div>
                   )
@@ -247,8 +261,8 @@ export const ReportingDamagePrintView: React.FC = () => {
                 )}
               </div>
 
-              <div className="mt-2 w-full border-t border-black pt-1">
-                <div className="text-[11px] font-semibold">
+              <div className="mt-2 w-full border-t border-black py-1">
+                <div className="text-[9px] font-semibold">
                   ({record.manager?.name ?? '—'})
                 </div>
                 {record.manager?.signed_at && (
@@ -260,25 +274,25 @@ export const ReportingDamagePrintView: React.FC = () => {
             </div>
 
             {/* Right: Pelaksana Perbaikan list */}
-            <div className="flex w-1/2 flex-col p-3 min-h-[180px]">
-              <div className="text-[10px] font-black uppercase mb-1 text-center">
+            <div className="flex min-h-[145px] flex-col p-0">
+              <div className="border-b border-black py-1 text-center text-[10px] font-black uppercase">
                 Pelaksana Perbaikan
               </div>
-              <div className="text-[9px] font-semibold mb-2 text-center text-gray-600">
+              <div className="border-b border-black py-0.5 text-center text-[9px] font-semibold text-gray-600">
                 Teknisi Telekomunikasi
               </div>
 
               {record.repairers.length === 0 ? (
-                <p className="text-center text-[10px] text-gray-400 italic">
+                <p className="p-2 text-center text-[10px] text-gray-400 italic">
                   Tidak ada pelaksana
                 </p>
               ) : (
-                <table className="w-full border-collapse text-[10px]">
+                <table className="-mt-px w-full table-fixed border-collapse text-[8px]">
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="border border-black px-1 py-0.5 w-6 text-center">No</th>
+                      <th className="w-[10%] border border-black px-1 py-0.5 text-center">No</th>
                       <th className="border border-black px-1 py-0.5 text-left">Nama Pelaksana</th>
-                      <th className="border border-black px-1 py-0.5 w-20 text-center">Paraf</th>
+                      <th className="w-[28%] border border-black px-1 py-0.5 text-center">Paraf</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -293,12 +307,12 @@ export const ReportingDamagePrintView: React.FC = () => {
                             </span>
                           )}
                         </td>
-                        <td className="border border-black px-1 py-0.5 text-center align-middle h-10">
+                        <td className="h-8 border border-black px-1 py-0.5 text-center align-middle">
                           {r.signature ? (
                             <img
                               src={r.signature}
                               alt={`TTD ${r.person_name}`}
-                              className="mx-auto max-h-9 max-w-[70px] object-contain"
+                              className="mx-auto max-h-7 max-w-[58px] object-contain"
                             />
                           ) : (
                             <span className="text-[8px] text-gray-400 italic">Belum TTD</span>
@@ -324,8 +338,8 @@ const BodyRow: React.FC<{
 }> = ({ no, label, children }) => (
   <tr className="align-top">
     <td className="border border-black px-2 py-1 text-center font-semibold">{no}</td>
-    <td className="border border-black px-2 py-1">{label}</td>
-    <td className="border border-black px-2 py-1">{children}</td>
+    <td className="border border-black px-2 py-1 font-medium">{label}</td>
+    <td className="border border-black px-2 py-1 leading-snug">{children}</td>
   </tr>
 );
 
@@ -333,7 +347,7 @@ const ObstacleCodeBox: React.FC<{
   selected: string | null;
   alasanLain?: string | null;
 }> = ({ selected, alasanLain }) => (
-  <div className="space-y-1.5">
+  <div className="space-y-1">
     <div className="grid grid-cols-1 gap-x-3 gap-y-0.5">
       {OBSTACLE_CODE_ORDER.map((code) => {
         const isSelected = selected === code;
@@ -346,14 +360,14 @@ const ObstacleCodeBox: React.FC<{
             }`}
           >
             <span
-              className={`inline-flex h-3 w-3 items-center justify-center border border-black shrink-0 mt-0.5 ${
+              className={`inline-flex h-2.5 w-2.5 items-center justify-center border border-black shrink-0 mt-0.5 ${
                 isSelected ? 'bg-black' : 'bg-white'
               }`}
               aria-hidden="true"
             >
               {isSelected && <span className="text-white text-[8px] leading-none">✓</span>}
             </span>
-            <span className="text-[10px]">
+            <span className="text-[8px] leading-tight">
               <strong>{code}</strong> - {OBSTACLE_CODE_LABELS[code]}
               {labelExtra}
             </span>

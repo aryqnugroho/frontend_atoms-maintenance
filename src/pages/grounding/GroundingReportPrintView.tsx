@@ -70,27 +70,46 @@ export const GroundingReportPrintView: React.FC = () => {
   const visualItems = record.items.filter((it) => it.section_name === 'VISUAL');
   const measurementItems = record.items.filter((it) => it.section_name === 'PENGUKURAN');
 
-  const shiftLabel: Record<string, string> = {
-    pagi: 'Pagi (07:00–13:00)',
-    siang: 'Siang (13:00–19:00)',
-    malam: 'Malam (19:00–07:00)',
-  };
-
   return (
     <div className="min-h-screen w-full bg-slate-100 p-4 text-black print:bg-white print:p-0">
       <style>
         {`
           @media print {
-            @page { size: A4 portrait; margin: 8mm 10mm; }
-            body { background: white !important; }
+            @page { size: A4 landscape; margin: 8mm; }
+            body {
+              background: white !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
             .print-hide { display: none !important; }
-            tr, td { page-break-inside: avoid; }
+            .grounding-print-sheet {
+              width: 100% !important;
+              max-width: none !important;
+            }
+            tr, td, th { page-break-inside: avoid; }
+          }
+          .grounding-report-table,
+          .grounding-report-table table {
+            border-collapse: collapse;
+            table-layout: fixed;
+            width: 100%;
+          }
+          .grounding-report-table {
+            border: 1px solid #000;
+          }
+          .grounding-report-table > thead > tr > th,
+          .grounding-report-table > tbody > tr > th,
+          .grounding-report-table > tbody > tr > td {
+            border: 1px solid #000;
+          }
+          .grounding-table-zone {
+            filter: grayscale(1);
           }
         `}
       </style>
 
       {/* Toolbar (screen only) */}
-      <div className="print-hide mx-auto mb-4 flex max-w-[210mm] items-center justify-between">
+      <div className="print-hide mx-auto mb-4 flex max-w-[277mm] items-center justify-between">
         <Button variant="outline" className="gap-2" onClick={() => navigate(`/grounding/reports/${record.id}`)}>
           <ArrowLeft size={16} /> Kembali
         </Button>
@@ -100,7 +119,7 @@ export const GroundingReportPrintView: React.FC = () => {
       </div>
 
       {/* A4 paper */}
-      <div className="mx-auto max-w-[210mm] border border-black bg-white font-sans text-[11px] print:mx-0 print:w-full print:max-w-none print:border-0">
+      <div className="grounding-print-sheet mx-auto w-full max-w-[277mm] overflow-hidden border border-black bg-white font-sans text-[11px] print:mx-0">
 
         {/* Kop */}
         <div className="flex border-b border-black">
@@ -137,126 +156,156 @@ export const GroundingReportPrintView: React.FC = () => {
           </div>
         </div>
 
-        {/* Info header */}
-        <div className="border-b border-black">
-          <div className="grid grid-cols-2 text-[10px]">
-            <div className="border-r border-black p-2 space-y-1">
-              <div className="grid grid-cols-[110px_1fr]">
-                <span className="font-bold">No. Laporan</span>
-                <span>: {record.report_number}</span>
-              </div>
-              <div className="grid grid-cols-[110px_1fr]">
-                <span className="font-bold">Tanggal</span>
-                <span>: {formatDate(record.date)}</span>
-              </div>
-              <div className="grid grid-cols-[110px_1fr]">
-                <span className="font-bold">Jam</span>
-                <span>: {record.time_filled ?? '-'}</span>
-              </div>
-              <div className="grid grid-cols-[110px_1fr]">
-                <span className="font-bold">Shift</span>
-                <span>: {shiftLabel[record.shift_type] ?? record.shift_type}</span>
-              </div>
-            </div>
-            <div className="p-2 space-y-1">
-              <div className="grid grid-cols-[110px_1fr]">
-                <span className="font-bold">Kantor Unit Kerja</span>
-                <span>: {record.work_unit}</span>
-              </div>
-              <div className="grid grid-cols-[110px_1fr]">
-                <span className="font-bold">Nama Peralatan</span>
-                <span>: {record.equipment_name}</span>
-              </div>
-              <div className="grid grid-cols-[110px_1fr]">
-                <span className="font-bold">Lokasi Peralatan</span>
-                <span>: {record.equipment_location}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div className="grounding-table-zone">
+          {/* Info header */}
+          <table className="grounding-report-table text-[10px]">
+            <colgroup>
+              <col style={{ width: '50%' }} />
+              <col style={{ width: '50%' }} />
+            </colgroup>
+            <tbody>
+              <tr>
+                <td className="align-top p-2">
+                  <div className="space-y-1">
+                    <div className="grid grid-cols-[110px_1fr]">
+                      <span className="font-bold">No. Laporan</span>
+                      <span>: {record.report_number}</span>
+                    </div>
+                    <div className="grid grid-cols-[110px_1fr]">
+                      <span className="font-bold">Tanggal</span>
+                      <span>: {formatDate(record.date)}</span>
+                    </div>
+                    <div className="grid grid-cols-[110px_1fr]">
+                      <span className="font-bold">Jam</span>
+                      <span>: {record.time_filled ?? '-'}</span>
+                    </div>
+                  </div>
+                </td>
+                <td className="align-top p-2">
+                  <div className="space-y-1">
+                    <div className="grid grid-cols-[110px_1fr]">
+                      <span className="font-bold">Kantor Unit Kerja</span>
+                      <span>: {record.work_unit}</span>
+                    </div>
+                    <div className="grid grid-cols-[110px_1fr]">
+                      <span className="font-bold">Nama Peralatan</span>
+                      <span>: {record.equipment_name}</span>
+                    </div>
+                    <div className="grid grid-cols-[110px_1fr]">
+                      <span className="font-bold">Lokasi Peralatan</span>
+                      <span>: {record.equipment_location}</span>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
-        {/* Section VISUAL */}
-        <div className="border-b border-black">
-          <div className="bg-green-100 px-3 py-1 text-[10px] font-bold uppercase border-b border-black">
-            VISUAL
-          </div>
-          <table className="w-full border-collapse text-[10px]">
+          {/* Section VISUAL */}
+          <table className="grounding-report-table text-[10px]">
+            <colgroup>
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '47%' }} />
+              <col style={{ width: '15%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '20%' }} />
+            </colgroup>
             <thead>
+              <tr>
+                <th colSpan={5} className="bg-gray-100 px-3 py-1 text-left font-bold uppercase">VISUAL</th>
+              </tr>
               <tr className="bg-gray-50">
-                <th className="border border-black px-2 py-1 text-center w-8">No</th>
-                <th className="border border-black px-2 py-1 text-left">Item Pemeriksaan</th>
-                <th className="border border-black px-2 py-1 text-center w-24">Ketersediaan</th>
-                <th className="border border-black px-2 py-1 text-center w-24">Kondisi</th>
-                <th className="border border-black px-2 py-1 text-left w-36">Catatan / Keterangan</th>
+                <th className="px-2 py-1 text-center">No</th>
+                <th className="px-2 py-1 text-left">Item Pemeriksaan</th>
+                <th className="px-2 py-1 text-center">Ketersediaan</th>
+                <th className="px-2 py-1 text-center">Kondisi</th>
+                <th className="px-2 py-1 text-left">Catatan / Keterangan</th>
               </tr>
             </thead>
             <tbody>
               {visualItems.map((item) => (
                 <tr key={item.id}>
-                  <td className="border border-black px-2 py-1 text-center">{item.item_number}</td>
-                  <td className="border border-black px-2 py-1">{item.item_name}</td>
-                  <td className="border border-black px-2 py-1 text-center">{val(item.availability)}</td>
-                  <td className="border border-black px-2 py-1 text-center">{val(item.condition)}</td>
-                  <td className="border border-black px-2 py-1">{val(item.notes)}</td>
+                  <td className="px-2 py-1 text-center">{item.item_number}</td>
+                  <td className="px-2 py-1">{item.item_name}</td>
+                  <td className="px-2 py-1 text-center">{val(item.availability)}</td>
+                  <td className="px-2 py-1 text-center">{val(item.condition)}</td>
+                  <td className="px-2 py-1">{val(item.notes)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
 
-        {/* Section PENGUKURAN */}
-        <div className="border-b border-black">
-          <div className="bg-green-100 px-3 py-1 text-[10px] font-bold uppercase border-b border-black">
-            PENGUKURAN
-          </div>
-          <table className="w-full border-collapse text-[10px]">
+          {/* Section PENGUKURAN */}
+          <table className="grounding-report-table text-[10px]">
+            <colgroup>
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '51%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '20%' }} />
+            </colgroup>
             <thead>
+              <tr>
+                <th colSpan={5} className="bg-gray-100 px-3 py-1 text-left font-bold uppercase">PENGUKURAN</th>
+              </tr>
               <tr className="bg-gray-50">
-                <th className="border border-black px-2 py-1 text-center w-8">No</th>
-                <th className="border border-black px-2 py-1 text-left">Item Pemeriksaan</th>
-                <th className="border border-black px-2 py-1 text-center w-20">Standard</th>
-                <th className="border border-black px-2 py-1 text-center w-24">Kondisi</th>
-                <th className="border border-black px-2 py-1 text-left w-36">Catatan / Keterangan</th>
+                <th className="px-2 py-1 text-center">No</th>
+                <th className="px-2 py-1 text-left">Item Pemeriksaan</th>
+                <th className="px-2 py-1 text-center">Standard</th>
+                <th className="px-2 py-1 text-center">Kondisi</th>
+                <th className="px-2 py-1 text-left">Catatan / Keterangan</th>
               </tr>
             </thead>
             <tbody>
               {measurementItems.map((item) => (
                 <tr key={item.id}>
-                  <td className="border border-black px-2 py-1 text-center">{item.item_number}</td>
-                  <td className="border border-black px-2 py-1">{item.item_name}</td>
-                  <td className="border border-black px-2 py-1 text-center font-mono">{val(item.standard)}</td>
-                  <td className="border border-black px-2 py-1 text-center">{val(item.condition)}</td>
-                  <td className="border border-black px-2 py-1">{val(item.notes)}</td>
+                  <td className="px-2 py-1 text-center">{item.item_number}</td>
+                  <td className="px-2 py-1">{item.item_name}</td>
+                  <td className="px-2 py-1 text-center font-mono">{val(item.standard)}</td>
+                  <td className="px-2 py-1 text-center">{val(item.condition)}</td>
+                  <td className="px-2 py-1">{val(item.notes)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
 
-        {/* Footer: Waktu Pelaksanaan + Tanda Tangan */}
-        <div>
           {/* Waktu pelaksanaan */}
-          <div className="flex border-b border-black text-[10px]">
-            <div className="flex-1 grid grid-cols-[70px_1fr] gap-0.5 p-2 border-r border-black">
-              <span className="font-bold">Hari</span>
-              <span>: {record.day_name ?? '-'}</span>
-            </div>
-            <div className="flex-1 grid grid-cols-[70px_1fr] gap-0.5 p-2 border-r border-black">
-              <span className="font-bold">Tanggal</span>
-              <span>: {formatDate(record.date)}</span>
-            </div>
-            <div className="flex-1 grid grid-cols-[50px_1fr] gap-0.5 p-2">
-              <span className="font-bold">Jam</span>
-              <span>: {record.time_filled ?? '-'}</span>
-            </div>
-          </div>
+          <table className="grounding-report-table text-[10px]">
+            <colgroup>
+              <col style={{ width: '33.33%' }} />
+              <col style={{ width: '33.33%' }} />
+              <col style={{ width: '33.34%' }} />
+            </colgroup>
+            <tbody>
+              <tr>
+                <td className="p-2">
+                  <div className="grid grid-cols-[70px_1fr] gap-0.5">
+                    <span className="font-bold">Hari</span>
+                    <span>: {record.day_name ?? '-'}</span>
+                  </div>
+                </td>
+                <td className="p-2">
+                  <div className="grid grid-cols-[70px_1fr] gap-0.5">
+                    <span className="font-bold">Tanggal</span>
+                    <span>: {formatDate(record.date)}</span>
+                  </div>
+                </td>
+                <td className="p-2">
+                  <div className="grid grid-cols-[50px_1fr] gap-0.5">
+                    <span className="font-bold">Jam</span>
+                    <span>: {record.time_filled ?? '-'}</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
           {/* Signature columns */}
-          <div className="flex">
+          <div className="grid grid-cols-[44%_28%_28%] border border-black">
             {/* Pelaksana Teknisi */}
             <div className="flex-1 border-r border-black p-2">
               <div className="text-[10px] font-black text-center uppercase mb-2">PELAKSANA TEKNISI</div>
-              <table className="w-full border-collapse text-[10px]">
+              <table className="grounding-report-table text-[10px]">
                 <thead>
                   <tr className="bg-gray-100">
                     <th className="border border-black px-1 py-1 w-8 text-center">No</th>
@@ -289,7 +338,7 @@ export const GroundingReportPrintView: React.FC = () => {
             </div>
 
             {/* Supervisor */}
-            <div className="flex w-[28%] flex-col items-center border-r border-black p-2 text-center min-h-[140px]">
+            <div className="flex min-h-[140px] flex-col items-center border-r border-black p-2 text-center">
               <div className="text-[10px] font-black uppercase mb-1">SUPERVISOR</div>
               <div className="flex flex-1 items-center justify-center w-full mt-1">
                 {record.supervisor ? (
@@ -307,7 +356,7 @@ export const GroundingReportPrintView: React.FC = () => {
             </div>
 
             {/* Manager Teknik */}
-            <div className="flex w-[28%] flex-col items-center p-2 text-center min-h-[140px]">
+            <div className="flex min-h-[140px] flex-col items-center p-2 text-center">
               <div className="text-[10px] font-black uppercase mb-1">MANAGER TEKNIK</div>
               <div className="flex flex-1 items-center justify-center w-full mt-1">
                 {record.manager ? (

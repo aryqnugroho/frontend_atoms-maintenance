@@ -14,8 +14,11 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { reportingDamageReportService } from '@/services/reportingDamageReportService';
 import {
+  DAMAGE_CATEGORY_LABELS,
+  DAMAGE_CATEGORY_ORDER,
   OBSTACLE_CODE_LABELS,
   OBSTACLE_CODE_ORDER,
+  normalizeDamageCategory,
 } from '@/types/reporting';
 import type {
   CreateReportingDamageReportPayload,
@@ -70,7 +73,7 @@ const defaultFormState = (): FormState => {
     facility: '',
     equipment_name: '',
     equipment_module: '',
-    damage_category: 'Ringan',
+    damage_category: '1',
     damage_description: '',
     damage_cause: '',
     repair_action: '',
@@ -130,7 +133,7 @@ export const ReportingDamageFormPage: React.FC = () => {
         facility: data.facility ?? '',
         equipment_name: data.equipment_name ?? '',
         equipment_module: data.equipment_module ?? '',
-        damage_category: data.damage_category,
+        damage_category: normalizeDamageCategory(data.damage_category),
         damage_description: data.damage_description ?? '',
         damage_cause: data.damage_cause ?? '',
         repair_action: data.repair_action ?? '',
@@ -189,14 +192,13 @@ export const ReportingDamageFormPage: React.FC = () => {
         // Only auto-fill if downtime_hours is empty or matches the previous auto-calc
         // Allow manual override: don't recalc if user already typed something
         setForm((prev) => {
-          if (prev.downtime_hours === '' ) {
+          if (prev.downtime_hours === '') {
             return { ...prev, downtime_hours: hours.toFixed(2) };
           }
           return prev;
         });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.damage_started_at, form.repair_finished_at]);
 
   const isCompleted = record?.status === 'completed';
@@ -462,10 +464,15 @@ export const ReportingDamageFormPage: React.FC = () => {
                 disabled={isCompleted}
                 className={inputCls}
               >
-                <option value="Ringan">Ringan</option>
-                <option value="Sedang">Sedang</option>
-                <option value="Berat">Berat</option>
+                {DAMAGE_CATEGORY_ORDER.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
               </select>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Keterangan: 1 = {DAMAGE_CATEGORY_LABELS['1']}, 2 = {DAMAGE_CATEGORY_LABELS['2']}, 3 = {DAMAGE_CATEGORY_LABELS['3']}.
+              </p>
             </Field>
           </Row>
           <Row>

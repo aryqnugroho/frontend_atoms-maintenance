@@ -40,6 +40,18 @@ export interface GroundingReportUpdatePayload {
   }>;
 }
 
+export interface GroundingReportCreatePayload {
+  date: string;
+  shift_type: ShiftType;
+  equipment_name: string;
+  equipment_location: string;
+  work_unit?: string;
+  time_filled?: string;
+  manager_id?: number;
+  supervisor_id?: number;
+  technician_ids?: number[];
+}
+
 export type GroundingReportRoleKey = 'manager' | 'supervisor' | 'technician';
 
 export const groundingReportService = {
@@ -72,13 +84,7 @@ export const groundingReportService = {
     return response.data.data as number[];
   },
 
-  async createRecord(payload: {
-    date: string;
-    shift_type: ShiftType;
-    equipment_name: string;
-    equipment_location: string;
-    work_unit?: string;
-  }): Promise<GroundingReportDetail> {
+  async createRecord(payload: GroundingReportCreatePayload): Promise<GroundingReportDetail> {
     const response = await axios.post(`${API_URL}/v1/grounding/reports`, payload, {
       headers: getAuthHeaders(),
     });
