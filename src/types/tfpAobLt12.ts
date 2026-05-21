@@ -1,7 +1,8 @@
 // ─── TFP Performance Check AOB Lantai 1 & 2 ──────────────────────────────
 //
-// Type definitions for the TFP AOB Lt 1&2 module.
-// Key difference from AOB Ground: 6 single-value panel columns (no Input/Output split).
+// Cells are dynamic: the record carries a `columns_config` defining panels
+// and sub-columns; each item stores values + is_disabled_map + merge_map keyed
+// by composite "panelId.subKey" (e.g. "panel_a05_app_room.value").
 
 import type { ShiftType } from '@/types';
 
@@ -26,19 +27,31 @@ export interface TfpAobLt12TechnicianRow {
   sort_order: number;
 }
 
+// ─── Dynamic columns ─────────────────────────────────────────────────────────
+
+export interface TfpAobLt12SubColumn {
+  key: string;
+  label: string;
+}
+
+export interface TfpAobLt12Panel {
+  id: string;
+  label: string;
+  sub_columns: TfpAobLt12SubColumn[];
+}
+
+export type TfpAobLt12ColumnsConfig = TfpAobLt12Panel[];
+
+export type TfpAobLt12CellKey = string;
+
 export interface TfpAobLt12Item {
   id: number;
   parameter_number: string | null;
   parameter_name: string;
   unit: string | null;
-  panel_a05_app_room: string | null;
-  panel_a06_app_room: string | null;
-  panel_a07_app_room: string | null;
-  panel_a08_gudang_lt1: string | null;
-  panel_a22_gudang_lt1: string | null;
-  panel_a09_amsc_room: string | null;
-  /** Map of column keys → true if that cell is disabled/grey */
-  is_disabled_map: Record<string, boolean> | null;
+  values: Record<TfpAobLt12CellKey, string>;
+  is_disabled_map: Record<TfpAobLt12CellKey, boolean>;
+  merge_map: Record<TfpAobLt12CellKey, number>;
   sort_order: number;
 }
 
@@ -76,6 +89,7 @@ export interface TfpAobLt12RecordDetail {
   time_filled: string | null;
   shift_type: ShiftType;
   location: string;
+  columns_config: TfpAobLt12ColumnsConfig;
   status: TfpAobLt12Status;
   manager: TfpAobLt12SignerInfo | null;
   supervisor: TfpAobLt12SignerInfo | null;
@@ -97,18 +111,23 @@ export interface TfpAobLt12ListParams {
 }
 
 export interface TfpAobLt12UpdatePayload {
+  time_filled?: string | null;
   items: Array<{
     id: number;
-    panel_a05_app_room?: string | null;
-    panel_a06_app_room?: string | null;
-    panel_a07_app_room?: string | null;
-    panel_a08_gudang_lt1?: string | null;
-    panel_a22_gudang_lt1?: string | null;
-    panel_a09_amsc_room?: string | null;
+    values?: Record<TfpAobLt12CellKey, string | null>;
   }>;
   facilities?: Array<{
     id: number;
     kondisi?: string | null;
     keterangan?: string | null;
+  }>;
+}
+
+export interface TfpAobLt12SaveStructurePayload {
+  columns_config: TfpAobLt12ColumnsConfig;
+  items: Array<{
+    id: number;
+    is_disabled_map?: Record<TfpAobLt12CellKey, boolean>;
+    merge_map?: Record<TfpAobLt12CellKey, number>;
   }>;
 }

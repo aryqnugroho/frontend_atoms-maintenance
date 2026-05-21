@@ -5,6 +5,7 @@ import type {
   TfpAobLt12RecordSummary,
   TfpAobLt12ListParams,
   TfpAobLt12UpdatePayload,
+  TfpAobLt12SaveStructurePayload,
   TfpAobLt12RoleKey,
 } from '@/types/tfpAobLt12';
 
@@ -92,5 +93,103 @@ export const tfpAobLt12Service = {
     await axios.delete(`${API_URL}/v1/tfp/aob-lt12/${id}`, {
       headers: getAuthHeaders(),
     });
+  },
+
+  // ─── Structural edit (Manager / Supervisor / Admin only) ─────
+
+  async saveStructure(
+    id: number,
+    payload: TfpAobLt12SaveStructurePayload,
+  ): Promise<TfpAobLt12RecordDetail> {
+    const response = await axios.put(
+      `${API_URL}/v1/tfp/aob-lt12/${id}/structure`,
+      payload,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async addParameter(
+    id: number,
+    payload: { parameter_name: string; parameter_number?: string | null; unit?: string | null },
+  ): Promise<TfpAobLt12RecordDetail> {
+    const response = await axios.post(
+      `${API_URL}/v1/tfp/aob-lt12/${id}/parameters`,
+      payload,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async updateParameter(
+    id: number,
+    paramId: number,
+    payload: { parameter_name?: string; parameter_number?: string | null; unit?: string | null },
+  ): Promise<TfpAobLt12RecordDetail> {
+    const response = await axios.put(
+      `${API_URL}/v1/tfp/aob-lt12/${id}/parameters/${paramId}`,
+      payload,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async deleteParameter(id: number, paramId: number): Promise<TfpAobLt12RecordDetail> {
+    const response = await axios.delete(
+      `${API_URL}/v1/tfp/aob-lt12/${id}/parameters/${paramId}`,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async reorderParameters(id: number, orderedIds: number[]): Promise<TfpAobLt12RecordDetail> {
+    const response = await axios.put(
+      `${API_URL}/v1/tfp/aob-lt12/${id}/parameters-reorder`,
+      { ordered_ids: orderedIds },
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async addFacility(
+    id: number,
+    payload: { facility_name: string },
+  ): Promise<TfpAobLt12RecordDetail> {
+    const response = await axios.post(
+      `${API_URL}/v1/tfp/aob-lt12/${id}/facilities`,
+      payload,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async updateFacility(
+    id: number,
+    facilityId: number,
+    payload: { facility_name?: string },
+  ): Promise<TfpAobLt12RecordDetail> {
+    const response = await axios.put(
+      `${API_URL}/v1/tfp/aob-lt12/${id}/facilities/${facilityId}`,
+      payload,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async deleteFacility(id: number, facilityId: number): Promise<TfpAobLt12RecordDetail> {
+    const response = await axios.delete(
+      `${API_URL}/v1/tfp/aob-lt12/${id}/facilities/${facilityId}`,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async reorderFacilities(id: number, orderedIds: number[]): Promise<TfpAobLt12RecordDetail> {
+    const response = await axios.put(
+      `${API_URL}/v1/tfp/aob-lt12/${id}/facilities-reorder`,
+      { ordered_ids: orderedIds },
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
   },
 };
