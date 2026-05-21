@@ -1,19 +1,16 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Bell, LogOut, Menu, X, Clock,
   LayoutDashboard, FileText, CheckSquare, Activity,
-  Plane, Zap, Users, ClipboardList, BookOpen, ExternalLink,
+  Plane, Zap, Users, ClipboardList, BookOpen, Inbox,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotification } from '@/hooks/useNotification';
 import { cn } from '@/lib/utils';
-import { mockNotifications } from '@/data/mockData';
+import type { Notification } from '@/types';
 
 // ─── Env ──────────────────────────────────────────────────────
-const ROSTERING_URL =
-  import.meta.env.VITE_ROSTERING_FRONTEND_URL || 'http://localhost:5174';
-
 // ─── Nav definition ───────────────────────────────────────────
 interface NavItem {
   name: string;
@@ -45,12 +42,37 @@ function timeAgo(dateStr: string): string {
 
 // ─── Topbar ────────────────────────────────────────────────────
 export const Topbar: React.FC = () => {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { unreadCount } = useNotification();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
 
-  const unread = unreadCount || mockNotifications.filter((n) => !n.is_read).length;
+  const unread = unreadCount;
+
+  // Show up to 8 newest items in the dropdown — full history lives on a
+  // future /notifications page; for now the dropdown is the primary surface.
+  const visibleNotifications = notifications.slice(0, 8);
+
+  const handleNotifClick = (notif: Notification) => {
+    if (!notif.is_read) {
+      void markAsRead(notif.id);
+    }
+    setShowNotif(false);
+
+    // Deep-link priority: data.route (explicit full path — used by CNSD
+    // Meter Reading notifications) > data.wo_id (Work Order family). Skipping
+    // navigation is fine; the bell badge already updated above.
+    const explicitRoute = typeof notif.data?.route === 'string' ? notif.data.route : null;
+    if (explicitRoute) {
+      navigate(explicitRoute);
+      return;
+    }
+    const woId = notif.data?.wo_id;
+    if (woId) {
+      navigate(`/work-orders/${woId}`);
+    }
+  };
 
   const visibleItems = navItems.filter(
     (item) => user?.role && item.roles.includes(user.role)
@@ -102,7 +124,7 @@ export const Topbar: React.FC = () => {
             onClick={() => setMobileOpen(false)}
           >
             <img
-              src="/assets/icon/logoairnav.svg"
+              src="/assets/icon/Logo-White-AirNav.png"
               alt="AirNav Surabaya"
               className="h-7 w-auto sm:h-8 shrink-0"
             />
@@ -141,19 +163,6 @@ export const Topbar: React.FC = () => {
           {/* ── Right action cluster ── */}
           {/* Shift badge REMOVED from topbar — visible in Dashboard page header instead */}
 
-          {/* ── Shortcut: Buka ATOMS Rostering ── */}
-          <a
-            href={ROSTERING_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1 p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-            title="Buka ATOMS Rostering"
-            aria-label="Buka ATOMS Rostering di tab baru"
-          >
-            <ExternalLink size={16} aria-hidden="true" />
-            <span className="hidden xl:inline text-[11px] font-medium">Rostering</span>
-          </a>
-
           {/* ── Notification bell ── */}
           <div className="relative shrink-0">
             <button
@@ -185,34 +194,47 @@ export const Topbar: React.FC = () => {
                 >
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-900">Notifikasi</h3>
-                    <button className="text-xs text-brand-primary hover:underline font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:rounded">
+                    <button
+                      onClick={() => void markAllAsRead()}
+                      disabled={unread === 0}
+                      className="text-xs text-brand-primary hover:underline font-medium disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:rounded"
+                    >
                       Tandai semua dibaca
                     </button>
                   </div>
                   <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
-                    {mockNotifications.map((notif) => (
-                      <button
-                        key={notif.id}
-                        className={`w-full text-left px-4 py-3 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary ${
-                          !notif.is_read ? 'bg-blue-50/60 hover:bg-blue-50' : 'hover:bg-slate-50'
-                        }`}
-                        role="menuitem"
-                      >
-                        <div className="flex items-start gap-2.5">
-                          {!notif.is_read && (
-                            <span className="h-2 w-2 mt-1.5 rounded-full bg-blue-500 shrink-0" aria-label="Belum dibaca" />
-                          )}
-                          <div className={`flex-1 min-w-0 ${notif.is_read ? 'pl-[18px]' : ''}`}>
-                            <p className="text-sm font-medium text-slate-800 leading-snug">{notif.title}</p>
-                            <p className="text-xs text-slate-500 truncate mt-0.5">{notif.message}</p>
-                            <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-1">
-                              <Clock size={10} aria-hidden="true" />
-                              {timeAgo(notif.created_at)}
-                            </p>
+                    {visibleNotifications.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 gap-2 text-center px-4">
+                        <Inbox size={28} className="text-slate-300" aria-hidden="true" />
+                        <p className="text-sm font-medium text-slate-500">Tidak ada notifikasi</p>
+                        <p className="text-xs text-slate-400">Notifikasi baru akan muncul di sini.</p>
+                      </div>
+                    ) : (
+                      visibleNotifications.map((notif) => (
+                        <button
+                          key={notif.id}
+                          onClick={() => handleNotifClick(notif)}
+                          className={`w-full text-left px-4 py-3 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary ${
+                            !notif.is_read ? 'bg-blue-50/60 hover:bg-blue-50' : 'hover:bg-slate-50'
+                          }`}
+                          role="menuitem"
+                        >
+                          <div className="flex items-start gap-2.5">
+                            {!notif.is_read && (
+                              <span className="h-2 w-2 mt-1.5 rounded-full bg-blue-500 shrink-0" aria-label="Belum dibaca" />
+                            )}
+                            <div className={`flex-1 min-w-0 ${notif.is_read ? 'pl-[18px]' : ''}`}>
+                              <p className="text-sm font-medium text-slate-800 leading-snug">{notif.title}</p>
+                              <p className="text-xs text-slate-500 truncate mt-0.5">{notif.message}</p>
+                              <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-1">
+                                <Clock size={10} aria-hidden="true" />
+                                {timeAgo(notif.created_at)}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
               </>
@@ -302,19 +324,8 @@ export const Topbar: React.FC = () => {
               ))}
             </div>
 
-            {/* Footer: Rostering shortcut + logout */}
-            <div className="px-5 py-3 border-t border-white/10 space-y-2">
-              {/* Rostering shortcut in mobile drawer */}
-              <a
-                href={ROSTERING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-white/60 hover:text-white text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:rounded"
-                aria-label="Buka ATOMS Rostering di tab baru"
-              >
-                <ExternalLink size={13} aria-hidden="true" />
-                Buka ATOMS Rostering
-              </a>
+            {/* Footer: app version + logout */}
+            <div className="px-5 py-3 border-t border-white/10">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] text-white/30">ATOMS-Maintenance v2.0</p>
                 <button

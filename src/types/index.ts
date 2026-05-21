@@ -29,13 +29,37 @@ export interface LoginResponse {
 }
 
 // ─── Notification ──────────────────────────────────────────
+/**
+ * Persisted in-app notification. id is Laravel's UUID (string) for real
+ * notifications and number for legacy mock data — keep the union to avoid
+ * churning every consumer.
+ *
+ * `data` holds the raw payload from the backend (wo_id, role, etc.) and is
+ * used by consumers to deep-link to the right page when a user clicks.
+ */
+export interface NotificationData {
+  type?: string;
+  title?: string;
+  message?: string;
+  wo_id?: number;
+  wo_number?: string;
+  role?: string;
+  shift_type?: ShiftType;
+  shift_date?: string;
+  changed_fields?: string[];
+  old_status?: WOStatus;
+  new_status?: WOStatus;
+  [key: string]: unknown;
+}
+
 export interface Notification {
-  id: number;
+  id: string | number;
   type: string;
   title: string;
   message: string;
   is_read: boolean;
   created_at: string;
+  data?: NotificationData;
 }
 
 // ─── Shift Schedule ────────────────────────────────────────

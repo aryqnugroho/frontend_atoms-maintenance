@@ -24,9 +24,12 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export interface NotificationContextType {
   notifications: Notification[];
   unreadCount: number;
+  isLoading: boolean;
+  /** Force an immediate refetch (called after user actions like sign / create). */
+  refresh: () => Promise<void>;
   addNotification: (notification: Notification) => void;
-  markAsRead: (id: number) => void;
-  markAllAsRead: () => void;
+  markAsRead: (id: string | number) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
 }
 export const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
