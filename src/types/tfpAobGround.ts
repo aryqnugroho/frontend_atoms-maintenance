@@ -104,6 +104,7 @@ export interface TfpAobGroundListParams {
 }
 
 export interface TfpAobGroundUpdatePayload {
+  time_filled?: string | null;
   items: Array<{
     id: number;
     panel_cos_a03_input?: string | null;

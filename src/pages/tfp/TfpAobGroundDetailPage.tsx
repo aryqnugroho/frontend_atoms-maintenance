@@ -140,7 +140,7 @@ interface CellInputProps {
 
 const CellInput: React.FC<CellInputProps> = ({ item, colKey, value, onChange, isCompleted }) => {
   if (isDisabled(item, colKey)) {
-    return <div className="w-full h-7 bg-slate-200 rounded" aria-hidden="true" />;
+    return <div className="w-full h-7 rounded" aria-hidden="true" />;
   }
   if (isCompleted) {
     return <span className="text-xs text-slate-700">{value || '—'}</span>;
@@ -151,7 +151,7 @@ const CellInput: React.FC<CellInputProps> = ({ item, colKey, value, onChange, is
       inputMode="decimal"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full h-7 px-1.5 text-center text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-sky-400 focus:outline-none"
+      className="w-full h-7 px-2 text-center text-xs rounded border border-slate-300 bg-white focus:ring-1 focus:ring-brand-primary focus:outline-none"
     />
   );
 };
@@ -313,6 +313,9 @@ export const TfpAobGroundDetailPage: React.FC = () => {
     Record<number, { kondisi: string; keterangan: string }>
   >({});
 
+  // Editable jam pengisian. Default = server-current time_filled (or now() if blank).
+  const [timeFilled, setTimeFilled] = useState<string>('');
+
   // Edit Mode state
   const [editMode, setEditMode] = useState(false);
   const [editingParamId, setEditingParamId] = useState<number | null>(null);
@@ -336,6 +339,8 @@ export const TfpAobGroundDetailPage: React.FC = () => {
   // re-seed local state consistently from the server payload.
   const hydrate = (data: TfpAobGroundRecordDetail) => {
     setRecord(data);
+    // Seed editable time from server snapshot. Falls back to current HH:MM when unset.
+    setTimeFilled(data.time_filled ?? new Date().toTimeString().slice(0, 5));
     const iv: Record<number, Record<ItemColKey, string>> = {};
     data.items.forEach((item) => {
       iv[item.id] = {
@@ -387,9 +392,13 @@ export const TfpAobGroundDetailPage: React.FC = () => {
         keterangan: facilityValues[f.id]?.keterangan || null,
       }));
 
+      // Only send time_filled when it actually parses to HH:MM — backend rejects malformed.
+      const isValidTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(timeFilled.trim());
+
       const updated = await tfpAobGroundService.updateRecord(record.id, {
         items: itemsPayload,
         facilities: facilitiesPayload,
+        time_filled: isValidTime ? timeFilled.trim() : null,
       });
       hydrate(updated);
       setSuccessMessage('Perubahan berhasil disimpan.');
@@ -566,10 +575,31 @@ export const TfpAobGroundDetailPage: React.FC = () => {
               <span className="font-medium">{record.day_name ?? ''}</span>
               <span>{record.date}</span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
-              <Clock size={13} className="text-slate-400" />
-              <span>{record.time_filled ?? '—'}</span>
-            </div>
+            {/* Editable jam pengisian — default = server time, user dapat ubah HH:MM */}
+            {isCompleted ? (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                <Clock size={13} className="text-slate-400" />
+                <span>{record.time_filled ?? '—'}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg" title="Klik untuk ubah jam pengisian (HH:MM)">
+                <Clock size={13} className="text-slate-400" />
+                <input
+                  type="time"
+                  value={timeFilled}
+                  onChange={(e) => setTimeFilled(e.target.value)}
+                  className="bg-transparent text-xs text-slate-700 font-medium focus:outline-none w-[68px]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setTimeFilled(new Date().toTimeString().slice(0, 5))}
+                  title="Reset ke waktu sekarang"
+                  className="text-[10px] text-slate-400 hover:text-sky-600 transition-colors"
+                >
+                  Now
+                </button>
+              </div>
+            )}
             <ShiftBadge shift={record.shift_type} />
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
               <Users size={13} className="text-slate-400" />
@@ -692,26 +722,34 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                 {showStructureControls && <col style={{ width: `${aksiColWidth}px` }} />}
               </colgroup>
               <thead>
-                <tr className="bg-sky-800 text-white">
-                  <th rowSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 align-middle text-xs">No</th>
-                  <th rowSpan={2} className="px-3 py-2 text-left font-semibold border border-sky-700 align-middle text-xs">Parameter</th>
-                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">Panel COS (A 03)</th>
-                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">Panel ATS (A 12)</th>
-                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">UPS TESCOM A</th>
-                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">UPS TESCOM B</th>
+                <tr className="bg-slate-100 text-slate-700">
+                  <th rowSpan={2} className="px-2 py-2 text-center font-semibold border-b border-slate-200 align-middle text-[10px] uppercase tracking-wider">No</th>
+                  <th rowSpan={2} className="px-3 py-2 text-left font-semibold border-b border-slate-200 align-middle text-[10px] uppercase tracking-wider">Parameter</th>
+                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border-b border-l border-slate-200 text-[10px] uppercase tracking-wider">Panel COS (A 03)</th>
+                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border-b border-l border-slate-200 text-[10px] uppercase tracking-wider">Panel ATS (A 12)</th>
+                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border-b border-l border-slate-200 text-[10px] uppercase tracking-wider">UPS TESCOM A</th>
+                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border-b border-l border-slate-200 text-[10px] uppercase tracking-wider">UPS TESCOM B</th>
                   {showStructureControls && (
-                    <th rowSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 align-middle text-xs">Aksi</th>
+                    <th rowSpan={2} className="px-2 py-2 text-center font-semibold border-b border-l border-slate-200 align-middle text-[10px] uppercase tracking-wider">Aksi</th>
                   )}
                 </tr>
-                <tr className="bg-sky-700 text-sky-100">
+                <tr className="bg-slate-50 text-slate-500">
                   {['Input', 'Output', 'Input', 'Output', 'Input', 'Output', 'Input', 'Output'].map((lbl, i) => (
-                    <th key={i} className="px-1 py-1.5 text-center font-medium border border-sky-600 text-[11px]">{lbl}</th>
+                    <th
+                      key={i}
+                      className={cn(
+                        'px-1 py-1.5 text-center font-medium border-b border-slate-200 text-[10px] uppercase tracking-wider',
+                        i % 2 === 0 ? 'border-l' : '',
+                      )}
+                    >
+                      {lbl}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {record.items.map((item, idx) => {
-                  const rowBase = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
+                  const rowBase = 'bg-white hover:bg-slate-50/60 transition-colors';
                   const isFirstRow = idx === 0;
                   const isLastRow = idx === record.items.length - 1;
 
@@ -732,7 +770,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                   ) : null;
 
                   const actionCell = showStructureControls ? (
-                    <td className="px-1.5 py-1 border-l border-slate-100">
+                    <td className="px-1.5 py-1.5 border-b border-l border-slate-100">
                       <div className="flex items-center justify-center gap-0.5">
                         <RowActionBtn
                           title="Pindah atas" disabled={isFirstRow}
@@ -754,19 +792,24 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                     </td>
                   ) : null;
 
+                  // Shared cell classes for consistency across all row variants
+                  const tdNo = 'px-2 py-2 text-slate-500 font-mono text-center text-[11px] border-b border-slate-100';
+                  const tdName = 'px-3 py-2 font-medium text-slate-700 text-xs border-b border-slate-100';
+                  const tdCell = 'px-1.5 py-1.5 border-b border-l border-slate-100';
+
                   // ── Row 18: Mode ──
                   if (isModeRow(item)) {
                     const cosVal = itemValues[item.id]?.panel_cos_a03_input ?? '';
                     const atsVal = itemValues[item.id]?.panel_ats_a12_input ?? '';
                     return (
                       <React.Fragment key={item.id}>
-                        <tr className="bg-blue-50/40">
-                          <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">{idx + 1}</td>
-                          <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
+                        <tr className={rowBase}>
+                          <td className={tdNo}>{idx + 1}</td>
+                          <td className={tdName}>
                             {item.parameter_name}
                             <span className="text-slate-400 ml-1 text-[10px]">(Auto/Manual)</span>
                           </td>
-                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 text-center">
+                          <td colSpan={2} className={cn(tdCell, 'text-center')}>
                             {isCompleted ? (
                               <span className="text-xs text-slate-700 font-semibold">{cosVal || '—'}</span>
                             ) : (
@@ -776,7 +819,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                               />
                             )}
                           </td>
-                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 text-center">
+                          <td colSpan={2} className={cn(tdCell, 'text-center')}>
                             {isCompleted ? (
                               <span className="text-xs text-slate-700 font-semibold">{atsVal || '—'}</span>
                             ) : (
@@ -786,8 +829,8 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                               />
                             )}
                           </td>
-                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
-                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
+                          <td colSpan={2} className={cn(tdCell, 'bg-slate-100')} />
+                          <td colSpan={2} className={cn(tdCell, 'bg-slate-100')} />
                           {actionCell}
                         </tr>
                         {editRow}
@@ -801,10 +844,10 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                     const atsVal = itemValues[item.id]?.panel_ats_a12_input ?? '';
                     return (
                       <React.Fragment key={item.id}>
-                        <tr className="bg-blue-50/40">
-                          <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">{idx + 1}</td>
-                          <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">{item.parameter_name}</td>
-                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 text-center">
+                        <tr className={rowBase}>
+                          <td className={tdNo}>{idx + 1}</td>
+                          <td className={tdName}>{item.parameter_name}</td>
+                          <td colSpan={2} className={cn(tdCell, 'text-center')}>
                             {isCompleted ? (
                               <span className="text-xs text-slate-700 font-semibold">{cosVal || '—'}</span>
                             ) : (
@@ -814,7 +857,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                               />
                             )}
                           </td>
-                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 text-center">
+                          <td colSpan={2} className={cn(tdCell, 'text-center')}>
                             {isCompleted ? (
                               <span className="text-xs text-slate-700 font-semibold">{atsVal || '—'}</span>
                             ) : (
@@ -824,8 +867,8 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                               />
                             )}
                           </td>
-                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
-                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
+                          <td colSpan={2} className={cn(tdCell, 'bg-slate-100')} />
+                          <td colSpan={2} className={cn(tdCell, 'bg-slate-100')} />
                           {actionCell}
                         </tr>
                         {editRow}
@@ -839,19 +882,19 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                     return (
                       <React.Fragment key={item.id}>
                         <tr className={rowBase}>
-                          <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">{idx + 1}</td>
-                          <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
+                          <td className={tdNo}>{idx + 1}</td>
+                          <td className={tdName}>
                             {item.parameter_name}
                             {item.unit && <span className="text-slate-400 ml-1 text-[10px]">({item.unit})</span>}
                           </td>
-                          <td colSpan={8} className="px-3 py-1 border-l border-slate-100">
+                          <td colSpan={8} className={cn(tdCell, 'px-3')}>
                             {isCompleted ? (
                               <span className="text-xs text-slate-700">{val || '—'}</span>
                             ) : (
                               <input
                                 type="text" inputMode="decimal" value={val}
                                 onChange={(e) => setItemCell(item.id, 'panel_cos_a03_input', e.target.value)}
-                                className="w-48 h-7 px-2 text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-sky-400 focus:outline-none"
+                                className="w-48 h-7 px-2 text-xs rounded border border-slate-300 bg-white focus:ring-1 focus:ring-brand-primary focus:outline-none"
                               />
                             )}
                           </td>
@@ -866,13 +909,13 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                   return (
                     <React.Fragment key={item.id}>
                       <tr className={rowBase}>
-                        <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">{idx + 1}</td>
-                        <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
+                        <td className={tdNo}>{idx + 1}</td>
+                        <td className={tdName}>
                           {item.parameter_name}
                           {item.unit && <span className="text-slate-400 ml-1 text-[10px]">({item.unit})</span>}
                         </td>
                         {ALL_COL_KEYS.map((colKey) => (
-                          <td key={colKey} className={cn('px-1.5 py-1 border-l border-slate-100', isDisabled(item, colKey) ? 'bg-slate-200' : '')}>
+                          <td key={colKey} className={cn(tdCell, isDisabled(item, colKey) ? 'bg-slate-100' : '')}>
                             <CellInput
                               item={item} colKey={colKey}
                               value={itemValues[item.id]?.[colKey] ?? ''}
@@ -911,7 +954,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
           <div className="divide-y divide-slate-100">
             {/* Column headers */}
             <div className={cn(
-              'grid gap-2 px-4 py-2 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest items-center',
+              'grid gap-2 px-4 py-2 bg-slate-100 text-[10px] font-semibold text-slate-700 uppercase tracking-wider items-center border-b border-slate-200',
               showStructureControls
                 ? 'grid-cols-[1fr_90px_1fr_88px]'
                 : 'grid-cols-[1fr_90px_1fr]',
@@ -1016,20 +1059,19 @@ const FacilityRow: React.FC<FacilityRowProps> = ({
   onChangeEditingName, onSaveEdit, onMove, onDelete,
 }) => {
   const palette = (() => {
-    if (kondisi === 'Baik') return 'bg-emerald-50 text-emerald-700 focus:ring-emerald-200';
-    if (kondisi === 'Rusak') return 'bg-red-50 text-red-700 focus:ring-red-200';
-    if (kondisi === 'Tidak Ada') return 'bg-slate-100 text-slate-600 focus:ring-slate-300';
-    return 'bg-white text-slate-500 focus:ring-slate-300';
+    if (kondisi === 'Baik') return 'bg-emerald-50 text-emerald-700 border-emerald-200 focus:ring-emerald-300';
+    if (kondisi === 'Rusak') return 'bg-red-50 text-red-700 border-red-200 focus:ring-red-300';
+    if (kondisi === 'Tidak Ada') return 'bg-slate-100 text-slate-600 border-slate-300 focus:ring-slate-400';
+    return 'bg-white text-slate-500 border-slate-300 focus:ring-brand-primary';
   })();
 
   return (
     <div
       className={cn(
-        'gap-2 px-4 py-2.5 items-center grid',
+        'gap-2 px-4 py-2 items-center grid bg-white hover:bg-slate-50/60 transition-colors',
         showStructureControls
           ? 'grid-cols-[1fr_90px_1fr_88px]'
           : 'grid-cols-[1fr_90px_1fr]',
-        idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40',
       )}
     >
       {isEditingStructure ? (
@@ -1054,7 +1096,7 @@ const FacilityRow: React.FC<FacilityRowProps> = ({
         <select
           value={kondisi} onChange={(e) => onKondisiChange(e.target.value)}
           className={cn(
-            'w-full h-8 px-1.5 text-xs rounded border-none focus:ring-1 focus:outline-none font-semibold',
+            'w-full h-8 px-1.5 text-xs rounded border focus:ring-1 focus:outline-none font-semibold',
             palette,
           )}
         >
@@ -1070,7 +1112,7 @@ const FacilityRow: React.FC<FacilityRowProps> = ({
           type="text" value={keterangan}
           onChange={(e) => onKeteranganChange(e.target.value)}
           placeholder="Keterangan..."
-          className="h-8 px-2 text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none w-full"
+          className="h-8 px-2 text-xs rounded border border-slate-300 bg-white focus:ring-1 focus:ring-brand-primary focus:outline-none w-full"
         />
       )}
 
