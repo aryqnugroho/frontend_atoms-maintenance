@@ -23,8 +23,12 @@ export const Tabs: React.FC<TabsProps> = ({ items, defaultKey, onChange, classNa
   };
 
   return (
-    <div className={cn('border-b border-gray-200', className)}>
-      <nav className="flex gap-x-1 -mb-px" aria-label="Tabs">
+    // min-w-0 + overflow-x-auto: when the tab list is wider than the parent
+    // (e.g. ATC SYSTEM has 12 long-named sections), tabs scroll horizontally
+    // INSIDE this container instead of pushing the whole page wider — which
+    // previously caused the topbar and tables on detail pages to look offset.
+    <div className={cn('border-b border-gray-200 min-w-0', className)}>
+      <nav className="flex gap-x-1 -mb-px overflow-x-auto" aria-label="Tabs">
         {items.map((item) => (
           <button
             key={item.key}
