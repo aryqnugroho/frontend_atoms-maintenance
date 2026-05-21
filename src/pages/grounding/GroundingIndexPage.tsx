@@ -498,10 +498,10 @@ export const GroundingIndexPage: React.FC = () => {
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">No. Laporan</th>
+                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Unit Kerja</th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Nama Peralatan</th>
-                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Lokasi Peralatan</th>
+                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Lokasi</th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Tanggal</th>
-                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Jam</th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Shift</th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Teknisi</th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 bg-gray-50/80">Status</th>
@@ -515,10 +515,10 @@ export const GroundingIndexPage: React.FC = () => {
                   return (
                     <tr key={r.id} onClick={() => navigate(`/grounding/reports/${r.id}`)} tabIndex={0} role="button" className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary">
                       <td className="px-6 py-4 font-mono text-slate-700 text-xs whitespace-nowrap">{r.report_number}</td>
+                      <td className="px-6 py-4 text-slate-600 text-xs whitespace-nowrap">{r.work_unit}</td>
                       <td className="px-6 py-4 text-slate-700 font-medium">{r.equipment_name}</td>
                       <td className="px-6 py-4 text-slate-500">{r.equipment_location}</td>
                       <td className="px-6 py-4 text-slate-700 whitespace-nowrap">{r.date}</td>
-                      <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{r.time_filled ?? '—'}</td>
                       <td className="px-6 py-4"><ShiftBadge shift={r.shift_type as import('@/types').ShiftType} /></td>
                       <td className="px-6 py-4"><div className="inline-flex items-center gap-1 text-slate-700" title={r.technician_names.join(', ')}><Users size={13} className="text-slate-400" /><span className="font-semibold">{r.technicians_count}</span><span className="text-slate-400 text-xs">teknisi</span></div></td>
                       <td className="px-6 py-4"><StatusBadge status={r.status} variant="pill" /></td>

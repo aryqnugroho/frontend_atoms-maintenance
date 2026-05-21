@@ -17,19 +17,6 @@ const formatDateTime = (v?: string | null): string => {
 
 const val = (v: string | null | undefined): string => (v == null || v === '' ? '' : v);
 
-/**
- * Grounding Report Print View.
- *
- * Layout:
- * - Header: AirNav logo left, Perum LPPNPI right
- * - Title: Checklist Fasilitas dan Peralatan Pemeliharaan Sistem Penangkal Petir dan Sistem Pembumian
- * - Info: Tanggal, Jam, Nama Peralatan, Lokasi Peralatan, Kantor Unit Kerja
- * - Section VISUAL table
- * - Section PENGUKURAN table
- * - Footer: Teknisi | Supervisor | Manager Teknik (TFP AOB Ground pattern)
- *
- * Print is manual only — no auto-print.
- */
 export const GroundingReportPrintView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -53,7 +40,7 @@ export const GroundingReportPrintView: React.FC = () => {
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-yellow-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-brand-primary" />
       </div>
     );
   }
@@ -75,41 +62,18 @@ export const GroundingReportPrintView: React.FC = () => {
       <style>
         {`
           @media print {
-            @page { size: A4 landscape; margin: 8mm; }
-            body {
-              background: white !important;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
+            @page { size: A4 landscape; margin: 6mm; }
+            body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .print-hide { display: none !important; }
-            .grounding-print-sheet {
-              width: 100% !important;
-              max-width: none !important;
-            }
-            tr, td, th { page-break-inside: avoid; }
           }
-          .grounding-report-table,
-          .grounding-report-table table {
-            border-collapse: collapse;
-            table-layout: fixed;
-            width: 100%;
-          }
-          .grounding-report-table {
-            border: 1px solid #000;
-          }
-          .grounding-report-table > thead > tr > th,
-          .grounding-report-table > tbody > tr > th,
-          .grounding-report-table > tbody > tr > td {
-            border: 1px solid #000;
-          }
-          .grounding-table-zone {
-            filter: grayscale(1);
-          }
+          .gc-table { border-collapse: collapse; width: 100%; }
+          .gc-cell { border: 1px solid #000 !important; }
+          .gc-cell-nb { border-left: 1px solid #000 !important; border-right: 1px solid #000 !important; border-bottom: 1px solid #000 !important; }
         `}
       </style>
 
-      {/* Toolbar (screen only) */}
-      <div className="print-hide mx-auto mb-4 flex max-w-[277mm] items-center justify-between">
+      {/* Toolbar */}
+      <div className="print-hide mx-auto mb-4 flex max-w-[297mm] items-center justify-between">
         <Button variant="outline" className="gap-2" onClick={() => navigate(`/grounding/reports/${record.id}`)}>
           <ArrowLeft size={16} /> Kembali
         </Button>
@@ -118,264 +82,213 @@ export const GroundingReportPrintView: React.FC = () => {
         </Button>
       </div>
 
-      {/* A4 paper */}
-      <div className="grounding-print-sheet mx-auto w-full max-w-[277mm] overflow-hidden border border-black bg-white font-sans text-[11px] print:mx-0">
-
-        {/* Kop */}
-        <div className="flex border-b border-black">
-          {/* Left: AirNav logo */}
-          <div className="flex w-[40%] items-center gap-2 border-r border-black p-3">
-            <img
-              src="/assets/icon/logoairnav.svg"
-              alt="AirNav Indonesia"
-              className="h-12 w-auto"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-            <div className="leading-tight">
-              <div className="text-[12px] font-black">AirNav Indonesia</div>
-              <div className="text-[8px] font-semibold text-gray-600">Teknik Fasilitas Penunjang</div>
-            </div>
-          </div>
-          {/* Right: Perum LPPNPI */}
-          <div className="flex w-[60%] flex-col justify-center p-3 text-[9px] leading-tight">
-            <div className="font-bold text-[12px]">Perum LPPNPI</div>
-            <div className="font-semibold uppercase">Kantor Cabang Surabaya</div>
-            <div className="text-gray-600 mt-0.5">Telp. (031)8688456 Fax : (031)8688536</div>
-            <div className="text-gray-600">email : sub@airnavindonesia.co.id</div>
-            <div className="text-gray-600">Web : www.airnavindonesia.co.id</div>
-          </div>
-        </div>
-
-        {/* Title */}
-        <div className="border-b border-black px-4 py-3 text-center">
-          <div className="text-[13px] font-black uppercase tracking-wide">
-            Checklist Fasilitas dan Peralatan
-          </div>
-          <div className="text-[11px] font-semibold mt-0.5">
-            Pemeliharaan Sistem Penangkal Petir dan Sistem Pembumian
-          </div>
-        </div>
-
-        <div className="grounding-table-zone">
-          {/* Info header */}
-          <table className="grounding-report-table text-[10px]">
-            <colgroup>
-              <col style={{ width: '50%' }} />
-              <col style={{ width: '50%' }} />
-            </colgroup>
-            <tbody>
-              <tr>
-                <td className="align-top p-2">
-                  <div className="space-y-1">
-                    <div className="grid grid-cols-[110px_1fr]">
-                      <span className="font-bold">No. Laporan</span>
-                      <span>: {record.report_number}</span>
-                    </div>
-                    <div className="grid grid-cols-[110px_1fr]">
-                      <span className="font-bold">Tanggal</span>
-                      <span>: {formatDate(record.date)}</span>
-                    </div>
-                    <div className="grid grid-cols-[110px_1fr]">
-                      <span className="font-bold">Jam</span>
-                      <span>: {record.time_filled ?? '-'}</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="align-top p-2">
-                  <div className="space-y-1">
-                    <div className="grid grid-cols-[110px_1fr]">
-                      <span className="font-bold">Kantor Unit Kerja</span>
-                      <span>: {record.work_unit}</span>
-                    </div>
-                    <div className="grid grid-cols-[110px_1fr]">
-                      <span className="font-bold">Nama Peralatan</span>
-                      <span>: {record.equipment_name}</span>
-                    </div>
-                    <div className="grid grid-cols-[110px_1fr]">
-                      <span className="font-bold">Lokasi Peralatan</span>
-                      <span>: {record.equipment_location}</span>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          {/* Section VISUAL */}
-          <table className="grounding-report-table text-[10px]">
-            <colgroup>
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '47%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '13%' }} />
-              <col style={{ width: '20%' }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th colSpan={5} className="bg-gray-100 px-3 py-1 text-left font-bold uppercase">VISUAL</th>
-              </tr>
-              <tr className="bg-gray-50">
-                <th className="px-2 py-1 text-center">No</th>
-                <th className="px-2 py-1 text-left">Item Pemeriksaan</th>
-                <th className="px-2 py-1 text-center">Ketersediaan</th>
-                <th className="px-2 py-1 text-center">Kondisi</th>
-                <th className="px-2 py-1 text-left">Catatan / Keterangan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visualItems.map((item) => (
-                <tr key={item.id}>
-                  <td className="px-2 py-1 text-center">{item.item_number}</td>
-                  <td className="px-2 py-1">{item.item_name}</td>
-                  <td className="px-2 py-1 text-center">{val(item.availability)}</td>
-                  <td className="px-2 py-1 text-center">{val(item.condition)}</td>
-                  <td className="px-2 py-1">{val(item.notes)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Section PENGUKURAN */}
-          <table className="grounding-report-table text-[10px]">
-            <colgroup>
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '51%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '20%' }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th colSpan={5} className="bg-gray-100 px-3 py-1 text-left font-bold uppercase">PENGUKURAN</th>
-              </tr>
-              <tr className="bg-gray-50">
-                <th className="px-2 py-1 text-center">No</th>
-                <th className="px-2 py-1 text-left">Item Pemeriksaan</th>
-                <th className="px-2 py-1 text-center">Standard</th>
-                <th className="px-2 py-1 text-center">Kondisi</th>
-                <th className="px-2 py-1 text-left">Catatan / Keterangan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {measurementItems.map((item) => (
-                <tr key={item.id}>
-                  <td className="px-2 py-1 text-center">{item.item_number}</td>
-                  <td className="px-2 py-1">{item.item_name}</td>
-                  <td className="px-2 py-1 text-center font-mono">{val(item.standard)}</td>
-                  <td className="px-2 py-1 text-center">{val(item.condition)}</td>
-                  <td className="px-2 py-1">{val(item.notes)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Waktu pelaksanaan */}
-          <table className="grounding-report-table text-[10px]">
-            <colgroup>
-              <col style={{ width: '33.33%' }} />
-              <col style={{ width: '33.33%' }} />
-              <col style={{ width: '33.34%' }} />
-            </colgroup>
-            <tbody>
-              <tr>
-                <td className="p-2">
-                  <div className="grid grid-cols-[70px_1fr] gap-0.5">
-                    <span className="font-bold">Hari</span>
-                    <span>: {record.day_name ?? '-'}</span>
-                  </div>
-                </td>
-                <td className="p-2">
-                  <div className="grid grid-cols-[70px_1fr] gap-0.5">
-                    <span className="font-bold">Tanggal</span>
-                    <span>: {formatDate(record.date)}</span>
-                  </div>
-                </td>
-                <td className="p-2">
-                  <div className="grid grid-cols-[50px_1fr] gap-0.5">
-                    <span className="font-bold">Jam</span>
-                    <span>: {record.time_filled ?? '-'}</span>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          {/* Signature columns */}
-          <div className="grid grid-cols-[44%_28%_28%] border border-black">
-            {/* Pelaksana Teknisi */}
-            <div className="flex-1 border-r border-black p-2">
-              <div className="text-[10px] font-black text-center uppercase mb-2">PELAKSANA TEKNISI</div>
-              <table className="grounding-report-table text-[10px]">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border border-black px-1 py-1 w-8 text-center">No</th>
-                    <th className="border border-black px-1 py-1 text-left">Nama</th>
-                    <th className="border border-black px-1 py-1 w-24 text-center">Paraf</th>
-                  </tr>
-                </thead>
+      {/* A4 Landscape sheet */}
+      <table className="gc-table" style={{ maxWidth: '297mm', margin: '0 auto', backgroundColor: '#fff', fontFamily: 'sans-serif', fontSize: '10px', color: '#000' }}>
+        <tbody>
+          {/* Header row: Logo + Perum LPPNPI left | Title center */}
+          <tr>
+            <td className="gc-cell" colSpan={5} style={{ padding: 0 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
-                  {record.technicians.length > 0 ? (
-                    record.technicians.map((tech, idx) => (
-                      <tr key={tech.id}>
-                        <td className="border border-black px-1 py-1 text-center">{idx + 1}</td>
-                        <td className="border border-black px-1 py-1">{tech.technician_name}</td>
-                        <td className="border border-black px-1 py-1 text-center align-middle h-12">
-                          {tech.signature ? (
-                            <img src={tech.signature} alt={`TTD ${tech.technician_name}`} className="mx-auto max-h-10 max-w-[90px] object-contain" />
-                          ) : (
-                            <span className="text-[9px] text-gray-400 italic">Belum TTD</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className="border border-black px-1 py-2 text-center text-gray-400">Tidak ada teknisi</td>
-                    </tr>
-                  )}
+                  <tr>
+                    <td style={{ width: '30%', padding: '8px 12px', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <img src="/assets/icon/logoairnav.svg" alt="AirNav" style={{ height: '40px', width: '40px', objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        <div style={{ lineHeight: 1.3 }}>
+                          <div style={{ fontSize: '11px', fontWeight: 800 }}>AirNav Indonesia</div>
+                          <div style={{ fontSize: '8px', fontWeight: 600, color: '#4b5563' }}>Teknik Fasilitas Penunjang</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ width: '70%', textAlign: 'center', verticalAlign: 'middle', padding: '8px 12px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Checklist Fasilitas dan Peralatan
+                      </div>
+                      <div style={{ fontSize: '10px', fontWeight: 600, marginTop: '2px' }}>
+                        Pemeliharaan Sistem Penangkal Petir dan Sistem Pembumian
+                      </div>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
-            </div>
+            </td>
+          </tr>
 
-            {/* Supervisor */}
-            <div className="flex min-h-[140px] flex-col items-center border-r border-black p-2 text-center">
-              <div className="text-[10px] font-black uppercase mb-1">SUPERVISOR</div>
-              <div className="flex flex-1 items-center justify-center w-full mt-1">
-                {record.supervisor ? (
-                  record.supervisor.signature ? (
-                    <img src={record.supervisor.signature} alt="TTD Supervisor" className="max-h-16 max-w-[110px] object-contain" />
-                  ) : (
-                    <div className="h-14 w-24 border border-dashed border-gray-400 flex items-center justify-center text-[9px] text-gray-400">Belum TTD</div>
-                  )
-                ) : (
-                  <span className="text-[9px] text-gray-400 italic">Tidak ada supervisor pada shift ini</span>
-                )}
-              </div>
-              <div className="mt-auto text-[11px] font-semibold">{record.supervisor?.name ?? '—'}</div>
-              {record.supervisor?.signed_at && <div className="text-[9px] text-gray-500">{formatDateTime(record.supervisor.signed_at)}</div>}
-            </div>
+          {/* Info row */}
+          <tr>
+            <td className="gc-cell" colSpan={5} style={{ padding: 0 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+                <tbody>
+                  <tr>
+                    <td style={{ width: '50%', padding: '6px 12px', verticalAlign: 'top' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '2px 4px' }}>
+                        <span style={{ fontWeight: 700 }}>No. Laporan</span><span>: {record.report_number}</span>
+                        <span style={{ fontWeight: 700 }}>Tanggal</span><span>: {formatDate(record.date)}</span>
+                        <span style={{ fontWeight: 700 }}>Jam</span><span>: {record.time_filled ?? '-'}</span>
+                      </div>
+                    </td>
+                    <td style={{ width: '50%', padding: '6px 12px', verticalAlign: 'top' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '2px 4px' }}>
+                        <span style={{ fontWeight: 700 }}>Kantor Unit Kerja</span><span>: {record.work_unit}</span>
+                        <span style={{ fontWeight: 700 }}>Nama Peralatan</span><span>: {record.equipment_name}</span>
+                        <span style={{ fontWeight: 700 }}>Lokasi Peralatan</span><span>: {record.equipment_location}</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
 
-            {/* Manager Teknik */}
-            <div className="flex min-h-[140px] flex-col items-center p-2 text-center">
-              <div className="text-[10px] font-black uppercase mb-1">MANAGER TEKNIK</div>
-              <div className="flex flex-1 items-center justify-center w-full mt-1">
-                {record.manager ? (
-                  record.manager.signature ? (
-                    <img src={record.manager.signature} alt="TTD Manager" className="max-h-16 max-w-[110px] object-contain" />
-                  ) : (
-                    <div className="h-14 w-24 border border-dashed border-gray-400 flex items-center justify-center text-[9px] text-gray-400">Belum TTD</div>
-                  )
-                ) : (
-                  <span className="text-[9px] text-gray-400 italic">Manager Teknik tidak ditugaskan</span>
-                )}
-              </div>
-              <div className="mt-auto text-[11px] font-semibold">{record.manager?.name ?? '—'}</div>
-              {record.manager?.signed_at && <div className="text-[9px] text-gray-500">{formatDateTime(record.manager.signed_at)}</div>}
-            </div>
-          </div>
-        </div>
+          {/* VISUAL section header */}
+          <tr>
+            <td className="gc-cell" colSpan={5} style={{ backgroundColor: '#f3f4f6', padding: '3px 12px', fontWeight: 700, fontSize: '10px', textTransform: 'uppercase' }}>
+              VISUAL
+            </td>
+          </tr>
+          {/* VISUAL column headers */}
+          <tr style={{ backgroundColor: '#f9fafb' }}>
+            <td className="gc-cell" style={{ width: '5%', padding: '3px 4px', textAlign: 'center', fontWeight: 700 }}>No</td>
+            <td className="gc-cell" style={{ width: '40%', padding: '3px 6px', fontWeight: 700 }}>Item Pemeriksaan</td>
+            <td className="gc-cell" style={{ width: '18%', padding: '3px 4px', textAlign: 'center', fontWeight: 700 }}>Ketersediaan</td>
+            <td className="gc-cell" style={{ width: '14%', padding: '3px 4px', textAlign: 'center', fontWeight: 700 }}>Kondisi</td>
+            <td className="gc-cell" style={{ width: '23%', padding: '3px 6px', fontWeight: 700 }}>Catatan / Keterangan</td>
+          </tr>
+          {/* VISUAL rows */}
+          {visualItems.map((item) => (
+            <tr key={item.id}>
+              <td className="gc-cell" style={{ padding: '2px 4px', textAlign: 'center' }}>{item.item_number}</td>
+              <td className="gc-cell" style={{ padding: '2px 6px' }}>{item.item_name}</td>
+              <td className="gc-cell" style={{ padding: '2px 4px', textAlign: 'center' }}>{val(item.availability)}</td>
+              <td className="gc-cell" style={{ padding: '2px 4px', textAlign: 'center' }}>{val(item.condition)}</td>
+              <td className="gc-cell" style={{ padding: '2px 6px' }}>{val(item.notes)}</td>
+            </tr>
+          ))}
 
-      </div>
+          {/* PENGUKURAN section header */}
+          <tr>
+            <td className="gc-cell" colSpan={5} style={{ backgroundColor: '#f3f4f6', padding: '3px 12px', fontWeight: 700, fontSize: '10px', textTransform: 'uppercase' }}>
+              PENGUKURAN
+            </td>
+          </tr>
+          {/* PENGUKURAN column headers */}
+          <tr style={{ backgroundColor: '#f9fafb' }}>
+            <td className="gc-cell" style={{ padding: '3px 4px', textAlign: 'center', fontWeight: 700 }}>No</td>
+            <td className="gc-cell" style={{ padding: '3px 6px', fontWeight: 700 }}>Item Pemeriksaan</td>
+            <td className="gc-cell" style={{ padding: '3px 4px', textAlign: 'center', fontWeight: 700 }}>Standard</td>
+            <td className="gc-cell" style={{ padding: '3px 4px', textAlign: 'center', fontWeight: 700 }}>Kondisi</td>
+            <td className="gc-cell" style={{ padding: '3px 6px', fontWeight: 700 }}>Catatan / Keterangan</td>
+          </tr>
+          {/* PENGUKURAN rows */}
+          {measurementItems.map((item) => (
+            <tr key={item.id}>
+              <td className="gc-cell" style={{ padding: '2px 4px', textAlign: 'center' }}>{item.item_number}</td>
+              <td className="gc-cell" style={{ padding: '2px 6px' }}>{item.item_name}</td>
+              <td className="gc-cell" style={{ padding: '2px 4px', textAlign: 'center', fontFamily: 'monospace' }}>{val(item.standard)}</td>
+              <td className="gc-cell" style={{ padding: '2px 4px', textAlign: 'center' }}>{val(item.condition)}</td>
+              <td className="gc-cell" style={{ padding: '2px 6px' }}>{val(item.notes)}</td>
+            </tr>
+          ))}
+
+          {/* Hari / Tanggal / Jam row */}
+          <tr>
+            <td className="gc-cell" colSpan={5} style={{ padding: 0 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+                <tbody>
+                  <tr>
+                    <td style={{ width: '33%', padding: '4px 8px', borderRight: '1px solid #000' }}>
+                      <span style={{ fontWeight: 700 }}>Hari</span> : {record.day_name ?? '-'}
+                    </td>
+                    <td style={{ width: '34%', padding: '4px 8px', borderRight: '1px solid #000' }}>
+                      <span style={{ fontWeight: 700 }}>Tanggal</span> : {formatDate(record.date)}
+                    </td>
+                    <td style={{ width: '33%', padding: '4px 8px' }}>
+                      <span style={{ fontWeight: 700 }}>Jam</span> : {record.time_filled ?? '-'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+
+          {/* Signature row: PELAKSANA TEKNISI | SUPERVISOR | MANAGER TEKNIK */}
+          <tr>
+            <td className="gc-cell" colSpan={5} style={{ padding: 0 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+                <tbody>
+                  <tr>
+                    {/* PELAKSANA TEKNISI — simple list, no nested table */}
+                    <td style={{ width: '44%', padding: '6px 10px', verticalAlign: 'top', borderRight: '1px solid #000' }}>
+                      <div style={{ textAlign: 'center', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', fontSize: '10px' }}>
+                        PELAKSANA TEKNISI
+                      </div>
+                      {record.technicians.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {record.technicians.map((tech, idx) => (
+                            <div key={tech.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ width: '14px', textAlign: 'right', flexShrink: 0 }}>{idx + 1}.</span>
+                              <span style={{ flex: 1, borderBottom: '1px dotted #64748b', paddingBottom: '1px' }}>{tech.technician_name}</span>
+                              <span style={{ width: '80px', textAlign: 'center', flexShrink: 0 }}>
+                                {tech.signature ? (
+                                  <img src={tech.signature} alt={`TTD ${tech.technician_name}`} style={{ maxHeight: '28px', maxWidth: '70px', objectFit: 'contain', display: 'inline-block' }} />
+                                ) : (
+                                  <span style={{ fontSize: '8px', color: '#9ca3af', fontStyle: 'italic' }}>Belum TTD</span>
+                                )}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', padding: '8px 0' }}>Tidak ada teknisi</div>
+                      )}
+                    </td>
+
+                    {/* SUPERVISOR */}
+                    <td style={{ width: '28%', padding: '6px 10px', verticalAlign: 'top', textAlign: 'center', borderRight: '1px solid #000' }}>
+                      <div style={{ fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', fontSize: '10px' }}>SUPERVISOR</div>
+                      <div style={{ minHeight: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {record.supervisor ? (
+                          record.supervisor.signature ? (
+                            <img src={record.supervisor.signature} alt="TTD Supervisor" style={{ maxHeight: '44px', maxWidth: '100px', objectFit: 'contain' }} />
+                          ) : (
+                            <div style={{ width: '80px', height: '40px', border: '1px dashed #9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ fontSize: '8px', color: '#9ca3af' }}>Belum TTD</span>
+                            </div>
+                          )
+                        ) : (
+                          <span style={{ fontSize: '8px', color: '#9ca3af', fontStyle: 'italic' }}>Tidak ada</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '10px', fontWeight: 600, marginTop: '4px' }}>{record.supervisor?.name ?? '—'}</div>
+                      {record.supervisor?.signed_at && <div style={{ fontSize: '8px', color: '#6b7280' }}>{formatDateTime(record.supervisor.signed_at)}</div>}
+                    </td>
+
+                    {/* MANAGER TEKNIK */}
+                    <td style={{ width: '28%', padding: '6px 10px', verticalAlign: 'top', textAlign: 'center' }}>
+                      <div style={{ fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', fontSize: '10px' }}>MANAGER TEKNIK</div>
+                      <div style={{ minHeight: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {record.manager ? (
+                          record.manager.signature ? (
+                            <img src={record.manager.signature} alt="TTD Manager" style={{ maxHeight: '44px', maxWidth: '100px', objectFit: 'contain' }} />
+                          ) : (
+                            <div style={{ width: '80px', height: '40px', border: '1px dashed #9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ fontSize: '8px', color: '#9ca3af' }}>Belum TTD</span>
+                            </div>
+                          )
+                        ) : (
+                          <span style={{ fontSize: '8px', color: '#9ca3af', fontStyle: 'italic' }}>Tidak ada</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '10px', fontWeight: 600, marginTop: '4px' }}>{record.manager?.name ?? '—'}</div>
+                      {record.manager?.signed_at && <div style={{ fontSize: '8px', color: '#6b7280' }}>{formatDateTime(record.manager.signed_at)}</div>}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 };
