@@ -1,3 +1,9 @@
+// ─── TFP Performance Check Gedung Glide Path ─────────────────────────────
+//
+// Cells are dynamic: the record carries a `columns_config` defining panels
+// and sub-columns; each item stores values + is_disabled_map + merge_map keyed
+// by composite "panelId.subKey" (e.g. "panel_gp01.value").
+
 import type { ShiftType } from '@/types';
 
 export type TfpGlidepathStatus  = 'ongoing' | 'on_hold' | 'completed';
@@ -21,13 +27,28 @@ export interface TfpGlidepathTechnicianRow {
   sort_order: number;
 }
 
+export interface TfpGlidepathSubColumn {
+  key: string;
+  label: string;
+}
+
+export interface TfpGlidepathPanel {
+  id: string;
+  label: string;
+  sub_columns: TfpGlidepathSubColumn[];
+}
+
+export type TfpGlidepathColumnsConfig = TfpGlidepathPanel[];
+export type TfpGlidepathCellKey = string;
+
 export interface TfpGlidepathItem {
   id: number;
   parameter_number: string | null;
   parameter_name: string;
   unit: string | null;
-  panel_gp01: string | null;
-  is_disabled_map: Record<string, boolean> | null;
+  values: Record<TfpGlidepathCellKey, string>;
+  is_disabled_map: Record<TfpGlidepathCellKey, boolean>;
+  merge_map: Record<TfpGlidepathCellKey, number>;
   sort_order: number;
 }
 
@@ -65,6 +86,7 @@ export interface TfpGlidepathRecordDetail {
   time_filled: string | null;
   shift_type: ShiftType;
   location: string;
+  columns_config: TfpGlidepathColumnsConfig;
   status: TfpGlidepathStatus;
   manager: TfpGlidepathSignerInfo | null;
   supervisor: TfpGlidepathSignerInfo | null;
@@ -86,6 +108,23 @@ export interface TfpGlidepathListParams {
 }
 
 export interface TfpGlidepathUpdatePayload {
-  items: Array<{ id: number; panel_gp01?: string | null }>;
-  facilities?: Array<{ id: number; kondisi?: string | null; keterangan?: string | null }>;
+  time_filled?: string | null;
+  items: Array<{
+    id: number;
+    values?: Record<TfpGlidepathCellKey, string | null>;
+  }>;
+  facilities?: Array<{
+    id: number;
+    kondisi?: string | null;
+    keterangan?: string | null;
+  }>;
+}
+
+export interface TfpGlidepathSaveStructurePayload {
+  columns_config: TfpGlidepathColumnsConfig;
+  items: Array<{
+    id: number;
+    is_disabled_map?: Record<TfpGlidepathCellKey, boolean>;
+    merge_map?: Record<TfpGlidepathCellKey, number>;
+  }>;
 }
