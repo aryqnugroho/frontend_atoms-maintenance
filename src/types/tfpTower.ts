@@ -1,3 +1,9 @@
+// ─── TFP Performance Check Gedung Tower ──────────────────────────────────
+//
+// Cells are dynamic: the record carries a `columns_config` defining panels
+// and sub-columns; each item stores values + is_disabled_map + merge_map keyed
+// by composite "panelId.subKey" (e.g. "panel_ats_a13.input").
+
 import type { ShiftType } from '@/types';
 
 export type TfpTowerStatus  = 'ongoing' | 'on_hold' | 'completed';
@@ -21,23 +27,28 @@ export interface TfpTowerTechnicianRow {
   sort_order: number;
 }
 
+export interface TfpTowerSubColumn {
+  key: string;
+  label: string;
+}
+
+export interface TfpTowerPanel {
+  id: string;
+  label: string;
+  sub_columns: TfpTowerSubColumn[];
+}
+
+export type TfpTowerColumnsConfig = TfpTowerPanel[];
+export type TfpTowerCellKey = string;
+
 export interface TfpTowerItem {
   id: number;
   parameter_number: string | null;
   parameter_name: string;
   unit: string | null;
-  panel_a10: string | null;
-  panel_a11: string | null;
-  panel_ats_a13_input: string | null;
-  panel_ats_a13_output: string | null;
-  panel_a14: string | null;
-  panel_a16: string | null;
-  panel_a17: string | null;
-  panel_a18: string | null;
-  panel_a19: string | null;
-  panel_a20: string | null;
-  panel_milat_ru1213: string | null;
-  is_disabled_map: Record<string, boolean> | null;
+  values: Record<TfpTowerCellKey, string>;
+  is_disabled_map: Record<TfpTowerCellKey, boolean>;
+  merge_map: Record<TfpTowerCellKey, number>;
   sort_order: number;
 }
 
@@ -75,6 +86,7 @@ export interface TfpTowerRecordDetail {
   time_filled: string | null;
   shift_type: ShiftType;
   location: string;
+  columns_config: TfpTowerColumnsConfig;
   status: TfpTowerStatus;
   manager: TfpTowerSignerInfo | null;
   supervisor: TfpTowerSignerInfo | null;
@@ -96,23 +108,23 @@ export interface TfpTowerListParams {
 }
 
 export interface TfpTowerUpdatePayload {
+  time_filled?: string | null;
   items: Array<{
     id: number;
-    panel_a10?: string | null;
-    panel_a11?: string | null;
-    panel_ats_a13_input?: string | null;
-    panel_ats_a13_output?: string | null;
-    panel_a14?: string | null;
-    panel_a16?: string | null;
-    panel_a17?: string | null;
-    panel_a18?: string | null;
-    panel_a19?: string | null;
-    panel_a20?: string | null;
-    panel_milat_ru1213?: string | null;
+    values?: Record<TfpTowerCellKey, string | null>;
   }>;
   facilities?: Array<{
     id: number;
     kondisi?: string | null;
     keterangan?: string | null;
+  }>;
+}
+
+export interface TfpTowerSaveStructurePayload {
+  columns_config: TfpTowerColumnsConfig;
+  items: Array<{
+    id: number;
+    is_disabled_map?: Record<TfpTowerCellKey, boolean>;
+    merge_map?: Record<TfpTowerCellKey, number>;
   }>;
 }
