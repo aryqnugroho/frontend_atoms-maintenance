@@ -12,28 +12,63 @@ import {
   Users,
   Clock,
   ChevronRight,
+  ChevronDown,
   Plane,
   Zap,
   LayoutDashboard,
   RefreshCw,
+  Gauge,
+  AlertTriangle,
 } from 'lucide-react';
+import type { ShiftType } from '@/types';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
+import { useNotification } from '@/hooks/useNotification';
 import {
   mockChecklist,
-  mockNotifications,
 } from '@/data/mockData';
 import { workOrderService } from '@/services/workOrderService';
 import { reportingDamageReportService } from '@/services/reportingDamageReportService';
 import { getCurrentShiftType, getCurrentShiftDate, getShiftLabel } from '@/lib/shiftUtils';
-import type { ShiftContextResponse, WorkOrder } from '@/types';
+import type { Notification, ShiftContextResponse, WorkOrder } from '@/types';
 import type { ReportingDamageReportSummary } from '@/types/reporting';
 import { OBSTACLE_CODE_LABELS } from '@/types/reporting';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+// ─── Daily Reminder Catalog ────────────────────────────────
+// Friendly reminders only — not enforced. Each entry deep-links to the
+// matching meter-reading list page so a technician can jump straight in.
+interface ReminderItem { label: string; route: string; }
+
+const ALWAYS_REMINDERS: ReminderItem[] = [
+  { label: 'Kesiapan Peralatan CNSD',          route: '/cnsd/readiness' },
+  { label: 'Performance Check AOB Lt. Ground', route: '/tfp/aob-ground' },
+];
+
+const SHIFT_REMINDERS: Record<ShiftType, ReminderItem[]> = {
+  pagi: [
+    { label: 'Localizer',   route: '/cnsd/localizer-meter'   },
+    { label: 'Glide Path',  route: '/cnsd/glidepath-meter'   },
+    { label: 'T-DME',       route: '/cnsd/tdme-meter'        },
+    { label: 'Transmitter', route: '/cnsd/transmitter-meter' },
+  ],
+  siang: [
+    { label: 'DVOR',  route: '/cnsd/dvor-meter'  },
+    { label: 'DME',   route: '/cnsd/dme-meter'   },
+    { label: 'Radar', route: '/cnsd/radar-meter' },
+  ],
+  malam: [
+    { label: 'Recorder',   route: '/cnsd/recorder-meter'   },
+    { label: 'ATC System', route: '/cnsd/atc-system-meter' },
+    { label: 'AMSC',       route: '/cnsd/amsc-meter'       },
+    { label: 'ATIS',       route: '/cnsd/atis-meter'       },
+    { label: 'Receiver',   route: '/cnsd/receiver-meter'   },
+  ],
+};
 
 // ─── Quick Navigation ──────────────────────────────────────
 const quickNavItems = [
@@ -74,6 +109,26 @@ interface DisplayPerson {
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, token } = useAuth();
+  const { notifications, markAsRead } = useNotification();
+
+  const handleNotifClick = (notif: Notification) => {
+    if (!notif.is_read) {
+      void markAsRead(notif.id);
+    }
+    // Same deep-link priority as the topbar dropdown: explicit data.route
+    // first (CNSD Meter Reading), then data.wo_id (Work Order family).
+    const explicitRoute = typeof notif.data?.route === 'string' ? notif.data.route : null;
+    if (explicitRoute) {
+      navigate(explicitRoute);
+      return;
+    }
+    const woId = notif.data?.wo_id;
+    if (woId) {
+      navigate(`/work-orders/${woId}`);
+    }
+  };
+
+  const recentNotifications = notifications.slice(0, 5);
 
   // ─── Rostering shift context state ────────────────────────
   const [shiftCtx, setShiftCtx] = useState<ShiftContextResponse | null>(null);
@@ -220,9 +275,18 @@ export const DashboardPage: React.FC = () => {
     void fetchRecentReports();
   }, [fetchRecentReports]);
 
-  const completedActive = mockChecklist.filter((c) => c.is_active && c.is_completed).length;
-  const totalActive = mockChecklist.filter((c) => c.is_active).length;
-  const progressPercent = totalActive > 0 ? Math.round((completedActive / totalActive) * 100) : 0;
+  // ─── Daily reminder card state ─────────────────────────
+  const currentShift = shiftCtx?.shift_type ?? filterShiftType;
+  // Track which non-active shifts the user has expanded. Default: collapsed.
+  const [expandedShifts, setExpandedShifts] = useState<Set<ShiftType>>(new Set());
+  const toggleShift = (s: ShiftType) => {
+    setExpandedShifts((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) { next.delete(s); } else { next.add(s); }
+      return next;
+    });
+  };
+  const otherShifts: ShiftType[] = (['pagi', 'siang', 'malam'] as const).filter((s) => s !== currentShift);
 
   // ─── Welcome Popup ─────────────────────────────────────────
   const [showWelcome, setShowWelcome] = useState(false);
@@ -465,75 +529,142 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Checklist Pengecekan */}
+        {/* Pengingat Pengecekan Harian */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
           <div className="px-6 py-4 border-b border-gray-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckSquare size={20} className="text-blue-700" />
-                <h3 className="text-base font-bold text-slate-800">Checklist Pengecekan</h3>
+                <h3 className="text-base font-bold text-slate-800">Pengingat Pengecekan Harian</h3>
               </div>
-              <span className="text-xs font-semibold text-slate-500">{completedActive}/{totalActive} selesai</span>
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">Reminder</span>
             </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Pengingat saja — pengecekan tidak dibatasi oleh shift.
+            </p>
           </div>
-          <div className="p-6">
-            <div className="space-y-2 mb-5">
-              {mockChecklist.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => item.is_active && !item.is_completed && item.route && navigate(item.route)}
-                  className={`flex items-center justify-between px-4 py-3 rounded-lg transition-colors border ${
-                    item.is_active && !item.is_completed
-                      ? 'hover:bg-blue-50 cursor-pointer border-gray-200'
-                      : item.is_active && item.is_completed
-                      ? 'bg-emerald-50/50 border-emerald-200'
-                      : 'opacity-50 cursor-not-allowed border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    {item.is_completed ? (
-                      <span className="text-emerald-600 text-xl">✅</span>
-                    ) : item.is_active ? (
-                      <span className="text-blue-500 text-xl">⬜</span>
-                    ) : (
-                      <span className="text-slate-400 text-xl">🔜</span>
-                    )}
-                    <div className="flex-1">
-                      <span className={`text-sm block ${item.is_active ? 'text-slate-800 font-semibold' : 'text-slate-400'}`}>
-                        {item.label}
-                      </span>
-                      <span className={`text-xs ${item.is_active ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {item.division}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {item.is_completed && (
-                      <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2 py-1 rounded">Selesai</span>
-                    )}
-                    {!item.is_active && (
-                      <span className="text-xs text-slate-400 font-medium">Coming Soon</span>
-                    )}
-                    {item.is_active && !item.is_completed && (
-                      <ChevronRight size={16} className="text-slate-400" />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
 
-            {/* Progress bar */}
+          <div className="p-6 space-y-4">
+            {/* Wajib semua shift */}
+            <section className="rounded-xl border border-amber-200 bg-amber-50/50">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-amber-200/70">
+                <AlertTriangle size={14} className="text-amber-700" aria-hidden="true" />
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                  Wajib di setiap shift
+                </p>
+              </div>
+              <ul className="divide-y divide-amber-100">
+                {ALWAYS_REMINDERS.map((item) => (
+                  <li key={item.route}>
+                    <button
+                      type="button"
+                      onClick={() => navigate(item.route)}
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-amber-100/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-inset"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="h-7 w-7 rounded-md bg-amber-100 flex items-center justify-center shrink-0">
+                          <CheckSquare size={14} className="text-amber-700" aria-hidden="true" />
+                        </span>
+                        <span className="text-sm font-medium text-slate-800 truncate">{item.label}</span>
+                      </div>
+                      <ChevronRight size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            {/* Current shift — expanded */}
+            <section className="rounded-xl border border-blue-200 bg-blue-50/40">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-blue-200/70">
+                <div className="flex items-center gap-2">
+                  <span aria-hidden="true">{getShiftLabel(currentShift).emoji}</span>
+                  <p className="text-xs font-bold uppercase tracking-wider text-blue-800">
+                    {getShiftLabel(currentShift).label}
+                  </p>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                    Aktif
+                  </span>
+                </div>
+                <span className="text-[11px] font-medium text-blue-700/80">
+                  {SHIFT_REMINDERS[currentShift].length} item
+                </span>
+              </div>
+              <ul className="divide-y divide-blue-100">
+                {SHIFT_REMINDERS[currentShift].map((item) => (
+                  <li key={item.route}>
+                    <button
+                      type="button"
+                      onClick={() => navigate(item.route)}
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-blue-100/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="h-7 w-7 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
+                          <Gauge size={14} className="text-blue-700" aria-hidden="true" />
+                        </span>
+                        <span className="text-sm font-medium text-slate-800 truncate">{item.label}</span>
+                      </div>
+                      <ChevronRight size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            {/* Other shifts — collapsed by default */}
             <div className="space-y-2">
-              <div className="flex justify-between text-xs text-slate-500">
-                <span className="font-semibold">Progress Shift</span>
-                <span className="font-bold text-blue-700">{progressPercent}%</span>
-              </div>
-              <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-700 rounded-full transition-all duration-500"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
+              {otherShifts.map((shift) => {
+                const items = SHIFT_REMINDERS[shift];
+                const meta = getShiftLabel(shift);
+                const open = expandedShifts.has(shift);
+                return (
+                  <section
+                    key={shift}
+                    className="rounded-xl border border-gray-200 bg-white"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleShift(shift)}
+                      aria-expanded={open}
+                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-inset"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span aria-hidden="true">{meta.emoji}</span>
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                          {meta.label}
+                        </p>
+                        <span className="text-[11px] font-medium text-slate-500">
+                          ({items.length} item)
+                        </span>
+                      </div>
+                      {open
+                        ? <ChevronDown size={14} className="text-slate-400" aria-hidden="true" />
+                        : <ChevronRight size={14} className="text-slate-400" aria-hidden="true" />}
+                    </button>
+                    {open && (
+                      <ul className="divide-y divide-gray-100 border-t border-gray-100">
+                        {items.map((item) => (
+                          <li key={item.route}>
+                            <button
+                              type="button"
+                              onClick={() => navigate(item.route)}
+                              className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-inset"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className="h-7 w-7 rounded-md bg-slate-100 flex items-center justify-center shrink-0">
+                                  <Gauge size={14} className="text-slate-500" aria-hidden="true" />
+                                </span>
+                                <span className="text-sm text-slate-700 truncate">{item.label}</span>
+                              </div>
+                              <ChevronRight size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -683,50 +814,70 @@ export const DashboardPage: React.FC = () => {
 
       {/* ─── Recent Notifications (Vertical Timeline) ────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
-        <div className="px-6 py-4 border-b border-gray-100">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bell size={20} className="text-blue-700" />
             <h3 className="text-base font-bold text-slate-800">Notifikasi Terbaru</h3>
           </div>
+          <span className="text-xs text-slate-400">Diperbarui otomatis</span>
         </div>
         <div className="p-6">
-          <div className="relative">
-            {/* Vertical Timeline Line */}
-            <div className="absolute left-[11px] top-0 bottom-0 w-0.5 bg-slate-200" />
-            
-            <div className="space-y-4">
-              {mockNotifications.slice(0, 5).map((notif, index) => (
-                <div key={notif.id} className="relative flex gap-4">
-                  {/* Timeline Dot */}
-                  <div className={`relative z-10 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
-                    !notif.is_read 
-                      ? 'bg-blue-600 ring-4 ring-blue-100' 
-                      : 'bg-slate-300'
-                  }`}>
-                    {!notif.is_read && <div className="w-2 h-2 bg-white rounded-full" />}
-                  </div>
-                  
-                  {/* Content */}
-                  <div className={`flex-1 pb-4 ${index === mockNotifications.slice(0, 5).length - 1 ? '' : 'border-b border-slate-100'}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold ${!notif.is_read ? 'text-slate-800' : 'text-slate-600'}`}>
-                          {notif.title}
-                        </p>
-                        <p className="text-sm text-slate-500 mt-1">
-                          {notif.message}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-slate-400 shrink-0">
-                        <Clock size={12} />
-                        {timeAgo(notif.created_at)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+          {recentNotifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+              <Bell size={28} className="text-slate-300" />
+              <p className="text-sm font-medium text-slate-500">Belum ada notifikasi</p>
+              <p className="text-xs text-slate-400">Notifikasi work order akan muncul di sini secara real-time.</p>
             </div>
-          </div>
+          ) : (
+            <div className="relative">
+              {/* Vertical Timeline Line */}
+              <div className="absolute left-[11px] top-0 bottom-0 w-0.5 bg-slate-200" />
+
+              <div className="space-y-4">
+                {recentNotifications.map((notif, index) => {
+                  const isClickable = !!notif.data?.wo_id || typeof notif.data?.route === 'string';
+                  return (
+                    <button
+                      key={notif.id}
+                      type="button"
+                      onClick={() => handleNotifClick(notif)}
+                      disabled={!isClickable}
+                      className={`relative flex gap-4 w-full text-left ${
+                        isClickable ? 'cursor-pointer hover:bg-slate-50/60 rounded-lg -mx-2 px-2' : 'cursor-default'
+                      } transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:rounded-lg`}
+                    >
+                      {/* Timeline Dot */}
+                      <div className={`relative z-10 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
+                        !notif.is_read
+                          ? 'bg-blue-600 ring-4 ring-blue-100'
+                          : 'bg-slate-300'
+                      }`}>
+                        {!notif.is_read && <div className="w-2 h-2 bg-white rounded-full" />}
+                      </div>
+
+                      {/* Content */}
+                      <div className={`flex-1 pb-4 ${index === recentNotifications.length - 1 ? '' : 'border-b border-slate-100'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-semibold ${!notif.is_read ? 'text-slate-800' : 'text-slate-600'}`}>
+                              {notif.title}
+                            </p>
+                            <p className="text-sm text-slate-500 mt-1">
+                              {notif.message}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-slate-400 shrink-0">
+                            <Clock size={12} />
+                            {timeAgo(notif.created_at)}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
