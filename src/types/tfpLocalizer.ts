@@ -1,3 +1,9 @@
+// ─── TFP Performance Check Gedung Localizer ──────────────────────────────
+//
+// Cells are dynamic: the record carries a `columns_config` defining panels
+// and sub-columns; each item stores values + is_disabled_map + merge_map keyed
+// by composite "panelId.subKey" (e.g. "panel_cos_lz02.input").
+
 import type { ShiftType } from '@/types';
 
 export type TfpLocalizerStatus  = 'ongoing' | 'on_hold' | 'completed';
@@ -21,19 +27,28 @@ export interface TfpLocalizerTechnicianRow {
   sort_order: number;
 }
 
+export interface TfpLocalizerSubColumn {
+  key: string;
+  label: string;
+}
+
+export interface TfpLocalizerPanel {
+  id: string;
+  label: string;
+  sub_columns: TfpLocalizerSubColumn[];
+}
+
+export type TfpLocalizerColumnsConfig = TfpLocalizerPanel[];
+export type TfpLocalizerCellKey = string;
+
 export interface TfpLocalizerItem {
   id: number;
   parameter_number: string | null;
   parameter_name: string;
   unit: string | null;
-  panel_lz01: string | null;
-  panel_cos_lz02_input: string | null;
-  panel_cos_lz02_output: string | null;
-  panel_lz03: string | null;
-  panel_cos_lz04_input: string | null;
-  panel_cos_lz04_output: string | null;
-  panel_mlat_ru04: string | null;
-  is_disabled_map: Record<string, boolean> | null;
+  values: Record<TfpLocalizerCellKey, string>;
+  is_disabled_map: Record<TfpLocalizerCellKey, boolean>;
+  merge_map: Record<TfpLocalizerCellKey, number>;
   sort_order: number;
 }
 
@@ -71,6 +86,7 @@ export interface TfpLocalizerRecordDetail {
   time_filled: string | null;
   shift_type: ShiftType;
   location: string;
+  columns_config: TfpLocalizerColumnsConfig;
   status: TfpLocalizerStatus;
   manager: TfpLocalizerSignerInfo | null;
   supervisor: TfpLocalizerSignerInfo | null;
@@ -92,19 +108,23 @@ export interface TfpLocalizerListParams {
 }
 
 export interface TfpLocalizerUpdatePayload {
+  time_filled?: string | null;
   items: Array<{
     id: number;
-    panel_lz01?: string | null;
-    panel_cos_lz02_input?: string | null;
-    panel_cos_lz02_output?: string | null;
-    panel_lz03?: string | null;
-    panel_cos_lz04_input?: string | null;
-    panel_cos_lz04_output?: string | null;
-    panel_mlat_ru04?: string | null;
+    values?: Record<TfpLocalizerCellKey, string | null>;
   }>;
   facilities?: Array<{
     id: number;
     kondisi?: string | null;
     keterangan?: string | null;
+  }>;
+}
+
+export interface TfpLocalizerSaveStructurePayload {
+  columns_config: TfpLocalizerColumnsConfig;
+  items: Array<{
+    id: number;
+    is_disabled_map?: Record<TfpLocalizerCellKey, boolean>;
+    merge_map?: Record<TfpLocalizerCellKey, number>;
   }>;
 }
