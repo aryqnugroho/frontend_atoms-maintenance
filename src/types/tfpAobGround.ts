@@ -1,12 +1,9 @@
 // ─── TFP Performance Check AOB Lantai Ground ──────────────────────────────
 //
 // Type definitions for the TFP AOB Ground module.
-// Mirrors the CNSD Recorder Meter shape but with TFP-specific item fields:
-//   - panel_cos_a03_input/output  : Panel COS (A 03)
-//   - panel_ats_a12_input/output  : Panel ATS (A 12)
-//   - ups_tescom_a_input/output   : UPS TESCOM A
-//   - ups_tescom_b_input/output   : UPS TESCOM B
-//   - is_disabled_map             : which cells are grey/disabled
+// Cells are dynamic now: the record carries a `columns_config` defining panels
+// and sub-columns; each item stores values + is_disabled_map + merge_map keyed
+// by composite "panelId.subKey" (e.g. "panel_cos_a03.input").
 
 import type { ShiftType } from '@/types';
 
@@ -31,21 +28,35 @@ export interface TfpAobGroundTechnicianRow {
   sort_order: number;
 }
 
+// ─── Dynamic columns ─────────────────────────────────────────────────────────
+
+export interface TfpAobGroundSubColumn {
+  key: string;   // stable slug e.g. "input", "output", "bypass"
+  label: string; // human label e.g. "Input"
+}
+
+export interface TfpAobGroundPanel {
+  id: string;       // stable slug e.g. "panel_cos_a03"
+  label: string;    // human label e.g. "Panel COS (A 03)"
+  sub_columns: TfpAobGroundSubColumn[];
+}
+
+export type TfpAobGroundColumnsConfig = TfpAobGroundPanel[];
+
+// Composite cell key shape: "panelId.subKey" (e.g. "panel_cos_a03.input")
+export type TfpAobGroundCellKey = string;
+
 export interface TfpAobGroundItem {
   id: number;
   parameter_number: string | null;
   parameter_name: string;
   unit: string | null;
-  panel_cos_a03_input: string | null;
-  panel_cos_a03_output: string | null;
-  panel_ats_a12_input: string | null;
-  panel_ats_a12_output: string | null;
-  ups_tescom_a_input: string | null;
-  ups_tescom_a_output: string | null;
-  ups_tescom_b_input: string | null;
-  ups_tescom_b_output: string | null;
-  /** Map of column keys → true if that cell is disabled/grey */
-  is_disabled_map: Record<string, boolean> | null;
+  /** cellKey → value */
+  values: Record<TfpAobGroundCellKey, string>;
+  /** cellKey → true if grey/disabled */
+  is_disabled_map: Record<TfpAobGroundCellKey, boolean>;
+  /** cellKey → colspan (≥2 means this cell spans N cells to the right) */
+  merge_map: Record<TfpAobGroundCellKey, number>;
   sort_order: number;
 }
 
@@ -83,6 +94,7 @@ export interface TfpAobGroundRecordDetail {
   time_filled: string | null;
   shift_type: ShiftType;
   location: string;
+  columns_config: TfpAobGroundColumnsConfig;
   status: TfpAobGroundStatus;
   manager: TfpAobGroundSignerInfo | null;
   supervisor: TfpAobGroundSignerInfo | null;
@@ -107,18 +119,20 @@ export interface TfpAobGroundUpdatePayload {
   time_filled?: string | null;
   items: Array<{
     id: number;
-    panel_cos_a03_input?: string | null;
-    panel_cos_a03_output?: string | null;
-    panel_ats_a12_input?: string | null;
-    panel_ats_a12_output?: string | null;
-    ups_tescom_a_input?: string | null;
-    ups_tescom_a_output?: string | null;
-    ups_tescom_b_input?: string | null;
-    ups_tescom_b_output?: string | null;
+    values?: Record<TfpAobGroundCellKey, string | null>;
   }>;
   facilities?: Array<{
     id: number;
     kondisi?: string | null;
     keterangan?: string | null;
+  }>;
+}
+
+export interface TfpAobGroundSaveStructurePayload {
+  columns_config: TfpAobGroundColumnsConfig;
+  items: Array<{
+    id: number;
+    is_disabled_map?: Record<TfpAobGroundCellKey, boolean>;
+    merge_map?: Record<TfpAobGroundCellKey, number>;
   }>;
 }

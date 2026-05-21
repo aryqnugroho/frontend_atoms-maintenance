@@ -6,47 +6,17 @@ import { tfpAobGroundService } from '@/services/tfpAobGroundService';
 import type {
   TfpAobGroundRecordDetail,
   TfpAobGroundItem,
-  TfpAobGroundFacility,
 } from '@/types/tfpAobGround';
-
-// ─── Column key map (matches backend item shape) ──────────────
-
-type ItemColKey =
-  | 'panel_cos_a03_input'
-  | 'panel_cos_a03_output'
-  | 'panel_ats_a12_input'
-  | 'panel_ats_a12_output'
-  | 'ups_tescom_a_input'
-  | 'ups_tescom_a_output'
-  | 'ups_tescom_b_input'
-  | 'ups_tescom_b_output';
-
-const ALL_COL_KEYS: ItemColKey[] = [
-  'panel_cos_a03_input',
-  'panel_cos_a03_output',
-  'panel_ats_a12_input',
-  'panel_ats_a12_output',
-  'ups_tescom_a_input',
-  'ups_tescom_a_output',
-  'ups_tescom_b_input',
-  'ups_tescom_b_output',
-];
 
 // ─── Helpers ──────────────────────────────────────────────────
 
-const isDisabled = (item: TfpAobGroundItem, colKey: ItemColKey): boolean =>
-  item.is_disabled_map?.[colKey] === true;
+const cellKeyOf = (panelId: string, subKey: string) => `${panelId}.${subKey}`;
 
 const isModeRow = (item: TfpAobGroundItem): boolean =>
   item.parameter_name.toLowerCase().startsWith('mode');
 
 const isSuplaiRow = (item: TfpAobGroundItem): boolean =>
   item.parameter_name.toLowerCase().startsWith('suplai aktif');
-
-const isSingleValueRow = (item: TfpAobGroundItem): boolean => {
-  const name = item.parameter_name.toLowerCase();
-  return name.startsWith('kwh') || name.startsWith('suhu eq');
-};
 
 const formatDate = (v?: string | null): string => {
   if (!v) return '-';
@@ -60,86 +30,17 @@ const formatDate = (v?: string | null): string => {
 const val = (v: string | null | undefined): string =>
   v == null || v === '' ? '' : v;
 
-/**
- * Decide what to render in a parameter/panel cell on print.
- * Returns either a "blocked" JSX (grey cell) or a normal cell with text.
- */
-const renderPrintCell = (
-  item: TfpAobGroundItem,
-  colKey: ItemColKey,
-): React.ReactElement => {
-  // Hard disabled by template (grey cell, no value)
-  if (isDisabled(item, colKey)) {
-    return <td className="border border-black bg-gray-300 px-1 py-1" />;
-  }
-
-  // Mode row — only COS input + ATS input show value
-  if (isModeRow(item)) {
-    if (colKey === 'panel_cos_a03_input' || colKey === 'panel_ats_a12_input') {
-      const v =
-        colKey === 'panel_cos_a03_input'
-          ? item.panel_cos_a03_input
-          : item.panel_ats_a12_input;
-      return (
-        <td className="border border-black px-1 py-1 text-center text-[10px] font-semibold">
-          {v ? val(v) : 'Auto / Manual'}
-        </td>
-      );
-    }
-    return <td className="border border-black bg-gray-300 px-1 py-1" />;
-  }
-
-  // Suplai Aktif row
-  if (isSuplaiRow(item)) {
-    if (colKey === 'panel_cos_a03_input') {
-      const v = item.panel_cos_a03_input;
-      return (
-        <td className="border border-black px-1 py-1 text-center text-[10px] font-semibold">
-          {v ? val(v) : 'PLN / UPS'}
-        </td>
-      );
-    }
-    if (colKey === 'panel_ats_a12_input') {
-      const v = item.panel_ats_a12_input;
-      return (
-        <td className="border border-black px-1 py-1 text-center text-[10px] font-semibold">
-          {v ? val(v) : 'PLN 1 / PLN 2'}
-        </td>
-      );
-    }
-    return <td className="border border-black bg-gray-300 px-1 py-1" />;
-  }
-
-  // Single-value rows — only panel_cos_a03_input is active
-  if (isSingleValueRow(item) && colKey !== 'panel_cos_a03_input') {
-    return <td className="border border-black bg-gray-300 px-1 py-1" />;
-  }
-
-  const v = item[colKey] as string | null;
-  return (
-    <td className="border border-black px-1 py-1 text-center text-[10px]">
-      {val(v)}
-    </td>
-  );
-};
-
 // ─── Main print view ──────────────────────────────────────────
 
 /**
- * TFP Performance Check AOB Lantai Ground — Print View
+ * TFP Performance Check AOB Lantai Ground — Print View (A4 landscape)
  *
- * Frontend-only HTML print layout that mirrors the official paper form.
+ * Renders the table dynamically from record.columns_config:
+ *   - Panel headers span their sub_columns count
+ *   - Cells honor per-item is_disabled_map (grey) and merge_map (colSpan)
+ *   - Mode/Suplai rows still render their label in the merged cell
  *
- * Layout:
- *   - Kop: AirNav logo (left), AirNav Indonesia text, Perum LPPNPI Cabang Surabaya
- *     Teknik Fasilitas Penunjang (right), Performance Check AOB Lantai Ground title.
- *   - Single big table with parameter (left) + facility (right) merged into one row.
- *   - Header rows merged: panel headers span 2 columns (Input/Output).
- *   - Disabled cells rendered as grey (bg-gray-300) cells with no content.
- *   - Footer: Waktu Pelaksanaan (Hari/Tanggal/Jam) + Pelaksana Teknisi/Paraf/Supervisor/Manager Teknik.
- *
- * Print does NOT auto-fire — the user must click the Print PDF button. This
- * matches the CNSD pattern and avoids the React StrictMode double-effect issue.
+ * Print does NOT auto-fire — user clicks Print PDF button.
  */
 export const TfpAobGroundPrintView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -161,9 +62,7 @@ export const TfpAobGroundPrintView: React.FC = () => {
       }
     };
     void fetchRecord();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [id]);
 
   if (isLoading) {
@@ -185,46 +84,42 @@ export const TfpAobGroundPrintView: React.FC = () => {
     );
   }
 
+  const config = record.columns_config ?? [];
   const items = record.items;
   const facilities = record.facilities;
 
-  // Compose unified row count: 22 rows (parameters + 1 future capacity for visual grid).
-  // Reference image shows 22 rows on left side; our template = 21 rows (Suhu Ruang ARO removed).
-  // Right column has up to 17 facilities. We'll render rows with parameter on left + facility on
-  // right when available, blank cell when one side runs out.
-  const maxRows = Math.max(items.length, facilities.length);
+  // Flatten config into ordered cell list (matches detail page logic)
+  const flatCells: { panelId: string; subKey: string; key: string }[] = [];
+  for (const p of config) {
+    for (const s of p.sub_columns) {
+      flatCells.push({ panelId: p.id, subKey: s.key, key: cellKeyOf(p.id, s.key) });
+    }
+  }
+  const totalCellCount = flatCells.length;
 
-  // Pad arrays so left/right rows align by index
-  const padded: { item: TfpAobGroundItem | null; facility: TfpAobGroundFacility | null }[] = [];
+  const maxRows = Math.max(items.length, facilities.length);
+  const padded: { item: TfpAobGroundItem | null; facility: typeof facilities[number] | null }[] = [];
   for (let i = 0; i < maxRows; i++) {
-    padded.push({
-      item: items[i] ?? null,
-      facility: facilities[i] ?? null,
-    });
+    padded.push({ item: items[i] ?? null, facility: facilities[i] ?? null });
   }
 
-  // Technicians render directly from record.technicians — no padding rows in
-  // the new CNSD-style signature block.
+  // Width budget: 22 (No) + 110 (Param) + N*cellW + 120 (NamaFas) + 50 (Kond) + 90 (Ket)
+  // Scale cell width down a bit when many panels exist to keep A4 landscape fit.
+  const cellW = totalCellCount <= 8 ? 40 : totalCellCount <= 12 ? 32 : 26;
 
   return (
     <div className="min-h-screen w-full bg-slate-100 p-4 text-black print:bg-white print:p-0">
-      <style>
-        {`
-          @media print {
-            @page { size: A4 landscape; margin: 8mm 8mm; }
-            body { background: white !important; }
-            .print-hide { display: none !important; }
-          }
-        `}
-      </style>
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 8mm 8mm; }
+          body { background: white !important; }
+          .print-hide { display: none !important; }
+        }
+      `}</style>
 
-      {/* ── Toolbar (screen only) ── */}
+      {/* Toolbar (screen only) */}
       <div className="print-hide mx-auto mb-4 flex max-w-[290mm] items-center justify-between">
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => navigate(`/tfp/aob-ground/${record.id}`)}
-        >
+        <Button variant="outline" className="gap-2" onClick={() => navigate(`/tfp/aob-ground/${record.id}`)}>
           <ArrowLeft size={16} />
           Kembali
         </Button>
@@ -234,32 +129,24 @@ export const TfpAobGroundPrintView: React.FC = () => {
         </Button>
       </div>
 
-      {/* ── A4 landscape paper ── */}
+      {/* A4 landscape paper */}
       <div className="mx-auto max-w-[290mm] bg-white font-sans text-[10px] print:mx-0 print:w-full print:max-w-none">
 
-        {/* ─── Kop ─── */}
+        {/* Kop */}
         <div className="grid grid-cols-[40%_30%_30%] items-center mb-2 px-2 pt-3">
-          {/* Left: logo + name */}
           <div className="flex items-center gap-2">
             <img
-              src="/assets/icon/logoairnav.svg"
-              alt="AirNav Indonesia"
+              src="/assets/icon/logoairnav.svg" alt="AirNav Indonesia"
               className="h-12 w-auto"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
             <div className="text-[14px] font-black leading-tight">AirNav Indonesia</div>
           </div>
 
-          {/* Center: title */}
           <div className="text-center">
-            <div className="text-[13px] font-black leading-tight">
-              Performance Check AOB Lantai Ground
-            </div>
+            <div className="text-[13px] font-black leading-tight">Performance Check AOB Lantai Ground</div>
           </div>
 
-          {/* Right: identitas */}
           <div className="text-right text-[10px] font-bold leading-tight">
             <div>Perum LPPNPI</div>
             <div>Cabang Surabaya</div>
@@ -267,113 +154,110 @@ export const TfpAobGroundPrintView: React.FC = () => {
           </div>
         </div>
 
-        {/* ─── Main table (parameter + facility) ─── */}
+        {/* Main table (parameter + facility merged side-by-side) */}
         <table className="w-full border-collapse text-[9px] mx-auto" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: '22px' }} /> {/* No */}
-            <col style={{ width: '110px' }} /> {/* Parameter */}
-            <col style={{ width: '40px' }} /> <col style={{ width: '40px' }} /> {/* Panel COS */}
-            <col style={{ width: '40px' }} /> <col style={{ width: '40px' }} /> {/* Panel ATS */}
-            <col style={{ width: '36px' }} /> <col style={{ width: '36px' }} /> {/* UPS A */}
-            <col style={{ width: '36px' }} /> <col style={{ width: '36px' }} /> {/* UPS B */}
-            <col style={{ width: '120px' }} /> {/* Nama Fasilitas */}
-            <col style={{ width: '50px' }} /> {/* Kondisi */}
-            <col style={{ width: '90px' }} /> {/* Keterangan */}
+            <col style={{ width: '22px' }} />
+            <col style={{ width: '110px' }} />
+            {flatCells.map((c) => <col key={c.key} style={{ width: `${cellW}px` }} />)}
+            <col style={{ width: '120px' }} />
+            <col style={{ width: '50px' }} />
+            <col style={{ width: '90px' }} />
           </colgroup>
 
-          {/* Header rows: 2 levels */}
+          {/* Header rows */}
           <thead>
             <tr className="bg-blue-100">
-              <th
-                rowSpan={2}
-                className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle"
-              >
-                No.
-              </th>
-              <th
-                rowSpan={2}
-                className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle"
-              >
-                Parameter
-              </th>
-              <th
-                colSpan={2}
-                className="border border-black px-1 py-0.5 text-center font-bold text-[9px]"
-              >
-                Panel COS (A 03)
-              </th>
-              <th
-                colSpan={2}
-                className="border border-black px-1 py-0.5 text-center font-bold text-[9px]"
-              >
-                Panel ATS (A 12)
-              </th>
-              <th
-                colSpan={2}
-                className="border border-black px-1 py-0.5 text-center font-bold text-[9px]"
-              >
-                UPS TESCOM A
-              </th>
-              <th
-                colSpan={2}
-                className="border border-black px-1 py-0.5 text-center font-bold text-[9px]"
-              >
-                UPS TESCOM B
-              </th>
-              <th
-                rowSpan={2}
-                className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle"
-              >
-                Nama Fasilitas
-              </th>
-              <th
-                rowSpan={2}
-                className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle"
-              >
-                Kondisi
-              </th>
-              <th
-                rowSpan={2}
-                className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle"
-              >
-                Keterangan
-              </th>
-            </tr>
-            <tr className="bg-blue-50 italic">
-              {/* Sub-headers Input/Output for 4 panel groups */}
-              {[
-                'Input',
-                'Output',
-                'Input',
-                'Output',
-                'Input',
-                'Output',
-                'Input',
-                'Output',
-              ].map((lbl, i) => (
-                <th
-                  key={i}
-                  className="border border-black px-0.5 py-0.5 text-center font-semibold text-[8px]"
-                >
-                  {lbl}
+              <th rowSpan={2} className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle">No.</th>
+              <th rowSpan={2} className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle">Parameter</th>
+              {config.map((panel) => (
+                <th key={panel.id} colSpan={panel.sub_columns.length}
+                  className="border border-black px-1 py-0.5 text-center font-bold text-[9px]">
+                  {panel.label}
                 </th>
               ))}
+              <th rowSpan={2} className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle">Nama Fasilitas</th>
+              <th rowSpan={2} className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle">Kondisi</th>
+              <th rowSpan={2} className="border border-black px-1 py-1 text-center font-bold text-[9px] align-middle">Keterangan</th>
+            </tr>
+            <tr className="bg-blue-50 italic">
+              {config.flatMap((panel) =>
+                panel.sub_columns.map((sub) => (
+                  <th key={cellKeyOf(panel.id, sub.key)}
+                    className="border border-black px-0.5 py-0.5 text-center font-semibold text-[8px]">
+                    {sub.label}
+                  </th>
+                ))
+              )}
             </tr>
           </thead>
 
-          {/* Body — parameter rows (left) + facility rows (right) */}
+          {/* Body */}
           <tbody>
             {padded.map((row, idx) => {
               const item = row.item;
               const facility = row.facility;
+
+              const skipKeys = new Set<string>();
+              const cells: React.ReactNode[] = [];
+
+              if (item) {
+                const modeRow = isModeRow(item);
+                const suplaiRow = isSuplaiRow(item);
+
+                flatCells.forEach((fc, fi) => {
+                  if (skipKeys.has(fc.key)) return;
+                  const colspan = item.merge_map?.[fc.key] ?? 1;
+                  const disabled = item.is_disabled_map?.[fc.key] === true;
+                  for (let k = 1; k < colspan; k++) {
+                    const nxt = flatCells[fi + k];
+                    if (nxt) skipKeys.add(nxt.key);
+                  }
+
+                  if (disabled) {
+                    cells.push(
+                      <td key={fc.key} colSpan={colspan} className="border border-black bg-gray-300 px-1 py-1" />
+                    );
+                    return;
+                  }
+
+                  const v = item.values?.[fc.key] ?? '';
+
+                  if (modeRow && !v) {
+                    cells.push(
+                      <td key={fc.key} colSpan={colspan} className="border border-black px-1 py-1 text-center text-[10px] font-semibold">
+                        Auto / Manual
+                      </td>
+                    );
+                    return;
+                  }
+                  if (suplaiRow && !v) {
+                    const placeholder = fc.panelId === 'panel_ats_a12' ? 'PLN 1 / PLN 2' : 'PLN / UPS';
+                    cells.push(
+                      <td key={fc.key} colSpan={colspan} className="border border-black px-1 py-1 text-center text-[10px] font-semibold">
+                        {placeholder}
+                      </td>
+                    );
+                    return;
+                  }
+
+                  cells.push(
+                    <td key={fc.key} colSpan={colspan}
+                      className={`border border-black px-1 py-1 text-center text-[10px] ${modeRow || suplaiRow ? 'font-semibold' : ''}`}>
+                      {val(v)}
+                    </td>
+                  );
+                });
+              } else {
+                // pad row (parameter side empty)
+                for (let i = 0; i < totalCellCount; i++) {
+                  cells.push(<td key={`pad-${idx}-${i}`} className="border border-black px-1 py-1" />);
+                }
+              }
+
               return (
                 <tr key={`row-${idx}`}>
-                  {/* No. */}
-                  <td className="border border-black px-1 py-1 text-center text-[9px]">
-                    {item ? idx + 1 : ''}
-                  </td>
-
-                  {/* Parameter name */}
+                  <td className="border border-black px-1 py-1 text-center text-[9px]">{item ? idx + 1 : ''}</td>
                   <td className="border border-black px-1 py-1 text-[9px]">
                     {item ? (
                       <>
@@ -382,48 +266,21 @@ export const TfpAobGroundPrintView: React.FC = () => {
                       </>
                     ) : null}
                   </td>
-
-                  {/* 8 panel columns */}
-                  {item
-                    ? ALL_COL_KEYS.map((colKey) => (
-                        <React.Fragment key={`${item.id}-${colKey}`}>
-                          {renderPrintCell(item, colKey)}
-                        </React.Fragment>
-                      ))
-                    : Array.from({ length: 8 }).map((_, i) => (
-                        <td
-                          key={`pad-${i}`}
-                          className="border border-black px-1 py-1"
-                        />
-                      ))}
-
-                  {/* Facility name */}
-                  <td className="border border-black px-1 py-1 text-[9px]">
-                    {facility ? facility.facility_name : ''}
-                  </td>
-
-                  {/* Kondisi */}
-                  <td className="border border-black px-1 py-1 text-center text-[9px]">
-                    {facility?.kondisi ?? ''}
-                  </td>
-
-                  {/* Keterangan */}
-                  <td className="border border-black px-1 py-1 text-[9px]">
-                    {facility?.keterangan ?? ''}
-                  </td>
+                  {cells}
+                  <td className="border border-black px-1 py-1 text-[9px]">{facility?.facility_name ?? ''}</td>
+                  <td className="border border-black px-1 py-1 text-center text-[9px]">{facility?.kondisi ?? ''}</td>
+                  <td className="border border-black px-1 py-1 text-[9px]">{facility?.keterangan ?? ''}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
 
-        {/* ─── Waktu Pelaksanaan (full-width row) ─── */}
+        {/* Waktu Pelaksanaan */}
         <table className="w-full border-collapse text-[9px] mt-0">
           <tbody>
             <tr className="bg-blue-100">
-              <td className="border border-black px-2 py-1 text-center font-bold w-[15%]">
-                Waktu Pelaksanaan
-              </td>
+              <td className="border border-black px-2 py-1 text-center font-bold w-[15%]">Waktu Pelaksanaan</td>
               <td className="border border-black px-2 py-1 font-bold w-[7%]">Hari :</td>
               <td className="border border-black px-2 py-1 w-[16%]">{record.day_name ?? ''}</td>
               <td className="border border-black px-2 py-1 font-bold w-[8%]">Tanggal :</td>
@@ -434,14 +291,11 @@ export const TfpAobGroundPrintView: React.FC = () => {
           </tbody>
         </table>
 
-        {/* ─── Signature footer (mirrors CNSD print pattern) ─── */}
+        {/* Signature footer */}
         <div className="mt-0 border border-black border-t-0">
           <div className="flex">
-            {/* Teknisi column — table with No / Nama / Paraf */}
             <div className="flex-1 border-r border-black p-2">
-              <div className="text-[10px] font-black text-center uppercase mb-2">
-                Teknisi
-              </div>
+              <div className="text-[10px] font-black text-center uppercase mb-2">Teknisi</div>
               <table className="w-full border-collapse text-[9px]">
                 <thead>
                   <tr className="bg-blue-100">
@@ -458,11 +312,8 @@ export const TfpAobGroundPrintView: React.FC = () => {
                         <td className="border border-black px-1 py-1">{tech.technician_name}</td>
                         <td className="border border-black px-1 py-1 text-center align-middle h-10">
                           {tech.signature ? (
-                            <img
-                              src={tech.signature}
-                              alt={`TTD ${tech.technician_name}`}
-                              className="mx-auto max-h-9 max-w-[90px] object-contain"
-                            />
+                            <img src={tech.signature} alt={`TTD ${tech.technician_name}`}
+                              className="mx-auto max-h-9 max-w-[90px] object-contain" />
                           ) : (
                             <span className="text-[9px] text-gray-400 italic">Belum TTD</span>
                           )}
@@ -480,59 +331,42 @@ export const TfpAobGroundPrintView: React.FC = () => {
               </table>
             </div>
 
-            {/* Supervisor column */}
             <div className="flex w-[24%] flex-col items-center border-r border-black p-2 text-center min-h-[140px]">
               <div className="text-[10px] font-black uppercase mb-1">Supervisor</div>
               <div className="flex flex-1 items-center justify-center w-full mt-1">
                 {record.supervisor ? (
                   record.supervisor.signature ? (
-                    <img
-                      src={record.supervisor.signature}
-                      alt="TTD Supervisor"
-                      className="max-h-16 max-w-[130px] object-contain"
-                    />
+                    <img src={record.supervisor.signature} alt="TTD Supervisor"
+                      className="max-h-16 max-w-[130px] object-contain" />
                   ) : (
                     <div className="h-16 w-28 border border-dashed border-gray-400" />
                   )
                 ) : (
-                  <span className="text-[9px] text-gray-400 italic">
-                    Tidak ada supervisor pada shift ini
-                  </span>
+                  <span className="text-[9px] text-gray-400 italic">Tidak ada supervisor pada shift ini</span>
                 )}
               </div>
-              <div className="mt-auto text-[10px] font-semibold">
-                {record.supervisor?.name ?? '—'}
-              </div>
+              <div className="mt-auto text-[10px] font-semibold">{record.supervisor?.name ?? '—'}</div>
             </div>
 
-            {/* Manager Teknik column */}
             <div className="flex w-[24%] flex-col items-center p-2 text-center min-h-[140px]">
               <div className="text-[10px] font-black uppercase mb-1">Manager Teknik</div>
               <div className="flex flex-1 items-center justify-center w-full mt-1">
                 {record.manager ? (
                   record.manager.signature ? (
-                    <img
-                      src={record.manager.signature}
-                      alt="TTD Manager Teknik"
-                      className="max-h-16 max-w-[130px] object-contain"
-                    />
+                    <img src={record.manager.signature} alt="TTD Manager Teknik"
+                      className="max-h-16 max-w-[130px] object-contain" />
                   ) : (
                     <div className="h-16 w-28 border border-dashed border-gray-400" />
                   )
                 ) : (
-                  <span className="text-[9px] text-gray-400 italic">
-                    Manager Teknik tidak ditugaskan
-                  </span>
+                  <span className="text-[9px] text-gray-400 italic">Manager Teknik tidak ditugaskan</span>
                 )}
               </div>
-              <div className="mt-auto text-[10px] font-semibold">
-                {record.manager?.name ?? '—'}
-              </div>
+              <div className="mt-auto text-[10px] font-semibold">{record.manager?.name ?? '—'}</div>
             </div>
           </div>
         </div>
 
-        {/* Footer notes */}
         <div className="mt-1 flex justify-between text-[8px] text-slate-700 px-1 pb-3">
           <span>(*) Coret yang tidak perlu</span>
           <span>Kondisi : (√) Baik / Normal</span>

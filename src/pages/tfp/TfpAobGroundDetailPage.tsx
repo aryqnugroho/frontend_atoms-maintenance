@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import {
@@ -18,6 +18,12 @@ import {
   Settings2,
   X,
   Check,
+  Ban,
+  MoveHorizontal,
+  Columns,
+  ColumnsIcon,
+  Eraser,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -30,38 +36,40 @@ import type {
   TfpAobGroundRecordDetail,
   TfpAobGroundItem,
   TfpAobGroundFacility,
+  TfpAobGroundColumnsConfig,
+  TfpAobGroundPanel,
 } from '@/types/tfpAobGround';
-
-// ─── Column definitions ────────────────────────────────────────────────────
-
-type ItemColKey =
-  | 'panel_cos_a03_input'
-  | 'panel_cos_a03_output'
-  | 'panel_ats_a12_input'
-  | 'panel_ats_a12_output'
-  | 'ups_tescom_a_input'
-  | 'ups_tescom_a_output'
-  | 'ups_tescom_b_input'
-  | 'ups_tescom_b_output';
-
-const ALL_COL_KEYS: ItemColKey[] = [
-  'panel_cos_a03_input',
-  'panel_cos_a03_output',
-  'panel_ats_a12_input',
-  'panel_ats_a12_output',
-  'ups_tescom_a_input',
-  'ups_tescom_a_output',
-  'ups_tescom_b_input',
-  'ups_tescom_b_output',
-];
-
-// Kondisi options for facility rows — per task spec.
-const KONDISI_OPTIONS = ['Baik', 'Rusak', 'Tidak Ada'] as const;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-const isDisabled = (item: TfpAobGroundItem, colKey: ItemColKey): boolean =>
-  item.is_disabled_map?.[colKey] === true;
+/** Build composite cell key "panelId.subKey" from a panel + sub-column. */
+const cellKeyOf = (panelId: string, subKey: string) => `${panelId}.${subKey}`;
+
+/** Flatten a columns_config into an ordered list of cell descriptors. */
+interface FlatCell {
+  panel: TfpAobGroundPanel;
+  subKey: string;
+  subLabel: string;
+  key: string;
+  index: number;
+}
+
+const flattenColumns = (config: TfpAobGroundColumnsConfig): FlatCell[] => {
+  const out: FlatCell[] = [];
+  let i = 0;
+  for (const panel of config) {
+    for (const sub of panel.sub_columns) {
+      out.push({
+        panel,
+        subKey: sub.key,
+        subLabel: sub.label,
+        key: cellKeyOf(panel.id, sub.key),
+        index: i++,
+      });
+    }
+  }
+  return out;
+};
 
 const isModeRow = (item: TfpAobGroundItem): boolean =>
   item.parameter_name.toLowerCase().startsWith('mode');
@@ -69,13 +77,17 @@ const isModeRow = (item: TfpAobGroundItem): boolean =>
 const isSuplaiRow = (item: TfpAobGroundItem): boolean =>
   item.parameter_name.toLowerCase().startsWith('suplai aktif');
 
-const isSingleValueRow = (item: TfpAobGroundItem): boolean => {
-  const name = item.parameter_name.toLowerCase();
-  return name.startsWith('kwh') || name.startsWith('suhu eq');
-};
+// Kondisi options for facility rows
+const KONDISI_OPTIONS = ['Baik', 'Rusak', 'Tidak Ada'] as const;
+
+// Slug a user-typed label into a stable key (matches backend slug function)
+const slugify = (raw: string): string =>
+  raw.toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
 
 // ─── ToggleButtonGroup — 2-state pill toggle (Mode/Suplai cells) ──────────
-// Click an option to select it. Click the active option again to clear.
 
 interface ToggleButtonGroupProps {
   options: readonly string[];
@@ -128,23 +140,18 @@ const ToggleButtonGroup: React.FC<ToggleButtonGroupProps> = ({
   );
 };
 
-// ─── Plain cell input (rows 1–17) ──────────────────────────────────────────
+// ─── Cell editor inputs (value entry mode) ─────────────────────────────────
 
 interface CellInputProps {
-  item: TfpAobGroundItem;
-  colKey: ItemColKey;
+  isDisabled: boolean;
+  isCompleted: boolean;
   value: string;
   onChange: (val: string) => void;
-  isCompleted: boolean;
 }
 
-const CellInput: React.FC<CellInputProps> = ({ item, colKey, value, onChange, isCompleted }) => {
-  if (isDisabled(item, colKey)) {
-    return <div className="w-full h-7 rounded" aria-hidden="true" />;
-  }
-  if (isCompleted) {
-    return <span className="text-xs text-slate-700">{value || '—'}</span>;
-  }
+const CellInput: React.FC<CellInputProps> = ({ isDisabled, isCompleted, value, onChange }) => {
+  if (isDisabled) return <div className="w-full h-7 rounded" aria-hidden="true" />;
+  if (isCompleted) return <span className="text-xs text-slate-700">{value || '—'}</span>;
   return (
     <input
       type="text"
@@ -155,6 +162,35 @@ const CellInput: React.FC<CellInputProps> = ({ item, colKey, value, onChange, is
     />
   );
 };
+
+// ─── Edit Mode cell — clickable to select + toggle disable + merge ─────────
+
+interface EditCellProps {
+  isDisabled: boolean;
+  isSelected: boolean;
+  colspan: number;
+  onClick: () => void;
+  label?: React.ReactNode;
+}
+
+const EditCell: React.FC<EditCellProps> = ({ isDisabled, isSelected, colspan, onClick, label }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      'w-full min-h-[28px] text-[10px] font-medium rounded transition-all flex items-center justify-center gap-1',
+      isDisabled
+        ? 'bg-slate-200 text-slate-400 hover:bg-slate-300'
+        : 'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200',
+      isSelected ? 'ring-2 ring-amber-400 ring-offset-1' : '',
+    )}
+    title={isDisabled ? 'Klik untuk aktifkan cell' : 'Klik untuk disable cell'}
+  >
+    {colspan > 1 && <MoveHorizontal size={10} />}
+    {label ?? (isDisabled ? <Ban size={10} /> : <Check size={10} />)}
+    {colspan > 1 && <span className="font-bold">×{colspan}</span>}
+  </button>
+);
 
 // ─── Inline structure-edit popover for parameter rename ───────────────────
 
@@ -287,6 +323,222 @@ const RowActionBtn: React.FC<{
   </button>
 );
 
+// ─── Add panel modal ──────────────────────────────────────────────────────
+
+interface AddPanelModalProps {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (panel: TfpAobGroundPanel) => void;
+  existingIds: string[];
+}
+
+const AddPanelModal: React.FC<AddPanelModalProps> = ({ open, onClose, onAdd, existingIds }) => {
+  const [label, setLabel] = useState('');
+  const [subs, setSubs] = useState<{ label: string }[]>([{ label: 'Input' }, { label: 'Output' }]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setLabel(''); setSubs([{ label: 'Input' }, { label: 'Output' }]); setError(null);
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const submit = () => {
+    setError(null);
+    const trimmedLabel = label.trim();
+    if (!trimmedLabel) { setError('Nama panel wajib diisi.'); return; }
+
+    const id = slugify(trimmedLabel);
+    if (!id) { setError('Nama panel tidak valid (harus mengandung huruf/angka).'); return; }
+    if (existingIds.includes(id)) { setError(`Panel dengan id "${id}" sudah ada.`); return; }
+
+    const cleanSubs = subs
+      .map((s) => ({ label: s.label.trim() }))
+      .filter((s) => s.label !== '');
+    if (cleanSubs.length === 0) { setError('Minimal 1 sub-kolom.'); return; }
+
+    // Make sub-keys unique within this panel
+    const subKeysSeen = new Set<string>();
+    const finalSubs: { key: string; label: string }[] = [];
+    for (const s of cleanSubs) {
+      let k = slugify(s.label) || 'col';
+      let base = k, n = 1;
+      while (subKeysSeen.has(k)) { k = `${base}_${++n}`; }
+      subKeysSeen.add(k);
+      finalSubs.push({ key: k, label: s.label });
+    }
+
+    onAdd({ id, label: trimmedLabel, sub_columns: finalSubs });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-fade-in" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <Columns size={16} className="text-sky-600" />
+            Tambah Panel Baru
+          </h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1 uppercase tracking-wider">Nama Panel</label>
+            <input
+              type="text" value={label} onChange={(e) => setLabel(e.target.value)} autoFocus
+              placeholder="misal: UPS TESCOM C"
+              className="w-full h-9 px-3 text-sm rounded border border-slate-300 focus:ring-1 focus:ring-sky-400 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Sub-Kolom</label>
+              <button
+                type="button"
+                onClick={() => setSubs([...subs, { label: '' }])}
+                className="text-[11px] text-sky-600 hover:text-sky-700 inline-flex items-center gap-1"
+              >
+                <Plus size={11} /> Tambah sub-kolom
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              {subs.map((s, i) => (
+                <div key={i} className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={s.label}
+                    onChange={(e) => {
+                      const next = [...subs]; next[i].label = e.target.value; setSubs(next);
+                    }}
+                    placeholder={`Sub-kolom ${i + 1}`}
+                    className="flex-1 h-8 px-2.5 text-xs rounded border border-slate-300 focus:ring-1 focus:ring-sky-400 focus:outline-none"
+                  />
+                  {subs.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setSubs(subs.filter((_, j) => j !== i))}
+                      className="h-8 w-8 rounded text-red-500 hover:bg-red-50 inline-flex items-center justify-center"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {error && (
+            <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2.5 py-1.5 flex items-center gap-1.5">
+              <AlertCircle size={12} /> {error}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button" onClick={onClose}
+            className="px-3 py-1.5 text-xs font-semibold rounded bg-white border border-slate-300 text-slate-600 hover:bg-slate-50"
+          >Batal</button>
+          <button
+            type="button" onClick={submit}
+            className="px-3 py-1.5 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700"
+          >
+            <Plus size={13} className="inline mr-1" /> Tambah Panel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Panel/Sub-column header in Edit Mode ──────────────────────────────────
+
+interface PanelHeaderEditProps {
+  panel: TfpAobGroundPanel;
+  onRename: (newLabel: string) => void;
+  onDelete: () => void;
+  onAddSub: () => void;
+  onRenameSub: (subKey: string, newLabel: string) => void;
+  canDeletePanel: boolean;
+}
+
+const PanelHeaderEdit: React.FC<PanelHeaderEditProps> = ({
+  panel, onRename, onDelete, onAddSub, onRenameSub, canDeletePanel,
+}) => {
+  const [editingPanel, setEditingPanel] = useState(false);
+  const [panelDraft, setPanelDraft] = useState(panel.label);
+  const [editingSub, setEditingSub] = useState<string | null>(null);
+  const [subDraft, setSubDraft] = useState('');
+
+  return (
+    <th colSpan={panel.sub_columns.length} className="px-2 py-2 text-center font-semibold border-b border-l border-amber-300 text-[10px] uppercase tracking-wider bg-amber-100 text-amber-900">
+      {editingPanel ? (
+        <div className="flex gap-1 items-center justify-center">
+          <input
+            autoFocus value={panelDraft} onChange={(e) => setPanelDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { onRename(panelDraft.trim()); setEditingPanel(false); }
+              if (e.key === 'Escape') { setEditingPanel(false); setPanelDraft(panel.label); }
+            }}
+            className="h-7 px-2 text-[11px] rounded border border-amber-400 bg-white text-slate-700 focus:outline-none w-32"
+          />
+          <button type="button" onClick={() => { onRename(panelDraft.trim()); setEditingPanel(false); }} className="text-emerald-600 hover:bg-emerald-100 rounded p-0.5"><Check size={12} /></button>
+          <button type="button" onClick={() => { setEditingPanel(false); setPanelDraft(panel.label); }} className="text-slate-500 hover:bg-slate-100 rounded p-0.5"><X size={12} /></button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-center gap-1">
+          <span>{panel.label}</span>
+          <button
+            type="button" title="Rename panel"
+            onClick={() => { setPanelDraft(panel.label); setEditingPanel(true); }}
+            className="text-amber-700 hover:bg-amber-200 rounded p-0.5"
+          ><Pencil size={10} /></button>
+          <button
+            type="button" title="Tambah sub-kolom"
+            onClick={onAddSub}
+            className="text-sky-700 hover:bg-sky-100 rounded p-0.5"
+          ><Plus size={11} /></button>
+          {canDeletePanel && (
+            <button
+              type="button" title="Hapus panel"
+              onClick={onDelete}
+              className="text-red-500 hover:bg-red-100 rounded p-0.5"
+            ><Trash2 size={10} /></button>
+          )}
+        </div>
+      )}
+
+      {/* Sub-column editor row appears inline below — only the inline editing of one sub at a time */}
+      {editingSub !== null && (() => {
+        const sub = panel.sub_columns.find((s) => s.key === editingSub);
+        if (!sub) return null;
+        return (
+          <div className="mt-1.5 flex gap-1 items-center justify-center">
+            <input
+              autoFocus value={subDraft} onChange={(e) => setSubDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { onRenameSub(sub.key, subDraft.trim()); setEditingSub(null); }
+                if (e.key === 'Escape') { setEditingSub(null); }
+              }}
+              placeholder={`Rename "${sub.label}"`}
+              className="h-7 px-2 text-[11px] rounded border border-amber-400 bg-white text-slate-700 focus:outline-none w-28"
+            />
+            <button type="button" onClick={() => { onRenameSub(sub.key, subDraft.trim()); setEditingSub(null); }} className="text-emerald-600 hover:bg-emerald-100 rounded p-0.5"><Check size={11} /></button>
+            <button type="button" onClick={() => setEditingSub(null)} className="text-slate-500 hover:bg-slate-100 rounded p-0.5"><X size={11} /></button>
+          </div>
+        );
+      })()}
+    </th>
+  );
+};
+
 // ─── Main component ────────────────────────────────────────────────────────
 
 export const TfpAobGroundDetailPage: React.FC = () => {
@@ -294,8 +546,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Edit Mode permission — only roles that own structural changes can toggle it.
-  // Teknisi can still edit values + sign, just not rename/add/delete/reorder.
+  // Edit Mode permission
   const canEditStructure =
     user?.role === 'Admin' ||
     user?.role === 'Manager Teknik' ||
@@ -304,16 +555,15 @@ export const TfpAobGroundDetailPage: React.FC = () => {
   const [record, setRecord] = useState<TfpAobGroundRecordDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingStructure, setIsSavingStructure] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Local editable state for value cells
-  const [itemValues, setItemValues] = useState<Record<number, Record<ItemColKey, string>>>({});
+  // Editable cell values: { itemId: { cellKey: stringValue } }
+  const [itemValues, setItemValues] = useState<Record<number, Record<string, string>>>({});
   const [facilityValues, setFacilityValues] = useState<
     Record<number, { kondisi: string; keterangan: string }>
   >({});
-
-  // Editable jam pengisian. Default = server-current time_filled (or now() if blank).
   const [timeFilled, setTimeFilled] = useState<string>('');
 
   // Edit Mode state
@@ -321,6 +571,37 @@ export const TfpAobGroundDetailPage: React.FC = () => {
   const [editingParamId, setEditingParamId] = useState<number | null>(null);
   const [editingFacilityId, setEditingFacilityId] = useState<number | null>(null);
   const [editingFacilityName, setEditingFacilityName] = useState('');
+
+  // Structural draft state (only used while in Edit Mode, persisted via Simpan Struktur)
+  const [draftConfig, setDraftConfig] = useState<TfpAobGroundColumnsConfig | null>(null);
+  const [draftItemMeta, setDraftItemMeta] = useState<Record<number, {
+    is_disabled_map: Record<string, boolean>;
+    merge_map: Record<string, number>;
+  }>>({});
+  const [showAddPanel, setShowAddPanel] = useState(false);
+
+  // ─── Data loading ───────────────────────────────────────────────────────
+
+  const hydrate = (data: TfpAobGroundRecordDetail) => {
+    setRecord(data);
+    setTimeFilled(data.time_filled ?? new Date().toTimeString().slice(0, 5));
+
+    const iv: Record<number, Record<string, string>> = {};
+    data.items.forEach((item) => {
+      iv[item.id] = { ...(item.values ?? {}) };
+    });
+    setItemValues(iv);
+
+    const fv: Record<number, { kondisi: string; keterangan: string }> = {};
+    data.facilities.forEach((f) => {
+      fv[f.id] = { kondisi: f.kondisi ?? '', keterangan: f.keterangan ?? '' };
+    });
+    setFacilityValues(fv);
+
+    // Reset structural draft to server state whenever we re-hydrate
+    setDraftConfig(null);
+    setDraftItemMeta({});
+  };
 
   const fetchRecord = useCallback(async () => {
     if (!id) return;
@@ -335,46 +616,58 @@ export const TfpAobGroundDetailPage: React.FC = () => {
     }
   }, [id]);
 
-  // Centralized hydration so all callers (initial fetch, save, sign, structure ops)
-  // re-seed local state consistently from the server payload.
-  const hydrate = (data: TfpAobGroundRecordDetail) => {
-    setRecord(data);
-    // Seed editable time from server snapshot. Falls back to current HH:MM when unset.
-    setTimeFilled(data.time_filled ?? new Date().toTimeString().slice(0, 5));
-    const iv: Record<number, Record<ItemColKey, string>> = {};
-    data.items.forEach((item) => {
-      iv[item.id] = {
-        panel_cos_a03_input: item.panel_cos_a03_input ?? '',
-        panel_cos_a03_output: item.panel_cos_a03_output ?? '',
-        panel_ats_a12_input: item.panel_ats_a12_input ?? '',
-        panel_ats_a12_output: item.panel_ats_a12_output ?? '',
-        ups_tescom_a_input: item.ups_tescom_a_input ?? '',
-        ups_tescom_a_output: item.ups_tescom_a_output ?? '',
-        ups_tescom_b_input: item.ups_tescom_b_input ?? '',
-        ups_tescom_b_output: item.ups_tescom_b_output ?? '',
-      };
-    });
-    setItemValues(iv);
-
-    const fv: Record<number, { kondisi: string; keterangan: string }> = {};
-    data.facilities.forEach((f) => {
-      fv[f.id] = {
-        kondisi: f.kondisi ?? '',
-        keterangan: f.keterangan ?? '',
-      };
-    });
-    setFacilityValues(fv);
-  };
-
-  useEffect(() => {
-    void fetchRecord();
-  }, [fetchRecord]);
+  useEffect(() => { void fetchRecord(); }, [fetchRecord]);
 
   useEffect(() => {
     const onFocus = () => void fetchRecord();
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [fetchRecord]);
+
+  // ─── Computed: effective columns_config & per-item meta ────────────────
+
+  const effectiveConfig: TfpAobGroundColumnsConfig = useMemo(
+    () => draftConfig ?? record?.columns_config ?? [],
+    [draftConfig, record],
+  );
+
+  const flatCells = useMemo(() => flattenColumns(effectiveConfig), [effectiveConfig]);
+  const flatKeys = useMemo(() => flatCells.map((c) => c.key), [flatCells]);
+
+  const getItemDisabled = (itemId: number, cellKey: string): boolean => {
+    const draft = draftItemMeta[itemId];
+    if (draft) return draft.is_disabled_map[cellKey] === true;
+    const item = record?.items.find((it) => it.id === itemId);
+    return item?.is_disabled_map?.[cellKey] === true;
+  };
+
+  const getItemMerge = (itemId: number, cellKey: string): number => {
+    const draft = draftItemMeta[itemId];
+    if (draft) return draft.merge_map[cellKey] ?? 1;
+    const item = record?.items.find((it) => it.id === itemId);
+    return item?.merge_map?.[cellKey] ?? 1;
+  };
+
+  // Mutate draft for an item — copies-from-server lazily on first touch
+  const mutateItemMeta = (itemId: number, fn: (m: { is_disabled_map: Record<string, boolean>; merge_map: Record<string, number> }) => void) => {
+    setDraftItemMeta((prev) => {
+      const existing = prev[itemId] ?? (() => {
+        const it = record?.items.find((x) => x.id === itemId);
+        return {
+          is_disabled_map: { ...(it?.is_disabled_map ?? {}) },
+          merge_map: { ...(it?.merge_map ?? {}) },
+        };
+      })();
+      const next = {
+        is_disabled_map: { ...existing.is_disabled_map },
+        merge_map: { ...existing.merge_map },
+      };
+      fn(next);
+      return { ...prev, [itemId]: next };
+    });
+  };
+
+  // ─── Value save (regular update) ───────────────────────────────────────
 
   const handleSave = async () => {
     if (!record) return;
@@ -384,7 +677,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
     try {
       const itemsPayload = record.items.map((item) => ({
         id: item.id,
-        ...itemValues[item.id],
+        values: itemValues[item.id] ?? {},
       }));
       const facilitiesPayload = record.facilities.map((f) => ({
         id: f.id,
@@ -392,7 +685,6 @@ export const TfpAobGroundDetailPage: React.FC = () => {
         keterangan: facilityValues[f.id]?.keterangan || null,
       }));
 
-      // Only send time_filled when it actually parses to HH:MM — backend rejects malformed.
       const isValidTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(timeFilled.trim());
 
       const updated = await tfpAobGroundService.updateRecord(record.id, {
@@ -415,24 +707,138 @@ export const TfpAobGroundDetailPage: React.FC = () => {
     }
   };
 
-  const setItemCell = (itemId: number, colKey: ItemColKey, val: string) => {
-    setItemValues((prev) => ({
-      ...prev,
-      [itemId]: { ...prev[itemId], [colKey]: val },
+  // ─── Structure save (batch "Simpan Struktur") ─────────────────────────
+
+  const isStructureDirty = draftConfig !== null || Object.keys(draftItemMeta).length > 0;
+
+  const handleSaveStructure = async () => {
+    if (!record || !isStructureDirty) return;
+    setIsSavingStructure(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const config = draftConfig ?? record.columns_config;
+      const itemPatches = record.items.map((it) => {
+        const draft = draftItemMeta[it.id];
+        return {
+          id: it.id,
+          is_disabled_map: draft?.is_disabled_map ?? it.is_disabled_map ?? {},
+          merge_map: draft?.merge_map ?? it.merge_map ?? {},
+        };
+      });
+      const updated = await tfpAobGroundService.saveStructure(record.id, {
+        columns_config: config,
+        items: itemPatches,
+      });
+      hydrate(updated);
+      setSuccessMessage('Struktur tabel berhasil disimpan.');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response) {
+        const data = err.response.data as { message?: string };
+        setErrorMessage(data.message ?? 'Gagal menyimpan struktur.');
+      } else {
+        setErrorMessage('Gagal menyimpan struktur. Coba lagi.');
+      }
+    } finally {
+      setIsSavingStructure(false);
+    }
+  };
+
+  const handleResetStructure = () => {
+    setDraftConfig(null);
+    setDraftItemMeta({});
+  };
+
+  // ─── Cell + panel edit actions (Edit Mode) ─────────────────────────────
+
+  // Toggle disabled on a single cell across all rows is too aggressive.
+  // We let user click each cell per-row, which is the Excel-correct model.
+  const toggleCellDisabled = (itemId: number, cellKey: string) => {
+    mutateItemMeta(itemId, (m) => {
+      if (m.is_disabled_map[cellKey]) {
+        delete m.is_disabled_map[cellKey];
+      } else {
+        m.is_disabled_map[cellKey] = true;
+        // Disabling a cell also drops it from any merge group starting at it
+        delete m.merge_map[cellKey];
+      }
+    });
+  };
+
+  // Merge right: extend colspan of cell at `cellKey` by 1.
+  // Skip if next neighbor is disabled, in another merge, or doesn't exist.
+  const mergeCellRight = (itemId: number, cellKey: string) => {
+    const idx = flatKeys.indexOf(cellKey);
+    if (idx < 0) return;
+
+    const draft = draftItemMeta[itemId] ?? {
+      is_disabled_map: { ...(record?.items.find((x) => x.id === itemId)?.is_disabled_map ?? {}) },
+      merge_map: { ...(record?.items.find((x) => x.id === itemId)?.merge_map ?? {}) },
+    };
+    const currentSpan = draft.merge_map[cellKey] ?? 1;
+    const nextIdx = idx + currentSpan;
+    if (nextIdx >= flatKeys.length) return;
+
+    const nextKey = flatKeys[nextIdx];
+    if (draft.is_disabled_map[nextKey]) return;
+    if (draft.merge_map[nextKey]) return; // can't absorb a starting cell
+
+    mutateItemMeta(itemId, (m) => {
+      m.merge_map[cellKey] = currentSpan + 1;
+    });
+  };
+
+  const unmergeCell = (itemId: number, cellKey: string) => {
+    mutateItemMeta(itemId, (m) => {
+      delete m.merge_map[cellKey];
+    });
+  };
+
+  // Columns_config mutations operate on draftConfig (initialized from server config)
+  const mutateConfig = (fn: (cfg: TfpAobGroundColumnsConfig) => TfpAobGroundColumnsConfig) => {
+    setDraftConfig((prev) => {
+      const base = prev ?? (record?.columns_config ?? []);
+      return fn(JSON.parse(JSON.stringify(base)));
+    });
+  };
+
+  const handleRenamePanel = (panelId: string, newLabel: string) => {
+    if (!newLabel.trim()) return;
+    mutateConfig((cfg) => cfg.map((p) => p.id === panelId ? { ...p, label: newLabel.trim() } : p));
+  };
+
+  const handleDeletePanel = (panelId: string) => {
+    if (!window.confirm('Hapus panel ini dan semua sub-kolomnya? Nilai yang sudah diisi pada panel ini akan ikut hilang setelah Simpan Struktur.')) return;
+    mutateConfig((cfg) => cfg.filter((p) => p.id !== panelId));
+  };
+
+  const handleAddSubColumn = (panelId: string) => {
+    const label = window.prompt('Nama sub-kolom baru:');
+    if (!label || !label.trim()) return;
+    mutateConfig((cfg) => cfg.map((p) => {
+      if (p.id !== panelId) return p;
+      const seen = new Set(p.sub_columns.map((s) => s.key));
+      let k = slugify(label) || 'col';
+      const base = k; let n = 1;
+      while (seen.has(k)) { k = `${base}_${++n}`; }
+      return { ...p, sub_columns: [...p.sub_columns, { key: k, label: label.trim() }] };
     }));
   };
 
-  const setFacilityField = (facilityId: number, field: 'kondisi' | 'keterangan', val: string) => {
-    setFacilityValues((prev) => ({
-      ...prev,
-      [facilityId]: { ...prev[facilityId], [field]: val },
+  const handleRenameSubColumn = (panelId: string, subKey: string, newLabel: string) => {
+    if (!newLabel.trim()) return;
+    mutateConfig((cfg) => cfg.map((p) => {
+      if (p.id !== panelId) return p;
+      return { ...p, sub_columns: p.sub_columns.map((s) => s.key === subKey ? { ...s, label: newLabel.trim() } : s) };
     }));
   };
 
-  // ─── Structure ops (Edit Mode) ─────────────────────────────────────────
-  // All ops refresh from the server payload so sort_order + ids stay accurate.
-  // Errors surface as a top-of-page banner; the action button is its own
-  // try/catch boundary to keep the rest of the table interactive.
+  const handleAddPanel = (panel: TfpAobGroundPanel) => {
+    mutateConfig((cfg) => [...cfg, panel]);
+  };
+
+  // ─── Existing structure ops (parameters / facilities CRUD via dedicated endpoints) ──
 
   const withStructureError = async (fn: () => Promise<TfpAobGroundRecordDetail>) => {
     setErrorMessage(null);
@@ -489,6 +895,14 @@ export const TfpAobGroundDetailPage: React.FC = () => {
     void withStructureError(() => tfpAobGroundService.reorderFacilities(record.id, ids));
   };
 
+  const setItemCell = (itemId: number, cellKey: string, val: string) => {
+    setItemValues((prev) => ({ ...prev, [itemId]: { ...prev[itemId], [cellKey]: val } }));
+  };
+
+  const setFacilityField = (facilityId: number, field: 'kondisi' | 'keterangan', val: string) => {
+    setFacilityValues((prev) => ({ ...prev, [facilityId]: { ...prev[facilityId], [field]: val } }));
+  };
+
   // ─── Render ─────────────────────────────────────────────────────────────
 
   if (isLoading) {
@@ -516,28 +930,16 @@ export const TfpAobGroundDetailPage: React.FC = () => {
   const isCompleted = record.status === 'completed';
   const showStructureControls = editMode && canEditStructure && !isCompleted;
 
-  // Width of "Aksi" column when Edit Mode is on
+  const totalCellCount = flatCells.length;
   const aksiColWidth = showStructureControls ? 132 : 0;
 
   return (
     <div className="max-w-full space-y-6 animate-fade-in pb-20">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-slate-500">
-        <button
-          type="button"
-          onClick={() => navigate('/tfp')}
-          className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors"
-        >
-          TFP
-        </button>
+        <button type="button" onClick={() => navigate('/tfp')} className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors">TFP</button>
         <span>/</span>
-        <button
-          type="button"
-          onClick={() => navigate('/tfp/aob-ground')}
-          className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors"
-        >
-          Performance Check AOB Ground
-        </button>
+        <button type="button" onClick={() => navigate('/tfp/aob-ground')} className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors">Performance Check AOB Ground</button>
         <span>/</span>
         <span className="text-slate-700 font-mono font-medium">{record.form_number}</span>
       </div>
@@ -546,24 +948,16 @@ export const TfpAobGroundDetailPage: React.FC = () => {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/tfp/aob-ground')}
-              className="hover:bg-slate-100 mt-0.5"
-            >
+            <Button variant="ghost" size="sm" onClick={() => navigate('/tfp/aob-ground')} className="hover:bg-slate-100 mt-0.5">
               <ArrowLeft size={20} />
             </Button>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg font-bold text-slate-900">
-                  Performance Check AOB Lantai Ground
-                </h1>
+                <h1 className="text-lg font-bold text-slate-900">Performance Check AOB Lantai Ground</h1>
                 <StatusBadge status={record.status} variant="pill" />
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                TFP — Cabang Surabaya &nbsp;·&nbsp;
-                <span className="font-mono">{record.form_number}</span>
+                TFP — Cabang Surabaya &nbsp;·&nbsp;<span className="font-mono">{record.form_number}</span>
               </p>
             </div>
           </div>
@@ -575,7 +969,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
               <span className="font-medium">{record.day_name ?? ''}</span>
               <span>{record.date}</span>
             </div>
-            {/* Editable jam pengisian — default = server time, user dapat ubah HH:MM */}
+
             {isCompleted ? (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
                 <Clock size={13} className="text-slate-400" />
@@ -585,9 +979,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
               <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg" title="Klik untuk ubah jam pengisian (HH:MM)">
                 <Clock size={13} className="text-slate-400" />
                 <input
-                  type="time"
-                  value={timeFilled}
-                  onChange={(e) => setTimeFilled(e.target.value)}
+                  type="time" value={timeFilled} onChange={(e) => setTimeFilled(e.target.value)}
                   className="bg-transparent text-xs text-slate-700 font-medium focus:outline-none w-[68px]"
                 />
                 <button
@@ -600,13 +992,13 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                 </button>
               </div>
             )}
+
             <ShiftBadge shift={record.shift_type} />
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
               <Users size={13} className="text-slate-400" />
               <span>{record.technicians.length} Teknisi TFP</span>
             </div>
 
-            {/* Edit Mode toggle — Manager/Supervisor/Admin only, hidden when completed */}
             {canEditStructure && !isCompleted && (
               <button
                 type="button"
@@ -614,6 +1006,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                   setEditMode((v) => !v);
                   setEditingParamId(null);
                   setEditingFacilityId(null);
+                  if (editMode) handleResetStructure();
                 }}
                 className={cn(
                   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors',
@@ -621,7 +1014,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                     ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600'
                     : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50',
                 )}
-                title="Aktifkan Edit Mode untuk mengubah struktur parameter & fasilitas"
+                title="Edit Mode: ubah struktur tabel seperti Excel"
               >
                 <Settings2 size={14} />
                 {editMode ? 'Selesai Edit' : 'Edit Mode'}
@@ -629,8 +1022,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
             )}
 
             <Button
-              variant="ghost"
-              size="sm"
+              variant="ghost" size="sm"
               onClick={() => navigate(`/tfp/aob-ground/${record.id}/print`)}
               className="gap-1.5 text-indigo-600 hover:bg-indigo-50"
             >
@@ -643,46 +1035,52 @@ export const TfpAobGroundDetailPage: React.FC = () => {
         {/* Personnel summary */}
         <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <div>
-            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">
-              Manager Teknik
-            </span>
+            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Manager Teknik</span>
             <p className="mt-0.5 font-medium text-slate-700">
               {record.manager?.name ?? <span className="text-slate-400 italic">Tidak ditugaskan</span>}
             </p>
           </div>
           <div>
-            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">
-              Supervisor TFP
-            </span>
+            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Supervisor TFP</span>
             <p className="mt-0.5 font-medium text-slate-700">
               {record.supervisor?.name ?? <span className="text-slate-400 italic">Tidak ditugaskan</span>}
             </p>
           </div>
           <div>
-            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">
-              Pelaksana Teknisi TFP
-            </span>
+            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Pelaksana Teknisi TFP</span>
             <p className="mt-0.5 font-medium text-slate-700">
-              {record.technicians.map((t) => t.technician_name).join(', ') || (
-                <span className="text-slate-400 italic">—</span>
-              )}
+              {record.technicians.map((t) => t.technician_name).join(', ') || <span className="text-slate-400 italic">—</span>}
             </p>
           </div>
         </div>
 
-        {/* Edit Mode hint banner */}
+        {/* Edit Mode hint banner + Simpan Struktur bar */}
         {showStructureControls && (
-          <div className="mt-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-center gap-2">
+          <div className="mt-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-center gap-2 flex-wrap">
             <Settings2 size={13} className="text-amber-600 shrink-0" />
-            <span>
-              <strong>Edit Mode aktif.</strong> Manager/Supervisor dapat rename, tambah, hapus, dan reorder parameter & fasilitas.
-              Pengisian nilai cell tidak dinonaktifkan.
+            <span className="flex-1 min-w-[200px]">
+              <strong>Edit Mode aktif (mirip Excel).</strong> Klik cell untuk disable/enable, tombol <MoveHorizontal size={11} className="inline" /> untuk merge ke kanan, atau klik header panel untuk rename / tambah sub-kolom.
             </span>
+            {isStructureDirty && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button" onClick={handleResetStructure} disabled={isSavingStructure}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <Eraser size={11} /> Batal
+                </button>
+                <button
+                  type="button" onClick={handleSaveStructure} disabled={isSavingStructure}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  <Save size={11} /> {isSavingStructure ? 'Menyimpan…' : 'Simpan Struktur'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Error / Success messages */}
       {errorMessage && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {errorMessage}
@@ -703,48 +1101,64 @@ export const TfpAobGroundDetailPage: React.FC = () => {
             <Zap size={16} className="text-amber-600" />
             <h2 className="text-sm font-bold text-slate-800">Parameter Pengukuran</h2>
             <span className="ml-auto text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-              {record.items.length} parameter
+              {record.items.length} parameter · {effectiveConfig.length} panel
             </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse min-w-[800px]" style={{ tableLayout: 'fixed' }}>
-              <colgroup>
-                <col style={{ width: '32px' }} />
-                <col style={{ width: '150px' }} />
-                <col style={{ width: '62px' }} />
-                <col style={{ width: '62px' }} />
-                <col style={{ width: '62px' }} />
-                <col style={{ width: '62px' }} />
-                <col style={{ width: '62px' }} />
-                <col style={{ width: '62px' }} />
-                <col style={{ width: '62px' }} />
-                <col style={{ width: '62px' }} />
-                {showStructureControls && <col style={{ width: `${aksiColWidth}px` }} />}
-              </colgroup>
+            <table className="w-full text-xs border-collapse" style={{ minWidth: Math.max(800, 220 + totalCellCount * 70 + aksiColWidth) }}>
               <thead>
+                {/* Panel header row */}
                 <tr className="bg-slate-100 text-slate-700">
-                  <th rowSpan={2} className="px-2 py-2 text-center font-semibold border-b border-slate-200 align-middle text-[10px] uppercase tracking-wider">No</th>
-                  <th rowSpan={2} className="px-3 py-2 text-left font-semibold border-b border-slate-200 align-middle text-[10px] uppercase tracking-wider">Parameter</th>
-                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border-b border-l border-slate-200 text-[10px] uppercase tracking-wider">Panel COS (A 03)</th>
-                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border-b border-l border-slate-200 text-[10px] uppercase tracking-wider">Panel ATS (A 12)</th>
-                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border-b border-l border-slate-200 text-[10px] uppercase tracking-wider">UPS TESCOM A</th>
-                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border-b border-l border-slate-200 text-[10px] uppercase tracking-wider">UPS TESCOM B</th>
+                  <th rowSpan={2} className="px-2 py-2 text-center font-semibold border-b border-slate-200 align-middle text-[10px] uppercase tracking-wider w-[40px]">No</th>
+                  <th rowSpan={2} className="px-3 py-2 text-left font-semibold border-b border-slate-200 align-middle text-[10px] uppercase tracking-wider w-[180px]">Parameter</th>
+                  {effectiveConfig.map((panel) => (
+                    showStructureControls ? (
+                      <PanelHeaderEdit
+                        key={panel.id}
+                        panel={panel}
+                        onRename={(lbl) => handleRenamePanel(panel.id, lbl)}
+                        onDelete={() => handleDeletePanel(panel.id)}
+                        onAddSub={() => handleAddSubColumn(panel.id)}
+                        onRenameSub={(k, lbl) => handleRenameSubColumn(panel.id, k, lbl)}
+                        canDeletePanel={effectiveConfig.length > 1}
+                      />
+                    ) : (
+                      <th key={panel.id} colSpan={panel.sub_columns.length}
+                        className="px-2 py-2 text-center font-semibold border-b border-l border-slate-200 text-[10px] uppercase tracking-wider">
+                        {panel.label}
+                      </th>
+                    )
+                  ))}
                   {showStructureControls && (
-                    <th rowSpan={2} className="px-2 py-2 text-center font-semibold border-b border-l border-slate-200 align-middle text-[10px] uppercase tracking-wider">Aksi</th>
+                    <th rowSpan={2} className="px-2 py-2 text-center font-semibold border-b border-l border-slate-200 align-middle text-[10px] uppercase tracking-wider" style={{ width: aksiColWidth }}>Aksi</th>
                   )}
                 </tr>
+                {/* Sub-column header row */}
                 <tr className="bg-slate-50 text-slate-500">
-                  {['Input', 'Output', 'Input', 'Output', 'Input', 'Output', 'Input', 'Output'].map((lbl, i) => (
-                    <th
-                      key={i}
-                      className={cn(
-                        'px-1 py-1.5 text-center font-medium border-b border-slate-200 text-[10px] uppercase tracking-wider',
-                        i % 2 === 0 ? 'border-l' : '',
-                      )}
-                    >
-                      {lbl}
-                    </th>
-                  ))}
+                  {effectiveConfig.flatMap((panel, pi) =>
+                    panel.sub_columns.map((sub, si) => (
+                      <th key={cellKeyOf(panel.id, sub.key)}
+                        className={cn(
+                          'px-1 py-1.5 text-center font-medium border-b border-slate-200 text-[10px] uppercase tracking-wider',
+                          si === 0 ? 'border-l' : '',
+                          pi === 0 && si === 0 ? '' : '',
+                        )}
+                      >
+                        {showStructureControls && panel.sub_columns.length > 1 ? (
+                          <SubColumnHeader
+                            label={sub.label}
+                            onRename={(lbl) => handleRenameSubColumn(panel.id, sub.key, lbl)}
+                            onDelete={() => {
+                              if (!window.confirm(`Hapus sub-kolom "${sub.label}"?`)) return;
+                              mutateConfig((cfg) => cfg.map((p) => p.id === panel.id
+                                ? { ...p, sub_columns: p.sub_columns.filter((s) => s.key !== sub.key) }
+                                : p));
+                            }}
+                          />
+                        ) : sub.label}
+                      </th>
+                    ))
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -753,16 +1167,16 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                   const isFirstRow = idx === 0;
                   const isLastRow = idx === record.items.length - 1;
 
-                  // Render structure-edit row inline above the actual row when active
+                  const tdNo = 'px-2 py-2 text-slate-500 font-mono text-center text-[11px] border-b border-slate-100 align-middle';
+                  const tdName = 'px-3 py-2 font-medium text-slate-700 text-xs border-b border-slate-100 align-middle';
+                  const tdCell = 'px-1.5 py-1.5 border-b border-l border-slate-100 align-middle';
+
                   const editRow = editingParamId === item.id ? (
                     <tr key={`${item.id}-edit`}>
-                      <td colSpan={10 + (showStructureControls ? 1 : 0)} className="p-0">
+                      <td colSpan={2 + totalCellCount + (showStructureControls ? 1 : 0)} className="p-0">
                         <ParamEditForm
                           item={item}
-                          onSave={async (patch) => {
-                            await handleUpdateParameter(item.id, patch);
-                            setEditingParamId(null);
-                          }}
+                          onSave={async (patch) => { await handleUpdateParameter(item.id, patch); setEditingParamId(null); }}
                           onCancel={() => setEditingParamId(null)}
                         />
                       </td>
@@ -772,140 +1186,105 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                   const actionCell = showStructureControls ? (
                     <td className="px-1.5 py-1.5 border-b border-l border-slate-100">
                       <div className="flex items-center justify-center gap-0.5">
-                        <RowActionBtn
-                          title="Pindah atas" disabled={isFirstRow}
-                          onClick={() => handleMoveParameter(idx, -1)}
-                        ><ChevronUp size={14} /></RowActionBtn>
-                        <RowActionBtn
-                          title="Pindah bawah" disabled={isLastRow}
-                          onClick={() => handleMoveParameter(idx, 1)}
-                        ><ChevronDown size={14} /></RowActionBtn>
-                        <RowActionBtn
-                          title="Rename"
-                          onClick={() => setEditingParamId(editingParamId === item.id ? null : item.id)}
-                        ><Pencil size={12} /></RowActionBtn>
-                        <RowActionBtn
-                          title="Hapus" variant="danger"
-                          onClick={() => handleDeleteParameter(item.id, item.parameter_name)}
-                        ><Trash2 size={12} /></RowActionBtn>
+                        <RowActionBtn title="Pindah atas" disabled={isFirstRow} onClick={() => handleMoveParameter(idx, -1)}><ChevronUp size={14} /></RowActionBtn>
+                        <RowActionBtn title="Pindah bawah" disabled={isLastRow} onClick={() => handleMoveParameter(idx, 1)}><ChevronDown size={14} /></RowActionBtn>
+                        <RowActionBtn title="Rename" onClick={() => setEditingParamId(editingParamId === item.id ? null : item.id)}><Pencil size={12} /></RowActionBtn>
+                        <RowActionBtn title="Hapus" variant="danger" onClick={() => handleDeleteParameter(item.id, item.parameter_name)}><Trash2 size={12} /></RowActionBtn>
                       </div>
                     </td>
                   ) : null;
 
-                  // Shared cell classes for consistency across all row variants
-                  const tdNo = 'px-2 py-2 text-slate-500 font-mono text-center text-[11px] border-b border-slate-100';
-                  const tdName = 'px-3 py-2 font-medium text-slate-700 text-xs border-b border-slate-100';
-                  const tdCell = 'px-1.5 py-1.5 border-b border-l border-slate-100';
+                  // Render dynamic cells (skip those consumed by merge)
+                  const skipKeys = new Set<string>();
+                  const renderedCells: React.ReactNode[] = [];
+                  const modeRow = isModeRow(item);
+                  const suplaiRow = isSuplaiRow(item);
 
-                  // ── Row 18: Mode ──
-                  if (isModeRow(item)) {
-                    const cosVal = itemValues[item.id]?.panel_cos_a03_input ?? '';
-                    const atsVal = itemValues[item.id]?.panel_ats_a12_input ?? '';
-                    return (
-                      <React.Fragment key={item.id}>
-                        <tr className={rowBase}>
-                          <td className={tdNo}>{idx + 1}</td>
-                          <td className={tdName}>
-                            {item.parameter_name}
-                            <span className="text-slate-400 ml-1 text-[10px]">(Auto/Manual)</span>
-                          </td>
-                          <td colSpan={2} className={cn(tdCell, 'text-center')}>
-                            {isCompleted ? (
-                              <span className="text-xs text-slate-700 font-semibold">{cosVal || '—'}</span>
-                            ) : (
-                              <ToggleButtonGroup
-                                options={['Auto', 'Manual']} value={cosVal} variant="mode"
-                                onChange={(v) => setItemCell(item.id, 'panel_cos_a03_input', v)}
-                              />
+                  flatCells.forEach((cell) => {
+                    if (skipKeys.has(cell.key)) return;
+
+                    const colspan = getItemMerge(item.id, cell.key);
+                    const disabled = getItemDisabled(item.id, cell.key);
+
+                    for (let k = 1; k < colspan; k++) {
+                      const nxt = flatCells[cell.index + k];
+                      if (nxt) skipKeys.add(nxt.key);
+                    }
+
+                    if (showStructureControls) {
+                      // Edit Mode cell — click to toggle disable. Side controls for merge.
+                      renderedCells.push(
+                        <td key={cell.key} colSpan={colspan} className={tdCell}>
+                          <div className="flex items-center gap-0.5 justify-center">
+                            <EditCell
+                              isDisabled={disabled}
+                              isSelected={false}
+                              colspan={colspan}
+                              onClick={() => toggleCellDisabled(item.id, cell.key)}
+                            />
+                            {!disabled && (
+                              <div className="flex gap-0.5">
+                                <button
+                                  type="button"
+                                  title="Merge dengan cell di kanan"
+                                  onClick={() => mergeCellRight(item.id, cell.key)}
+                                  className="h-5 w-5 rounded text-slate-500 hover:bg-amber-100 hover:text-amber-700 inline-flex items-center justify-center"
+                                >
+                                  <MoveHorizontal size={10} />
+                                </button>
+                                {colspan > 1 && (
+                                  <button
+                                    type="button"
+                                    title="Pisah cell (unmerge)"
+                                    onClick={() => unmergeCell(item.id, cell.key)}
+                                    className="h-5 w-5 rounded text-slate-500 hover:bg-sky-100 hover:text-sky-700 inline-flex items-center justify-center"
+                                  >
+                                    <ColumnsIcon size={10} />
+                                  </button>
+                                )}
+                              </div>
                             )}
-                          </td>
-                          <td colSpan={2} className={cn(tdCell, 'text-center')}>
-                            {isCompleted ? (
-                              <span className="text-xs text-slate-700 font-semibold">{atsVal || '—'}</span>
-                            ) : (
-                              <ToggleButtonGroup
-                                options={['Auto', 'Manual']} value={atsVal} variant="mode"
-                                onChange={(v) => setItemCell(item.id, 'panel_ats_a12_input', v)}
-                              />
-                            )}
-                          </td>
-                          <td colSpan={2} className={cn(tdCell, 'bg-slate-100')} />
-                          <td colSpan={2} className={cn(tdCell, 'bg-slate-100')} />
-                          {actionCell}
-                        </tr>
-                        {editRow}
-                      </React.Fragment>
+                          </div>
+                        </td>
+                      );
+                      return;
+                    }
+
+                    // Normal value entry mode
+                    const val = itemValues[item.id]?.[cell.key] ?? '';
+
+                    // Mode/Suplai toggles when applicable — first enabled cell of each panel
+                    if ((modeRow || suplaiRow) && !disabled && colspan >= 1) {
+                      const isPLNATSPanel = suplaiRow && cell.panel.id === 'panel_ats_a12';
+                      let options: readonly string[];
+                      let variant: 'mode' | 'suplai' = modeRow ? 'mode' : 'suplai';
+                      if (modeRow) options = ['Auto', 'Manual'];
+                      else if (isPLNATSPanel) options = ['PLN 1', 'PLN 2'];
+                      else options = ['PLN', 'UPS'];
+
+                      renderedCells.push(
+                        <td key={cell.key} colSpan={colspan} className={cn(tdCell, 'text-center', disabled && 'bg-slate-100')}>
+                          {isCompleted ? (
+                            <span className="text-xs text-slate-700 font-semibold">{val || '—'}</span>
+                          ) : (
+                            <ToggleButtonGroup
+                              options={options} value={val} variant={variant}
+                              onChange={(v) => setItemCell(item.id, cell.key, v)}
+                            />
+                          )}
+                        </td>
+                      );
+                      return;
+                    }
+
+                    renderedCells.push(
+                      <td key={cell.key} colSpan={colspan} className={cn(tdCell, disabled && 'bg-slate-100')}>
+                        <CellInput isDisabled={disabled} isCompleted={isCompleted}
+                          value={val} onChange={(v) => setItemCell(item.id, cell.key, v)} />
+                      </td>
                     );
-                  }
+                  });
 
-                  // ── Row 19: Suplai Aktif ──
-                  if (isSuplaiRow(item)) {
-                    const cosVal = itemValues[item.id]?.panel_cos_a03_input ?? '';
-                    const atsVal = itemValues[item.id]?.panel_ats_a12_input ?? '';
-                    return (
-                      <React.Fragment key={item.id}>
-                        <tr className={rowBase}>
-                          <td className={tdNo}>{idx + 1}</td>
-                          <td className={tdName}>{item.parameter_name}</td>
-                          <td colSpan={2} className={cn(tdCell, 'text-center')}>
-                            {isCompleted ? (
-                              <span className="text-xs text-slate-700 font-semibold">{cosVal || '—'}</span>
-                            ) : (
-                              <ToggleButtonGroup
-                                options={['PLN', 'UPS']} value={cosVal} variant="suplai"
-                                onChange={(v) => setItemCell(item.id, 'panel_cos_a03_input', v)}
-                              />
-                            )}
-                          </td>
-                          <td colSpan={2} className={cn(tdCell, 'text-center')}>
-                            {isCompleted ? (
-                              <span className="text-xs text-slate-700 font-semibold">{atsVal || '—'}</span>
-                            ) : (
-                              <ToggleButtonGroup
-                                options={['PLN 1', 'PLN 2']} value={atsVal} variant="suplai"
-                                onChange={(v) => setItemCell(item.id, 'panel_ats_a12_input', v)}
-                              />
-                            )}
-                          </td>
-                          <td colSpan={2} className={cn(tdCell, 'bg-slate-100')} />
-                          <td colSpan={2} className={cn(tdCell, 'bg-slate-100')} />
-                          {actionCell}
-                        </tr>
-                        {editRow}
-                      </React.Fragment>
-                    );
-                  }
-
-                  // ── Rows 20-21: KWH / Suhu Eq. Room ──
-                  if (isSingleValueRow(item)) {
-                    const val = itemValues[item.id]?.panel_cos_a03_input ?? '';
-                    return (
-                      <React.Fragment key={item.id}>
-                        <tr className={rowBase}>
-                          <td className={tdNo}>{idx + 1}</td>
-                          <td className={tdName}>
-                            {item.parameter_name}
-                            {item.unit && <span className="text-slate-400 ml-1 text-[10px]">({item.unit})</span>}
-                          </td>
-                          <td colSpan={8} className={cn(tdCell, 'px-3')}>
-                            {isCompleted ? (
-                              <span className="text-xs text-slate-700">{val || '—'}</span>
-                            ) : (
-                              <input
-                                type="text" inputMode="decimal" value={val}
-                                onChange={(e) => setItemCell(item.id, 'panel_cos_a03_input', e.target.value)}
-                                className="w-48 h-7 px-2 text-xs rounded border border-slate-300 bg-white focus:ring-1 focus:ring-brand-primary focus:outline-none"
-                              />
-                            )}
-                          </td>
-                          {actionCell}
-                        </tr>
-                        {editRow}
-                      </React.Fragment>
-                    );
-                  }
-
-                  // ── Rows 1–17: normal cells ──
                   return (
                     <React.Fragment key={item.id}>
                       <tr className={rowBase}>
@@ -914,16 +1293,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                           {item.parameter_name}
                           {item.unit && <span className="text-slate-400 ml-1 text-[10px]">({item.unit})</span>}
                         </td>
-                        {ALL_COL_KEYS.map((colKey) => (
-                          <td key={colKey} className={cn(tdCell, isDisabled(item, colKey) ? 'bg-slate-100' : '')}>
-                            <CellInput
-                              item={item} colKey={colKey}
-                              value={itemValues[item.id]?.[colKey] ?? ''}
-                              onChange={(val) => setItemCell(item.id, colKey, val)}
-                              isCompleted={isCompleted}
-                            />
-                          </td>
-                        ))}
+                        {renderedCells}
                         {actionCell}
                       </tr>
                       {editRow}
@@ -934,11 +1304,24 @@ export const TfpAobGroundDetailPage: React.FC = () => {
             </table>
           </div>
 
-          {/* Inline "Add Parameter" form (Edit Mode only) */}
+          {/* Inline forms (Edit Mode only) */}
           {showStructureControls && (
-            <div className="border-t border-slate-200">
-              <AddParameterForm onSave={handleAddParameter} />
-            </div>
+            <>
+              <div className="border-t border-slate-200">
+                <AddParameterForm onSave={handleAddParameter} />
+              </div>
+              <div className="border-t border-slate-200 px-3 py-2 flex items-center justify-between bg-sky-50/40">
+                <span className="text-[11px] text-sky-700 font-medium flex items-center gap-1.5">
+                  <Columns size={12} /> Butuh panel baru? Tambahkan unit panel/UPS di sini.
+                </span>
+                <button
+                  type="button" onClick={() => setShowAddPanel(true)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded bg-sky-600 text-white hover:bg-sky-700"
+                >
+                  <Plus size={13} /> Tambah Panel
+                </button>
+              </div>
+            </>
           )}
         </div>
 
@@ -952,12 +1335,9 @@ export const TfpAobGroundDetailPage: React.FC = () => {
             </span>
           </div>
           <div className="divide-y divide-slate-100">
-            {/* Column headers */}
             <div className={cn(
               'grid gap-2 px-4 py-2 bg-slate-100 text-[10px] font-semibold text-slate-700 uppercase tracking-wider items-center border-b border-slate-200',
-              showStructureControls
-                ? 'grid-cols-[1fr_90px_1fr_88px]'
-                : 'grid-cols-[1fr_90px_1fr]',
+              showStructureControls ? 'grid-cols-[1fr_90px_1fr_88px]' : 'grid-cols-[1fr_90px_1fr]',
             )}>
               <span>Nama Fasilitas</span>
               <span className="text-center">Kondisi</span>
@@ -983,10 +1363,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                   setEditingFacilityId(facility.id);
                   setEditingFacilityName(facility.facility_name);
                 }}
-                onCancelEdit={() => {
-                  setEditingFacilityId(null);
-                  setEditingFacilityName('');
-                }}
+                onCancelEdit={() => { setEditingFacilityId(null); setEditingFacilityName(''); }}
                 onChangeEditingName={setEditingFacilityName}
                 onSaveEdit={async () => {
                   if (!editingFacilityName.trim()) return;
@@ -1000,7 +1377,6 @@ export const TfpAobGroundDetailPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Inline "Add Facility" form (Edit Mode only) */}
           {showStructureControls && (
             <div className="border-t border-slate-200">
               <AddFacilityForm onSave={handleAddFacility} />
@@ -1024,8 +1400,55 @@ export const TfpAobGroundDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Signature panel */}
       <TfpAobGroundSignaturePanel record={record} onUpdated={hydrate} />
+
+      <AddPanelModal
+        open={showAddPanel}
+        onClose={() => setShowAddPanel(false)}
+        onAdd={handleAddPanel}
+        existingIds={effectiveConfig.map((p) => p.id)}
+      />
+    </div>
+  );
+};
+
+// ─── SubColumnHeader — inline rename/delete for one sub-column ────────────
+
+const SubColumnHeader: React.FC<{
+  label: string;
+  onRename: (lbl: string) => void;
+  onDelete: () => void;
+}> = ({ label, onRename, onDelete }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(label);
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { onRename(draft.trim()); setEditing(false); }
+            if (e.key === 'Escape') { setDraft(label); setEditing(false); }
+          }}
+          className="h-6 px-1 text-[10px] rounded border border-amber-400 bg-white text-slate-700 focus:outline-none w-16"
+        />
+        <button type="button" onClick={() => { onRename(draft.trim()); setEditing(false); }} className="text-emerald-600 hover:bg-emerald-100 rounded p-0.5"><Check size={10} /></button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-0.5 justify-center group">
+      <span>{label}</span>
+      <button type="button" title="Rename" onClick={() => { setDraft(label); setEditing(true); }}
+        className="text-amber-600 hover:bg-amber-100 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Pencil size={9} />
+      </button>
+      <button type="button" title="Hapus sub-kolom" onClick={onDelete}
+        className="text-red-500 hover:bg-red-100 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Trash2 size={9} />
+      </button>
     </div>
   );
 };
@@ -1069,9 +1492,7 @@ const FacilityRow: React.FC<FacilityRowProps> = ({
     <div
       className={cn(
         'gap-2 px-4 py-2 items-center grid bg-white hover:bg-slate-50/60 transition-colors',
-        showStructureControls
-          ? 'grid-cols-[1fr_90px_1fr_88px]'
-          : 'grid-cols-[1fr_90px_1fr]',
+        showStructureControls ? 'grid-cols-[1fr_90px_1fr_88px]' : 'grid-cols-[1fr_90px_1fr]',
       )}
     >
       {isEditingStructure ? (

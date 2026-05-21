@@ -5,6 +5,7 @@ import type {
   TfpAobGroundRecordSummary,
   TfpAobGroundListParams,
   TfpAobGroundUpdatePayload,
+  TfpAobGroundSaveStructurePayload,
   TfpAobGroundRoleKey,
 } from '@/types/tfpAobGround';
 
@@ -177,6 +178,23 @@ export const tfpAobGroundService = {
     const response = await axios.put(
       `${API_URL}/v1/tfp/aob-ground/${id}/facilities-reorder`,
       { ordered_ids: orderedIds },
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  // ─── Excel-like structure save (Manager / Supervisor / Admin) ─────────────
+  //
+  // Batch-save the full columns_config + per-item is_disabled_map + merge_map.
+  // Cell values are kept intact server-side, except for cells whose keys are
+  // no longer present in the new columns_config — those get pruned.
+  async saveStructure(
+    id: number,
+    payload: TfpAobGroundSaveStructurePayload,
+  ): Promise<TfpAobGroundRecordDetail> {
+    const response = await axios.put(
+      `${API_URL}/v1/tfp/aob-ground/${id}/structure`,
+      payload,
       { headers: getAuthHeaders() },
     );
     return response.data.data;
