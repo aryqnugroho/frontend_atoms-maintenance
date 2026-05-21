@@ -10,14 +10,18 @@ import { ComingSoonCard } from '@/components/common/ComingSoonCard';
  */
 const GROUND_CHECK_EQUIPMENT = [
   { id: 1, code: 'GC-001', name: 'ADC', location: 'Gedung TX, RX dan Tower', is_active: true },
-  { id: 2, code: 'GC-002', name: 'VHF', location: 'Gedung TX, RX dan Tower', is_active: false },
-  { id: 3, code: 'GC-003', name: 'Localizer', location: 'Shelter Localizer', is_active: false },
-  { id: 4, code: 'GC-004', name: 'Glide Path', location: 'Shelter Glide Path', is_active: false },
-  { id: 5, code: 'GC-005', name: 'DVOR', location: 'Shelter VOR', is_active: false },
+  { id: 2, code: 'GC-002', name: 'VHF', location: 'Gedung TX, RX dan Tower', is_active: true },
+  { id: 3, code: 'GC-003', name: 'Localizer', location: 'Shelter Localizer', is_active: true },
+  { id: 4, code: 'GC-004', name: 'Glide Path', location: 'Shelter Glide Path', is_active: true },
+  { id: 5, code: 'GC-005', name: 'DVOR', location: 'Shelter VOR', is_active: true },
 ];
 
 const GC_ACTIVE_ROUTES: Record<string, string> = {
   'GC-001': '/ground-check/adc',
+  'GC-002': '/ground-check/vhf',
+  'GC-003': '/ground-check/llz',
+  'GC-004': '/ground-check/gp',
+  'GC-005': '/ground-check/dvor',
 };
 
 export const GroundCheckIndexPage: React.FC = () => {

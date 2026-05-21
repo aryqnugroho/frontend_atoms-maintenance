@@ -1,0 +1,156 @@
+import axios from 'axios';
+import type {
+  GroundCheckLlzListResponse,
+  GroundCheckLlzRecordDetail,
+} from '@/types/groundCheckLlz';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const BASE = `${API_URL}/v1/ground-check/llz`;
+
+function getAuthHeaders() {
+  const token = sessionStorage.getItem('auth_token');
+  return {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+export interface GroundCheckLlzFilters {
+  search?: string;
+  date?: string;
+  year?: string;
+  shift_type?: string;
+  status?: string;
+  per_page?: number;
+  page?: number;
+  [key: string]: string | number | undefined;
+}
+
+export const groundCheckLlzService = {
+  async list(filters: GroundCheckLlzFilters = {}): Promise<GroundCheckLlzListResponse> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== '' && value !== null) {
+        params.append(key, String(value));
+      }
+    });
+    const res = await axios.get(`${BASE}?${params.toString()}`, { headers: getAuthHeaders() });
+    return res.data;
+  },
+
+  async getYears(): Promise<number[]> {
+    const res = await axios.get(`${BASE}/years`, { headers: getAuthHeaders() });
+    return res.data.data;
+  },
+
+  async getTemplate(): Promise<{ items: unknown[]; curve_points: unknown[] }> {
+    const res = await axios.get(`${BASE}/template`, { headers: getAuthHeaders() });
+    return res.data.data;
+  },
+
+  async create(data: { date: string; shift_type: string }): Promise<{ success: boolean; data: GroundCheckLlzRecordDetail; message: string }> {
+    const res = await axios.post(BASE, data, { headers: getAuthHeaders() });
+    return res.data;
+  },
+
+  async getDetail(id: number): Promise<GroundCheckLlzRecordDetail> {
+    const res = await axios.get(`${BASE}/${id}`, { headers: getAuthHeaders() });
+    return res.data.data;
+  },
+
+  async update(id: number, data: {
+    equipment_location?: string | null;
+    equipment_function?: string | null;
+    technical_data?: string | null;
+    identification?: string | null;
+    last_calibration?: string | null;
+    time_filled?: string | null;
+    curve_facility?: string | null;
+    curve_merk?: string | null;
+    curve_ident_freq?: string | null;
+    curve_jarak_ant?: string | null;
+    items?: Array<{
+      id: number;
+      calibration_result?: string | null;
+      tolerance?: string | null;
+      tx1_hasil_pd?: string | null;
+      tx1_in_tolerance?: string | null;
+      tx1_out_of_tolerance?: string | null;
+      tx2_hasil_pd?: string | null;
+      tx2_in_tolerance?: string | null;
+      tx2_out_of_tolerance?: string | null;
+      keterangan?: string | null;
+    }>;
+    curve_points?: Array<{
+      id: number;
+      tx1_ddm_pct?: number | null;
+      tx1_ddm_ua?: number | null;
+      tx1_sum_pct?: number | null;
+      tx1_mod_90hz?: number | null;
+      tx1_mod_150hz?: number | null;
+      tx1_rf_level_db?: number | null;
+      tx2_ddm_pct?: number | null;
+      tx2_ddm_ua?: number | null;
+      tx2_sum_pct?: number | null;
+      tx2_mod_90hz?: number | null;
+      tx2_mod_150hz?: number | null;
+      tx2_rf_level_db?: number | null;
+    }>;
+  }): Promise<{ success: boolean; data: GroundCheckLlzRecordDetail; message: string }> {
+    const res = await axios.put(`${BASE}/${id}`, data, { headers: getAuthHeaders() });
+    return res.data;
+  },
+
+  async sign(id: number, data: {
+    role: 'manager' | 'supervisor' | 'technician';
+    signature: string;
+    technician_row_id?: number;
+  }): Promise<{ success: boolean; data: GroundCheckLlzRecordDetail; message: string }> {
+    const res = await axios.post(`${BASE}/${id}/sign`, data, { headers: getAuthHeaders() });
+    return res.data;
+  },
+
+  async delete(id: number): Promise<{ success: boolean; message: string }> {
+    const res = await axios.delete(`${BASE}/${id}`, { headers: getAuthHeaders() });
+    return res.data;
+  },
+
+  // ─── Photos ──────────────────────────────────────────────────
+  async uploadPhoto(
+    id: number,
+    file: File,
+    caption?: string | null,
+  ): Promise<{ success: boolean; data: GroundCheckLlzRecordDetail; message: string }> {
+    const token = sessionStorage.getItem('auth_token');
+    const fd = new FormData();
+    fd.append('photo', file);
+    if (caption) fd.append('caption', caption);
+    const res = await axios.post(`${BASE}/${id}/photos`, fd, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.data;
+  },
+
+  async updatePhotoCaption(
+    id: number,
+    photoId: number,
+    caption: string | null,
+  ): Promise<{ success: boolean; data: GroundCheckLlzRecordDetail; message: string }> {
+    const res = await axios.put(
+      `${BASE}/${id}/photos/${photoId}`,
+      { caption },
+      { headers: getAuthHeaders() },
+    );
+    return res.data;
+  },
+
+  async deletePhoto(
+    id: number,
+    photoId: number,
+  ): Promise<{ success: boolean; data: GroundCheckLlzRecordDetail; message: string }> {
+    const res = await axios.delete(`${BASE}/${id}/photos/${photoId}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.data;
+  },
+};
