@@ -1,3 +1,9 @@
+// ─── TFP Performance Check Gedung Radar ──────────────────────────────────
+//
+// Cells are dynamic: the record carries a `columns_config` defining panels
+// and sub-columns; each item stores values + is_disabled_map + merge_map keyed
+// by composite "panelId.subKey" (e.g. "panel_cos_rd03.input").
+
 import type { ShiftType } from '@/types';
 
 export type TfpRadarStatus  = 'ongoing' | 'on_hold' | 'completed';
@@ -21,23 +27,28 @@ export interface TfpRadarTechnicianRow {
   sort_order: number;
 }
 
+export interface TfpRadarSubColumn {
+  key: string;
+  label: string;
+}
+
+export interface TfpRadarPanel {
+  id: string;
+  label: string;
+  sub_columns: TfpRadarSubColumn[];
+}
+
+export type TfpRadarColumnsConfig = TfpRadarPanel[];
+export type TfpRadarCellKey = string;
+
 export interface TfpRadarItem {
   id: number;
   parameter_number: string | null;
   parameter_name: string;
   unit: string | null;
-  panel_rd01: string | null;
-  panel_rd02: string | null;
-  panel_cos_rd03_input: string | null;
-  panel_cos_rd03_output: string | null;
-  ups_topaz_input: string | null;
-  ups_topaz_output: string | null;
-  panel_rd04: string | null;
-  panel_rd05: string | null;
-  panel_rd06: string | null;
-  panel_rd07: string | null;
-  panel_rd08: string | null;
-  is_disabled_map: Record<string, boolean> | null;
+  values: Record<TfpRadarCellKey, string>;
+  is_disabled_map: Record<TfpRadarCellKey, boolean>;
+  merge_map: Record<TfpRadarCellKey, number>;
   sort_order: number;
 }
 
@@ -75,6 +86,7 @@ export interface TfpRadarRecordDetail {
   time_filled: string | null;
   shift_type: ShiftType;
   location: string;
+  columns_config: TfpRadarColumnsConfig;
   status: TfpRadarStatus;
   manager: TfpRadarSignerInfo | null;
   supervisor: TfpRadarSignerInfo | null;
@@ -96,23 +108,23 @@ export interface TfpRadarListParams {
 }
 
 export interface TfpRadarUpdatePayload {
+  time_filled?: string | null;
   items: Array<{
     id: number;
-    panel_rd01?: string | null;
-    panel_rd02?: string | null;
-    panel_cos_rd03_input?: string | null;
-    panel_cos_rd03_output?: string | null;
-    ups_topaz_input?: string | null;
-    ups_topaz_output?: string | null;
-    panel_rd04?: string | null;
-    panel_rd05?: string | null;
-    panel_rd06?: string | null;
-    panel_rd07?: string | null;
-    panel_rd08?: string | null;
+    values?: Record<TfpRadarCellKey, string | null>;
   }>;
   facilities?: Array<{
     id: number;
     kondisi?: string | null;
     keterangan?: string | null;
+  }>;
+}
+
+export interface TfpRadarSaveStructurePayload {
+  columns_config: TfpRadarColumnsConfig;
+  items: Array<{
+    id: number;
+    is_disabled_map?: Record<TfpRadarCellKey, boolean>;
+    merge_map?: Record<TfpRadarCellKey, number>;
   }>;
 }
