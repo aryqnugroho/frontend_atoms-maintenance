@@ -93,4 +93,92 @@ export const tfpAobGroundService = {
       headers: getAuthHeaders(),
     });
   },
+
+  // ─── Structural edit (Manager / Supervisor / Admin only) ─────
+  // All eight return the refreshed detail record so callers can
+  // setRecord() directly without a follow-up GET.
+
+  async addParameter(
+    id: number,
+    payload: { parameter_name: string; parameter_number?: string | null; unit?: string | null },
+  ): Promise<TfpAobGroundRecordDetail> {
+    const response = await axios.post(
+      `${API_URL}/v1/tfp/aob-ground/${id}/parameters`,
+      payload,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async updateParameter(
+    id: number,
+    paramId: number,
+    payload: { parameter_name?: string; parameter_number?: string | null; unit?: string | null },
+  ): Promise<TfpAobGroundRecordDetail> {
+    const response = await axios.put(
+      `${API_URL}/v1/tfp/aob-ground/${id}/parameters/${paramId}`,
+      payload,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async deleteParameter(id: number, paramId: number): Promise<TfpAobGroundRecordDetail> {
+    const response = await axios.delete(
+      `${API_URL}/v1/tfp/aob-ground/${id}/parameters/${paramId}`,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async reorderParameters(id: number, orderedIds: number[]): Promise<TfpAobGroundRecordDetail> {
+    const response = await axios.put(
+      `${API_URL}/v1/tfp/aob-ground/${id}/parameters-reorder`,
+      { ordered_ids: orderedIds },
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async addFacility(
+    id: number,
+    payload: { facility_name: string },
+  ): Promise<TfpAobGroundRecordDetail> {
+    const response = await axios.post(
+      `${API_URL}/v1/tfp/aob-ground/${id}/facilities`,
+      payload,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async updateFacility(
+    id: number,
+    facilityId: number,
+    payload: { facility_name?: string },
+  ): Promise<TfpAobGroundRecordDetail> {
+    const response = await axios.put(
+      `${API_URL}/v1/tfp/aob-ground/${id}/facilities/${facilityId}`,
+      payload,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async deleteFacility(id: number, facilityId: number): Promise<TfpAobGroundRecordDetail> {
+    const response = await axios.delete(
+      `${API_URL}/v1/tfp/aob-ground/${id}/facilities/${facilityId}`,
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
+
+  async reorderFacilities(id: number, orderedIds: number[]): Promise<TfpAobGroundRecordDetail> {
+    const response = await axios.put(
+      `${API_URL}/v1/tfp/aob-ground/${id}/facilities-reorder`,
+      { ordered_ids: orderedIds },
+      { headers: getAuthHeaders() },
+    );
+    return response.data.data;
+  },
 };

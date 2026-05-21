@@ -10,14 +10,27 @@ import {
   Clock,
   Zap,
   CheckSquare,
+  Pencil,
+  Plus,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
+  Settings2,
+  X,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { tfpAobGroundService } from '@/services/tfpAobGroundService';
 import { TfpAobGroundSignaturePanel } from './components/TfpAobGroundSignaturePanel';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import type { TfpAobGroundRecordDetail, TfpAobGroundItem } from '@/types/tfpAobGround';
+import type {
+  TfpAobGroundRecordDetail,
+  TfpAobGroundItem,
+  TfpAobGroundFacility,
+} from '@/types/tfpAobGround';
 
 // ─── Column definitions ────────────────────────────────────────────────────
 
@@ -42,26 +55,80 @@ const ALL_COL_KEYS: ItemColKey[] = [
   'ups_tescom_b_output',
 ];
 
+// Kondisi options for facility rows — per task spec.
+const KONDISI_OPTIONS = ['Baik', 'Rusak', 'Tidak Ada'] as const;
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 const isDisabled = (item: TfpAobGroundItem, colKey: ItemColKey): boolean =>
   item.is_disabled_map?.[colKey] === true;
 
-/** Determine if a parameter row is the "Mode" row */
 const isModeRow = (item: TfpAobGroundItem): boolean =>
   item.parameter_name.toLowerCase().startsWith('mode');
 
-/** Determine if a parameter row is the "Suplai Aktif" row */
 const isSuplaiRow = (item: TfpAobGroundItem): boolean =>
   item.parameter_name.toLowerCase().startsWith('suplai aktif');
 
-/** Determine if a parameter row is a single-value row (KWH Meter, Suhu Eq. Room) */
 const isSingleValueRow = (item: TfpAobGroundItem): boolean => {
   const name = item.parameter_name.toLowerCase();
   return name.startsWith('kwh') || name.startsWith('suhu eq');
 };
 
-// ─── Cell input component (used for rows 1–17 only) ───────────────────────
+// ─── ToggleButtonGroup — 2-state pill toggle (Mode/Suplai cells) ──────────
+// Click an option to select it. Click the active option again to clear.
+
+interface ToggleButtonGroupProps {
+  options: readonly string[];
+  value: string;
+  onChange: (val: string) => void;
+  variant?: 'default' | 'mode' | 'suplai';
+  disabled?: boolean;
+}
+
+const ToggleButtonGroup: React.FC<ToggleButtonGroupProps> = ({
+  options, value, onChange, variant = 'default', disabled,
+}) => {
+  const palette = (val: string, active: boolean) => {
+    if (!active) return 'bg-white text-slate-500 hover:bg-slate-50 border-slate-200';
+    if (variant === 'mode') {
+      return val === 'Auto'
+        ? 'bg-emerald-600 text-white border-emerald-600'
+        : 'bg-amber-500 text-white border-amber-500';
+    }
+    if (variant === 'suplai') {
+      return val === 'PLN' || val === 'PLN 1'
+        ? 'bg-emerald-600 text-white border-emerald-600'
+        : 'bg-sky-600 text-white border-sky-600';
+    }
+    return 'bg-slate-700 text-white border-slate-700';
+  };
+
+  return (
+    <div className="inline-flex rounded-md border border-slate-200 overflow-hidden shadow-sm">
+      {options.map((opt, i) => {
+        const active = value === opt;
+        return (
+          <button
+            key={opt}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(active ? '' : opt)}
+            className={cn(
+              'px-2.5 py-1 text-[11px] font-semibold transition-colors border-r border-slate-200 last:border-r-0 disabled:opacity-50 disabled:cursor-not-allowed',
+              palette(opt, active),
+              i === 0 ? 'rounded-l-md' : '',
+              i === options.length - 1 ? 'rounded-r-md' : '',
+            )}
+          >
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── Plain cell input (rows 1–17) ──────────────────────────────────────────
 
 interface CellInputProps {
   item: TfpAobGroundItem;
@@ -75,11 +142,9 @@ const CellInput: React.FC<CellInputProps> = ({ item, colKey, value, onChange, is
   if (isDisabled(item, colKey)) {
     return <div className="w-full h-7 bg-slate-200 rounded" aria-hidden="true" />;
   }
-
   if (isCompleted) {
     return <span className="text-xs text-slate-700">{value || '—'}</span>;
   }
-
   return (
     <input
       type="text"
@@ -91,11 +156,150 @@ const CellInput: React.FC<CellInputProps> = ({ item, colKey, value, onChange, is
   );
 };
 
+// ─── Inline structure-edit popover for parameter rename ───────────────────
+
+interface ParamEditFormProps {
+  item: TfpAobGroundItem;
+  onSave: (patch: { parameter_number?: string | null; parameter_name?: string; unit?: string | null }) => Promise<void>;
+  onCancel: () => void;
+}
+
+const ParamEditForm: React.FC<ParamEditFormProps> = ({ item, onSave, onCancel }) => {
+  const [num, setNum] = useState(item.parameter_number ?? '');
+  const [name, setName] = useState(item.parameter_name);
+  const [unit, setUnit] = useState(item.unit ?? '');
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <div className="px-3 py-2 bg-amber-50 border-y border-amber-200 grid grid-cols-1 sm:grid-cols-[60px_1fr_90px_auto] gap-2 items-center">
+      <input
+        type="text" value={num} onChange={(e) => setNum(e.target.value)} placeholder="No"
+        className="h-8 px-2 text-xs rounded border border-slate-300 bg-white focus:ring-1 focus:ring-amber-400 focus:outline-none"
+      />
+      <input
+        type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama parameter"
+        className="h-8 px-2 text-xs rounded border border-slate-300 bg-white focus:ring-1 focus:ring-amber-400 focus:outline-none"
+      />
+      <input
+        type="text" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Unit"
+        className="h-8 px-2 text-xs rounded border border-slate-300 bg-white focus:ring-1 focus:ring-amber-400 focus:outline-none"
+      />
+      <div className="flex gap-1.5">
+        <button
+          type="button" disabled={busy || !name.trim()}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await onSave({
+                parameter_number: num.trim() || null,
+                parameter_name: name.trim(),
+                unit: unit.trim() || null,
+              });
+            } finally { setBusy(false); }
+          }}
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+        >
+          <Check size={13} /> Simpan
+        </button>
+        <button
+          type="button" onClick={onCancel}
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded bg-white border border-slate-300 text-slate-600 hover:bg-slate-50"
+        >
+          <X size={13} /> Batal
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Inline "add parameter" form ───────────────────────────────────────────
+
+interface AddParameterFormProps {
+  onSave: (data: { parameter_name: string; parameter_number?: string | null; unit?: string | null }) => Promise<void>;
+}
+
+const AddParameterForm: React.FC<AddParameterFormProps> = ({ onSave }) => {
+  const [num, setNum] = useState('');
+  const [name, setName] = useState('');
+  const [unit, setUnit] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!name.trim()) return;
+    setBusy(true);
+    try {
+      await onSave({
+        parameter_name: name.trim(),
+        parameter_number: num.trim() || null,
+        unit: unit.trim() || null,
+      });
+      setNum(''); setName(''); setUnit('');
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="px-3 py-2 grid grid-cols-1 sm:grid-cols-[60px_1fr_90px_auto] gap-2 items-center bg-slate-50/40">
+      <input
+        type="text" value={num} onChange={(e) => setNum(e.target.value)} placeholder="No"
+        className="h-8 px-2 text-xs rounded border border-slate-300 bg-white focus:ring-1 focus:ring-emerald-400 focus:outline-none"
+      />
+      <input
+        type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama parameter baru"
+        className="h-8 px-2 text-xs rounded border border-slate-300 bg-white focus:ring-1 focus:ring-emerald-400 focus:outline-none"
+        onKeyDown={(e) => { if (e.key === 'Enter') void submit(); }}
+      />
+      <input
+        type="text" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Unit"
+        className="h-8 px-2 text-xs rounded border border-slate-300 bg-white focus:ring-1 focus:ring-emerald-400 focus:outline-none"
+      />
+      <button
+        type="button" disabled={busy || !name.trim()} onClick={() => void submit()}
+        className="inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+      >
+        <Plus size={13} /> Tambah
+      </button>
+    </div>
+  );
+};
+
+// ─── Row-action button (pencil, trash, up, down) ───────────────────────────
+
+const RowActionBtn: React.FC<{
+  onClick: () => void;
+  title: string;
+  variant?: 'default' | 'danger';
+  disabled?: boolean;
+  children: React.ReactNode;
+}> = ({ onClick, title, variant = 'default', disabled, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title={title}
+    disabled={disabled}
+    className={cn(
+      'inline-flex items-center justify-center h-6 w-6 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
+      variant === 'danger'
+        ? 'text-red-500 hover:bg-red-50'
+        : 'text-slate-500 hover:bg-slate-100',
+    )}
+  >
+    {children}
+  </button>
+);
+
 // ─── Main component ────────────────────────────────────────────────────────
 
 export const TfpAobGroundDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Edit Mode permission — only roles that own structural changes can toggle it.
+  // Teknisi can still edit values + sign, just not rename/add/delete/reorder.
+  const canEditStructure =
+    user?.role === 'Admin' ||
+    user?.role === 'Manager Teknik' ||
+    user?.role === 'Supervisor TFP';
 
   const [record, setRecord] = useState<TfpAobGroundRecordDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -103,44 +307,24 @@ export const TfpAobGroundDetailPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Local editable state for items and facilities
+  // Local editable state for value cells
   const [itemValues, setItemValues] = useState<Record<number, Record<ItemColKey, string>>>({});
   const [facilityValues, setFacilityValues] = useState<
     Record<number, { kondisi: string; keterangan: string }>
   >({});
+
+  // Edit Mode state
+  const [editMode, setEditMode] = useState(false);
+  const [editingParamId, setEditingParamId] = useState<number | null>(null);
+  const [editingFacilityId, setEditingFacilityId] = useState<number | null>(null);
+  const [editingFacilityName, setEditingFacilityName] = useState('');
 
   const fetchRecord = useCallback(async () => {
     if (!id) return;
     setIsLoading(true);
     try {
       const data = await tfpAobGroundService.getRecord(Number(id));
-      setRecord(data);
-
-      // Initialize local item values
-      const iv: Record<number, Record<ItemColKey, string>> = {};
-      data.items.forEach((item) => {
-        iv[item.id] = {
-          panel_cos_a03_input: item.panel_cos_a03_input ?? '',
-          panel_cos_a03_output: item.panel_cos_a03_output ?? '',
-          panel_ats_a12_input: item.panel_ats_a12_input ?? '',
-          panel_ats_a12_output: item.panel_ats_a12_output ?? '',
-          ups_tescom_a_input: item.ups_tescom_a_input ?? '',
-          ups_tescom_a_output: item.ups_tescom_a_output ?? '',
-          ups_tescom_b_input: item.ups_tescom_b_input ?? '',
-          ups_tescom_b_output: item.ups_tescom_b_output ?? '',
-        };
-      });
-      setItemValues(iv);
-
-      // Initialize local facility values
-      const fv: Record<number, { kondisi: string; keterangan: string }> = {};
-      data.facilities.forEach((f) => {
-        fv[f.id] = {
-          kondisi: f.kondisi ?? 'Baik',
-          keterangan: f.keterangan ?? '',
-        };
-      });
-      setFacilityValues(fv);
+      hydrate(data);
     } catch {
       setErrorMessage('Gagal memuat data form. Coba refresh halaman.');
     } finally {
@@ -148,11 +332,39 @@ export const TfpAobGroundDetailPage: React.FC = () => {
     }
   }, [id]);
 
+  // Centralized hydration so all callers (initial fetch, save, sign, structure ops)
+  // re-seed local state consistently from the server payload.
+  const hydrate = (data: TfpAobGroundRecordDetail) => {
+    setRecord(data);
+    const iv: Record<number, Record<ItemColKey, string>> = {};
+    data.items.forEach((item) => {
+      iv[item.id] = {
+        panel_cos_a03_input: item.panel_cos_a03_input ?? '',
+        panel_cos_a03_output: item.panel_cos_a03_output ?? '',
+        panel_ats_a12_input: item.panel_ats_a12_input ?? '',
+        panel_ats_a12_output: item.panel_ats_a12_output ?? '',
+        ups_tescom_a_input: item.ups_tescom_a_input ?? '',
+        ups_tescom_a_output: item.ups_tescom_a_output ?? '',
+        ups_tescom_b_input: item.ups_tescom_b_input ?? '',
+        ups_tescom_b_output: item.ups_tescom_b_output ?? '',
+      };
+    });
+    setItemValues(iv);
+
+    const fv: Record<number, { kondisi: string; keterangan: string }> = {};
+    data.facilities.forEach((f) => {
+      fv[f.id] = {
+        kondisi: f.kondisi ?? '',
+        keterangan: f.keterangan ?? '',
+      };
+    });
+    setFacilityValues(fv);
+  };
+
   useEffect(() => {
     void fetchRecord();
   }, [fetchRecord]);
 
-  // Refresh on window focus (same pattern as Work Order)
   useEffect(() => {
     const onFocus = () => void fetchRecord();
     window.addEventListener('focus', onFocus);
@@ -171,15 +383,15 @@ export const TfpAobGroundDetailPage: React.FC = () => {
       }));
       const facilitiesPayload = record.facilities.map((f) => ({
         id: f.id,
-        kondisi: facilityValues[f.id]?.kondisi ?? null,
-        keterangan: facilityValues[f.id]?.keterangan ?? null,
+        kondisi: facilityValues[f.id]?.kondisi || null,
+        keterangan: facilityValues[f.id]?.keterangan || null,
       }));
 
       const updated = await tfpAobGroundService.updateRecord(record.id, {
         items: itemsPayload,
         facilities: facilitiesPayload,
       });
-      setRecord(updated);
+      hydrate(updated);
       setSuccessMessage('Perubahan berhasil disimpan.');
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -208,6 +420,68 @@ export const TfpAobGroundDetailPage: React.FC = () => {
     }));
   };
 
+  // ─── Structure ops (Edit Mode) ─────────────────────────────────────────
+  // All ops refresh from the server payload so sort_order + ids stay accurate.
+  // Errors surface as a top-of-page banner; the action button is its own
+  // try/catch boundary to keep the rest of the table interactive.
+
+  const withStructureError = async (fn: () => Promise<TfpAobGroundRecordDetail>) => {
+    setErrorMessage(null);
+    try {
+      const updated = await fn();
+      hydrate(updated);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response) {
+        const data = err.response.data as { message?: string };
+        setErrorMessage(data.message ?? 'Operasi gagal.');
+      } else {
+        setErrorMessage('Operasi gagal. Coba lagi.');
+      }
+    }
+  };
+
+  const handleAddParameter = (data: { parameter_name: string; parameter_number?: string | null; unit?: string | null }) =>
+    withStructureError(() => tfpAobGroundService.addParameter(record!.id, data));
+
+  const handleUpdateParameter = (paramId: number, patch: { parameter_number?: string | null; parameter_name?: string; unit?: string | null }) =>
+    withStructureError(() => tfpAobGroundService.updateParameter(record!.id, paramId, patch));
+
+  const handleDeleteParameter = (paramId: number, name: string) => {
+    if (!window.confirm(`Hapus parameter "${name}"? Data nilai yang sudah diisi akan ikut hilang.`)) return;
+    void withStructureError(() => tfpAobGroundService.deleteParameter(record!.id, paramId));
+  };
+
+  const handleMoveParameter = (idx: number, dir: -1 | 1) => {
+    if (!record) return;
+    const ids = record.items.map((it) => it.id);
+    const target = idx + dir;
+    if (target < 0 || target >= ids.length) return;
+    [ids[idx], ids[target]] = [ids[target], ids[idx]];
+    void withStructureError(() => tfpAobGroundService.reorderParameters(record.id, ids));
+  };
+
+  const handleAddFacility = (name: string) =>
+    withStructureError(() => tfpAobGroundService.addFacility(record!.id, { facility_name: name }));
+
+  const handleUpdateFacility = (facilityId: number, name: string) =>
+    withStructureError(() => tfpAobGroundService.updateFacility(record!.id, facilityId, { facility_name: name }));
+
+  const handleDeleteFacility = (facilityId: number, name: string) => {
+    if (!window.confirm(`Hapus fasilitas "${name}"?`)) return;
+    void withStructureError(() => tfpAobGroundService.deleteFacility(record!.id, facilityId));
+  };
+
+  const handleMoveFacility = (idx: number, dir: -1 | 1) => {
+    if (!record) return;
+    const ids = record.facilities.map((f) => f.id);
+    const target = idx + dir;
+    if (target < 0 || target >= ids.length) return;
+    [ids[idx], ids[target]] = [ids[target], ids[idx]];
+    void withStructureError(() => tfpAobGroundService.reorderFacilities(record.id, ids));
+  };
+
+  // ─── Render ─────────────────────────────────────────────────────────────
+
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto space-y-4 animate-fade-in">
@@ -231,6 +505,10 @@ export const TfpAobGroundDetailPage: React.FC = () => {
   }
 
   const isCompleted = record.status === 'completed';
+  const showStructureControls = editMode && canEditStructure && !isCompleted;
+
+  // Width of "Aksi" column when Edit Mode is on
+  const aksiColWidth = showStructureControls ? 132 : 0;
 
   return (
     <div className="max-w-full space-y-6 animate-fade-in pb-20">
@@ -282,7 +560,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
           </div>
 
           {/* Meta info */}
-          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
               <Calendar size={13} className="text-slate-400" />
               <span className="font-medium">{record.day_name ?? ''}</span>
@@ -297,6 +575,29 @@ export const TfpAobGroundDetailPage: React.FC = () => {
               <Users size={13} className="text-slate-400" />
               <span>{record.technicians.length} Teknisi TFP</span>
             </div>
+
+            {/* Edit Mode toggle — Manager/Supervisor/Admin only, hidden when completed */}
+            {canEditStructure && !isCompleted && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditMode((v) => !v);
+                  setEditingParamId(null);
+                  setEditingFacilityId(null);
+                }}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors',
+                  editMode
+                    ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600'
+                    : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50',
+                )}
+                title="Aktifkan Edit Mode untuk mengubah struktur parameter & fasilitas"
+              >
+                <Settings2 size={14} />
+                {editMode ? 'Selesai Edit' : 'Edit Mode'}
+              </button>
+            )}
+
             <Button
               variant="ghost"
               size="sm"
@@ -316,9 +617,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
               Manager Teknik
             </span>
             <p className="mt-0.5 font-medium text-slate-700">
-              {record.manager?.name ?? (
-                <span className="text-slate-400 italic">Tidak ditugaskan</span>
-              )}
+              {record.manager?.name ?? <span className="text-slate-400 italic">Tidak ditugaskan</span>}
             </p>
           </div>
           <div>
@@ -326,9 +625,7 @@ export const TfpAobGroundDetailPage: React.FC = () => {
               Supervisor TFP
             </span>
             <p className="mt-0.5 font-medium text-slate-700">
-              {record.supervisor?.name ?? (
-                <span className="text-slate-400 italic">Tidak ditugaskan</span>
-              )}
+              {record.supervisor?.name ?? <span className="text-slate-400 italic">Tidak ditugaskan</span>}
             </p>
           </div>
           <div>
@@ -342,14 +639,22 @@ export const TfpAobGroundDetailPage: React.FC = () => {
             </p>
           </div>
         </div>
+
+        {/* Edit Mode hint banner */}
+        {showStructureControls && (
+          <div className="mt-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-center gap-2">
+            <Settings2 size={13} className="text-amber-600 shrink-0" />
+            <span>
+              <strong>Edit Mode aktif.</strong> Manager/Supervisor dapat rename, tambah, hapus, dan reorder parameter & fasilitas.
+              Pengisian nilai cell tidak dinonaktifkan.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Error / Success messages */}
       {errorMessage && (
-        <div
-          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-          role="alert"
-        >
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {errorMessage}
         </div>
       )}
@@ -359,17 +664,20 @@ export const TfpAobGroundDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── Two-panel layout: Parameter table (left) + Facility panel (right) ─── */}
+      {/* ─── Two-panel layout ─── */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6 items-start">
 
-        {/* ── Left panel: Parameter Pengukuran ── */}
+        {/* ── Parameter Pengukuran ── */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2 bg-slate-50/60">
             <Zap size={16} className="text-amber-600" />
             <h2 className="text-sm font-bold text-slate-800">Parameter Pengukuran</h2>
+            <span className="ml-auto text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+              {record.items.length} parameter
+            </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse min-w-[700px]" style={{ tableLayout: 'fixed' }}>
+            <table className="w-full text-xs border-collapse min-w-[800px]" style={{ tableLayout: 'fixed' }}>
               <colgroup>
                 <col style={{ width: '32px' }} />
                 <col style={{ width: '150px' }} />
@@ -381,303 +689,283 @@ export const TfpAobGroundDetailPage: React.FC = () => {
                 <col style={{ width: '62px' }} />
                 <col style={{ width: '62px' }} />
                 <col style={{ width: '62px' }} />
+                {showStructureControls && <col style={{ width: `${aksiColWidth}px` }} />}
               </colgroup>
               <thead>
                 <tr className="bg-sky-800 text-white">
-                  <th rowSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 align-middle text-xs">
-                    No
-                  </th>
-                  <th rowSpan={2} className="px-3 py-2 text-left font-semibold border border-sky-700 align-middle text-xs">
-                    Parameter
-                  </th>
-                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">
-                    Panel COS (A 03)
-                  </th>
-                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">
-                    Panel ATS (A 12)
-                  </th>
-                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">
-                    UPS TESCOM A
-                  </th>
-                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">
-                    UPS TESCOM B
-                  </th>
+                  <th rowSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 align-middle text-xs">No</th>
+                  <th rowSpan={2} className="px-3 py-2 text-left font-semibold border border-sky-700 align-middle text-xs">Parameter</th>
+                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">Panel COS (A 03)</th>
+                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">Panel ATS (A 12)</th>
+                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">UPS TESCOM A</th>
+                  <th colSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 text-xs">UPS TESCOM B</th>
+                  {showStructureControls && (
+                    <th rowSpan={2} className="px-2 py-2 text-center font-semibold border border-sky-700 align-middle text-xs">Aksi</th>
+                  )}
                 </tr>
                 <tr className="bg-sky-700 text-sky-100">
-                  {['Input', 'Output', 'Input', 'Output', 'Input', 'Output', 'Input', 'Output'].map(
-                    (lbl, i) => (
-                      <th key={i} className="px-1 py-1.5 text-center font-medium border border-sky-600 text-[11px]">
-                        {lbl}
-                      </th>
-                    ),
-                  )}
+                  {['Input', 'Output', 'Input', 'Output', 'Input', 'Output', 'Input', 'Output'].map((lbl, i) => (
+                    <th key={i} className="px-1 py-1.5 text-center font-medium border border-sky-600 text-[11px]">{lbl}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {record.items.map((item, idx) => {
                   const rowBase = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
+                  const isFirstRow = idx === 0;
+                  const isLastRow = idx === record.items.length - 1;
 
-                  // ── Row 18: Mode (colSpan=2 per panel group) ──
+                  // Render structure-edit row inline above the actual row when active
+                  const editRow = editingParamId === item.id ? (
+                    <tr key={`${item.id}-edit`}>
+                      <td colSpan={10 + (showStructureControls ? 1 : 0)} className="p-0">
+                        <ParamEditForm
+                          item={item}
+                          onSave={async (patch) => {
+                            await handleUpdateParameter(item.id, patch);
+                            setEditingParamId(null);
+                          }}
+                          onCancel={() => setEditingParamId(null)}
+                        />
+                      </td>
+                    </tr>
+                  ) : null;
+
+                  const actionCell = showStructureControls ? (
+                    <td className="px-1.5 py-1 border-l border-slate-100">
+                      <div className="flex items-center justify-center gap-0.5">
+                        <RowActionBtn
+                          title="Pindah atas" disabled={isFirstRow}
+                          onClick={() => handleMoveParameter(idx, -1)}
+                        ><ChevronUp size={14} /></RowActionBtn>
+                        <RowActionBtn
+                          title="Pindah bawah" disabled={isLastRow}
+                          onClick={() => handleMoveParameter(idx, 1)}
+                        ><ChevronDown size={14} /></RowActionBtn>
+                        <RowActionBtn
+                          title="Rename"
+                          onClick={() => setEditingParamId(editingParamId === item.id ? null : item.id)}
+                        ><Pencil size={12} /></RowActionBtn>
+                        <RowActionBtn
+                          title="Hapus" variant="danger"
+                          onClick={() => handleDeleteParameter(item.id, item.parameter_name)}
+                        ><Trash2 size={12} /></RowActionBtn>
+                      </div>
+                    </td>
+                  ) : null;
+
+                  // ── Row 18: Mode ──
                   if (isModeRow(item)) {
                     const cosVal = itemValues[item.id]?.panel_cos_a03_input ?? '';
                     const atsVal = itemValues[item.id]?.panel_ats_a12_input ?? '';
-                    const modeSelectCls = (val: string) =>
-                      cn(
-                        'w-full h-7 px-1.5 text-xs rounded border focus:ring-1 focus:outline-none font-medium',
-                        val === 'Auto'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 focus:ring-emerald-200'
-                          : val === 'Manual'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-200'
-                          : 'bg-white border-slate-200 text-slate-700 focus:ring-slate-300',
-                      );
                     return (
-                      <tr key={item.id} className="bg-blue-50/40">
-                        <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">
-                          {idx + 1}
-                        </td>
-                        <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
-                          {item.parameter_name}
-                          <span className="text-slate-400 ml-1 text-[10px]">(Auto/Manual)</span>
-                        </td>
-                        {/* COS: colSpan=2 */}
-                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100">
-                          {isCompleted ? (
-                            <span className="text-xs text-slate-700">{cosVal || '—'}</span>
-                          ) : (
-                            <select
-                              value={cosVal}
-                              onChange={(e) => setItemCell(item.id, 'panel_cos_a03_input', e.target.value)}
-                              className={modeSelectCls(cosVal)}
-                            >
-                              <option value="">—</option>
-                              <option value="Auto">Auto</option>
-                              <option value="Manual">Manual</option>
-                            </select>
-                          )}
-                        </td>
-                        {/* ATS: colSpan=2 */}
-                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100">
-                          {isCompleted ? (
-                            <span className="text-xs text-slate-700">{atsVal || '—'}</span>
-                          ) : (
-                            <select
-                              value={atsVal}
-                              onChange={(e) => setItemCell(item.id, 'panel_ats_a12_input', e.target.value)}
-                              className={modeSelectCls(atsVal)}
-                            >
-                              <option value="">—</option>
-                              <option value="Auto">Auto</option>
-                              <option value="Manual">Manual</option>
-                            </select>
-                          )}
-                        </td>
-                        {/* UPS A: colSpan=2, disabled */}
-                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
-                        {/* UPS B: colSpan=2, disabled */}
-                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
-                      </tr>
+                      <React.Fragment key={item.id}>
+                        <tr className="bg-blue-50/40">
+                          <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">{idx + 1}</td>
+                          <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
+                            {item.parameter_name}
+                            <span className="text-slate-400 ml-1 text-[10px]">(Auto/Manual)</span>
+                          </td>
+                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 text-center">
+                            {isCompleted ? (
+                              <span className="text-xs text-slate-700 font-semibold">{cosVal || '—'}</span>
+                            ) : (
+                              <ToggleButtonGroup
+                                options={['Auto', 'Manual']} value={cosVal} variant="mode"
+                                onChange={(v) => setItemCell(item.id, 'panel_cos_a03_input', v)}
+                              />
+                            )}
+                          </td>
+                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 text-center">
+                            {isCompleted ? (
+                              <span className="text-xs text-slate-700 font-semibold">{atsVal || '—'}</span>
+                            ) : (
+                              <ToggleButtonGroup
+                                options={['Auto', 'Manual']} value={atsVal} variant="mode"
+                                onChange={(v) => setItemCell(item.id, 'panel_ats_a12_input', v)}
+                              />
+                            )}
+                          </td>
+                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
+                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
+                          {actionCell}
+                        </tr>
+                        {editRow}
+                      </React.Fragment>
                     );
                   }
 
-                  // ── Row 19: Suplai Aktif (colSpan=2 per panel group) ──
+                  // ── Row 19: Suplai Aktif ──
                   if (isSuplaiRow(item)) {
                     const cosVal = itemValues[item.id]?.panel_cos_a03_input ?? '';
                     const atsVal = itemValues[item.id]?.panel_ats_a12_input ?? '';
-                    const suplaiSelectCls = (val: string) =>
-                      cn(
-                        'w-full h-7 px-1.5 text-xs rounded border focus:ring-1 focus:outline-none font-medium',
-                        val === 'PLN' || val === 'PLN 1'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 focus:ring-emerald-200'
-                          : val === 'UPS' || val === 'PLN 2'
-                          ? 'bg-sky-50 text-sky-700 border-sky-200 focus:ring-sky-200'
-                          : 'bg-white border-slate-200 text-slate-700 focus:ring-slate-300',
-                      );
                     return (
-                      <tr key={item.id} className="bg-blue-50/40">
-                        <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">
-                          {idx + 1}
-                        </td>
-                        <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
-                          {item.parameter_name}
-                        </td>
-                        {/* COS: colSpan=2, PLN/UPS */}
-                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100">
-                          {isCompleted ? (
-                            <span className="text-xs text-slate-700">{cosVal || '—'}</span>
-                          ) : (
-                            <select
-                              value={cosVal}
-                              onChange={(e) => setItemCell(item.id, 'panel_cos_a03_input', e.target.value)}
-                              className={suplaiSelectCls(cosVal)}
-                            >
-                              <option value="">—</option>
-                              <option value="PLN">PLN</option>
-                              <option value="UPS">UPS</option>
-                            </select>
-                          )}
-                        </td>
-                        {/* ATS: colSpan=2, PLN 1/PLN 2 */}
-                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100">
-                          {isCompleted ? (
-                            <span className="text-xs text-slate-700">{atsVal || '—'}</span>
-                          ) : (
-                            <select
-                              value={atsVal}
-                              onChange={(e) => setItemCell(item.id, 'panel_ats_a12_input', e.target.value)}
-                              className={suplaiSelectCls(atsVal)}
-                            >
-                              <option value="">—</option>
-                              <option value="PLN 1">PLN 1</option>
-                              <option value="PLN 2">PLN 2</option>
-                            </select>
-                          )}
-                        </td>
-                        {/* UPS A: colSpan=2, disabled */}
-                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
-                        {/* UPS B: colSpan=2, disabled */}
-                        <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
-                      </tr>
+                      <React.Fragment key={item.id}>
+                        <tr className="bg-blue-50/40">
+                          <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">{idx + 1}</td>
+                          <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">{item.parameter_name}</td>
+                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 text-center">
+                            {isCompleted ? (
+                              <span className="text-xs text-slate-700 font-semibold">{cosVal || '—'}</span>
+                            ) : (
+                              <ToggleButtonGroup
+                                options={['PLN', 'UPS']} value={cosVal} variant="suplai"
+                                onChange={(v) => setItemCell(item.id, 'panel_cos_a03_input', v)}
+                              />
+                            )}
+                          </td>
+                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 text-center">
+                            {isCompleted ? (
+                              <span className="text-xs text-slate-700 font-semibold">{atsVal || '—'}</span>
+                            ) : (
+                              <ToggleButtonGroup
+                                options={['PLN 1', 'PLN 2']} value={atsVal} variant="suplai"
+                                onChange={(v) => setItemCell(item.id, 'panel_ats_a12_input', v)}
+                              />
+                            )}
+                          </td>
+                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
+                          <td colSpan={2} className="px-1.5 py-1 border-l border-slate-100 bg-slate-200" />
+                          {actionCell}
+                        </tr>
+                        {editRow}
+                      </React.Fragment>
                     );
                   }
 
-                  // ── Rows 20-21: KWH Meter / Suhu Eq. Room (single value, colSpan=8) ──
+                  // ── Rows 20-21: KWH / Suhu Eq. Room ──
                   if (isSingleValueRow(item)) {
                     const val = itemValues[item.id]?.panel_cos_a03_input ?? '';
                     return (
-                      <tr key={item.id} className={rowBase}>
-                        <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">
-                          {idx + 1}
-                        </td>
-                        <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
-                          {item.parameter_name}
-                          {item.unit && (
-                            <span className="text-slate-400 ml-1 text-[10px]">({item.unit})</span>
-                          )}
-                        </td>
-                        <td colSpan={8} className="px-3 py-1 border-l border-slate-100">
-                          {isCompleted ? (
-                            <span className="text-xs text-slate-700">{val || '—'}</span>
-                          ) : (
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={val}
-                              onChange={(e) => setItemCell(item.id, 'panel_cos_a03_input', e.target.value)}
-                              className="w-48 h-7 px-2 text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-sky-400 focus:outline-none"
-                            />
-                          )}
-                        </td>
-                      </tr>
+                      <React.Fragment key={item.id}>
+                        <tr className={rowBase}>
+                          <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">{idx + 1}</td>
+                          <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
+                            {item.parameter_name}
+                            {item.unit && <span className="text-slate-400 ml-1 text-[10px]">({item.unit})</span>}
+                          </td>
+                          <td colSpan={8} className="px-3 py-1 border-l border-slate-100">
+                            {isCompleted ? (
+                              <span className="text-xs text-slate-700">{val || '—'}</span>
+                            ) : (
+                              <input
+                                type="text" inputMode="decimal" value={val}
+                                onChange={(e) => setItemCell(item.id, 'panel_cos_a03_input', e.target.value)}
+                                className="w-48 h-7 px-2 text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-sky-400 focus:outline-none"
+                              />
+                            )}
+                          </td>
+                          {actionCell}
+                        </tr>
+                        {editRow}
+                      </React.Fragment>
                     );
                   }
 
-                  // ── Rows 1–17: Normal rows ──
+                  // ── Rows 1–17: normal cells ──
                   return (
-                    <tr key={item.id} className={rowBase}>
-                      <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">
-                        {idx + 1}
-                      </td>
-                      <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
-                        {item.parameter_name}
-                        {item.unit && (
-                          <span className="text-slate-400 ml-1 text-[10px]">({item.unit})</span>
-                        )}
-                      </td>
-                      {ALL_COL_KEYS.map((colKey) => (
-                        <td
-                          key={colKey}
-                          className={cn(
-                            'px-1.5 py-1 border-l border-slate-100',
-                            isDisabled(item, colKey) ? 'bg-slate-200' : '',
-                          )}
-                        >
-                          <CellInput
-                            item={item}
-                            colKey={colKey}
-                            value={itemValues[item.id]?.[colKey] ?? ''}
-                            onChange={(val) => setItemCell(item.id, colKey, val)}
-                            isCompleted={isCompleted}
-                          />
+                    <React.Fragment key={item.id}>
+                      <tr className={rowBase}>
+                        <td className="px-2 py-1.5 text-slate-400 font-mono text-center text-xs border-r border-slate-100">{idx + 1}</td>
+                        <td className="px-3 py-1.5 font-medium text-slate-700 text-xs border-r border-slate-100">
+                          {item.parameter_name}
+                          {item.unit && <span className="text-slate-400 ml-1 text-[10px]">({item.unit})</span>}
                         </td>
-                      ))}
-                    </tr>
+                        {ALL_COL_KEYS.map((colKey) => (
+                          <td key={colKey} className={cn('px-1.5 py-1 border-l border-slate-100', isDisabled(item, colKey) ? 'bg-slate-200' : '')}>
+                            <CellInput
+                              item={item} colKey={colKey}
+                              value={itemValues[item.id]?.[colKey] ?? ''}
+                              onChange={(val) => setItemCell(item.id, colKey, val)}
+                              isCompleted={isCompleted}
+                            />
+                          </td>
+                        ))}
+                        {actionCell}
+                      </tr>
+                      {editRow}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
             </table>
           </div>
+
+          {/* Inline "Add Parameter" form (Edit Mode only) */}
+          {showStructureControls && (
+            <div className="border-t border-slate-200">
+              <AddParameterForm onSave={handleAddParameter} />
+            </div>
+          )}
         </div>
 
-        {/* ── Right panel: Kondisi Fasilitas ── */}
+        {/* ── Kondisi Fasilitas ── */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2 bg-slate-50/60">
             <CheckSquare size={16} className="text-sky-600" />
             <h2 className="text-sm font-bold text-slate-800">Kondisi Fasilitas</h2>
+            <span className="ml-auto text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+              {record.facilities.length} fasilitas
+            </span>
           </div>
           <div className="divide-y divide-slate-100">
             {/* Column headers */}
-            <div className="grid grid-cols-[1fr_90px_1fr] gap-2 px-4 py-2 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className={cn(
+              'grid gap-2 px-4 py-2 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest items-center',
+              showStructureControls
+                ? 'grid-cols-[1fr_90px_1fr_88px]'
+                : 'grid-cols-[1fr_90px_1fr]',
+            )}>
               <span>Nama Fasilitas</span>
               <span className="text-center">Kondisi</span>
               <span>Keterangan</span>
+              {showStructureControls && <span className="text-center">Aksi</span>}
             </div>
-            {record.facilities.map((facility, idx) => {
-              const kondisi = facilityValues[facility.id]?.kondisi ?? 'Baik';
-              const isGood = kondisi === 'Baik' || kondisi === 'Normal';
-              return (
-                <div
-                  key={facility.id}
-                  className={cn(
-                    'grid grid-cols-[1fr_90px_1fr] gap-2 px-4 py-2.5 items-center',
-                    idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40',
-                  )}
-                >
-                  <span className="text-xs font-medium text-slate-700">{facility.facility_name}</span>
-                  {isCompleted ? (
-                    <span
-                      className={cn(
-                        'text-xs font-semibold text-center',
-                        isGood ? 'text-emerald-700' : 'text-red-700',
-                      )}
-                    >
-                      {kondisi || '—'}
-                    </span>
-                  ) : (
-                    <select
-                      value={kondisi}
-                      onChange={(e) => setFacilityField(facility.id, 'kondisi', e.target.value)}
-                      className={cn(
-                        'w-full h-8 px-1.5 text-xs rounded border-none focus:ring-1 focus:outline-none font-semibold',
-                        isGood
-                          ? 'bg-emerald-50 text-emerald-700 focus:ring-emerald-200'
-                          : 'bg-red-50 text-red-700 focus:ring-red-200',
-                      )}
-                    >
-                      <option value="Baik">Baik</option>
-                      <option value="Normal">Normal</option>
-                      <option value="Tidak Baik">Tidak Baik</option>
-                    </select>
-                  )}
-                  {isCompleted ? (
-                    <span className="text-xs text-slate-600">
-                      {facilityValues[facility.id]?.keterangan || '—'}
-                    </span>
-                  ) : (
-                    <input
-                      type="text"
-                      value={facilityValues[facility.id]?.keterangan ?? ''}
-                      onChange={(e) => setFacilityField(facility.id, 'keterangan', e.target.value)}
-                      placeholder="Keterangan..."
-                      className="h-8 px-2 text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none w-full"
-                    />
-                  )}
-                </div>
-              );
-            })}
+
+            {record.facilities.map((facility, idx) => (
+              <FacilityRow
+                key={facility.id}
+                facility={facility}
+                idx={idx}
+                total={record.facilities.length}
+                isCompleted={isCompleted}
+                showStructureControls={showStructureControls}
+                kondisi={facilityValues[facility.id]?.kondisi ?? ''}
+                keterangan={facilityValues[facility.id]?.keterangan ?? ''}
+                onKondisiChange={(v) => setFacilityField(facility.id, 'kondisi', v)}
+                onKeteranganChange={(v) => setFacilityField(facility.id, 'keterangan', v)}
+                isEditingStructure={editingFacilityId === facility.id}
+                editingName={editingFacilityName}
+                onStartEdit={() => {
+                  setEditingFacilityId(facility.id);
+                  setEditingFacilityName(facility.facility_name);
+                }}
+                onCancelEdit={() => {
+                  setEditingFacilityId(null);
+                  setEditingFacilityName('');
+                }}
+                onChangeEditingName={setEditingFacilityName}
+                onSaveEdit={async () => {
+                  if (!editingFacilityName.trim()) return;
+                  await handleUpdateFacility(facility.id, editingFacilityName.trim());
+                  setEditingFacilityId(null);
+                  setEditingFacilityName('');
+                }}
+                onMove={(dir) => handleMoveFacility(idx, dir)}
+                onDelete={() => handleDeleteFacility(facility.id, facility.facility_name)}
+              />
+            ))}
           </div>
+
+          {/* Inline "Add Facility" form (Edit Mode only) */}
+          {showStructureControls && (
+            <div className="border-t border-slate-200">
+              <AddFacilityForm onSave={handleAddFacility} />
+            </div>
+          )}
         </div>
 
-      </div>{/* end two-panel grid */}
+      </div>{/* end grid */}
 
       {/* Save button */}
       {!isCompleted && (
@@ -694,27 +982,148 @@ export const TfpAobGroundDetailPage: React.FC = () => {
       )}
 
       {/* Signature panel */}
-      <TfpAobGroundSignaturePanel
-        record={record}
-        onUpdated={(updated) => {
-          setRecord(updated);
-          // Re-sync local item values from updated record
-          const iv: Record<number, Record<ItemColKey, string>> = {};
-          updated.items.forEach((item) => {
-            iv[item.id] = {
-              panel_cos_a03_input: item.panel_cos_a03_input ?? '',
-              panel_cos_a03_output: item.panel_cos_a03_output ?? '',
-              panel_ats_a12_input: item.panel_ats_a12_input ?? '',
-              panel_ats_a12_output: item.panel_ats_a12_output ?? '',
-              ups_tescom_a_input: item.ups_tescom_a_input ?? '',
-              ups_tescom_a_output: item.ups_tescom_a_output ?? '',
-              ups_tescom_b_input: item.ups_tescom_b_input ?? '',
-              ups_tescom_b_output: item.ups_tescom_b_output ?? '',
-            };
-          });
-          setItemValues(iv);
-        }}
+      <TfpAobGroundSignaturePanel record={record} onUpdated={hydrate} />
+    </div>
+  );
+};
+
+// ─── FacilityRow — extracted to keep the main component readable ───────────
+
+interface FacilityRowProps {
+  facility: TfpAobGroundFacility;
+  idx: number;
+  total: number;
+  isCompleted: boolean;
+  showStructureControls: boolean;
+  kondisi: string;
+  keterangan: string;
+  onKondisiChange: (v: string) => void;
+  onKeteranganChange: (v: string) => void;
+  isEditingStructure: boolean;
+  editingName: string;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onChangeEditingName: (v: string) => void;
+  onSaveEdit: () => Promise<void>;
+  onMove: (dir: -1 | 1) => void;
+  onDelete: () => void;
+}
+
+const FacilityRow: React.FC<FacilityRowProps> = ({
+  facility, idx, total, isCompleted, showStructureControls,
+  kondisi, keterangan, onKondisiChange, onKeteranganChange,
+  isEditingStructure, editingName, onStartEdit, onCancelEdit,
+  onChangeEditingName, onSaveEdit, onMove, onDelete,
+}) => {
+  const palette = (() => {
+    if (kondisi === 'Baik') return 'bg-emerald-50 text-emerald-700 focus:ring-emerald-200';
+    if (kondisi === 'Rusak') return 'bg-red-50 text-red-700 focus:ring-red-200';
+    if (kondisi === 'Tidak Ada') return 'bg-slate-100 text-slate-600 focus:ring-slate-300';
+    return 'bg-white text-slate-500 focus:ring-slate-300';
+  })();
+
+  return (
+    <div
+      className={cn(
+        'gap-2 px-4 py-2.5 items-center grid',
+        showStructureControls
+          ? 'grid-cols-[1fr_90px_1fr_88px]'
+          : 'grid-cols-[1fr_90px_1fr]',
+        idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40',
+      )}
+    >
+      {isEditingStructure ? (
+        <input
+          autoFocus type="text" value={editingName}
+          onChange={(e) => onChangeEditingName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void onSaveEdit();
+            if (e.key === 'Escape') onCancelEdit();
+          }}
+          className="h-8 px-2 text-xs rounded border border-amber-400 bg-amber-50 focus:ring-1 focus:ring-amber-400 focus:outline-none"
+        />
+      ) : (
+        <span className="text-xs font-medium text-slate-700">{facility.facility_name}</span>
+      )}
+
+      {isCompleted ? (
+        <span className={cn('text-xs font-semibold text-center', kondisi === 'Baik' ? 'text-emerald-700' : kondisi === 'Rusak' ? 'text-red-700' : 'text-slate-500')}>
+          {kondisi || '—'}
+        </span>
+      ) : (
+        <select
+          value={kondisi} onChange={(e) => onKondisiChange(e.target.value)}
+          className={cn(
+            'w-full h-8 px-1.5 text-xs rounded border-none focus:ring-1 focus:outline-none font-semibold',
+            palette,
+          )}
+        >
+          <option value="">—</option>
+          {KONDISI_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+      )}
+
+      {isCompleted ? (
+        <span className="text-xs text-slate-600">{keterangan || '—'}</span>
+      ) : (
+        <input
+          type="text" value={keterangan}
+          onChange={(e) => onKeteranganChange(e.target.value)}
+          placeholder="Keterangan..."
+          className="h-8 px-2 text-xs rounded border border-slate-200 bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none w-full"
+        />
+      )}
+
+      {showStructureControls && (
+        <div className="flex items-center justify-center gap-0.5">
+          {isEditingStructure ? (
+            <>
+              <RowActionBtn title="Simpan" onClick={() => void onSaveEdit()}><Check size={12} /></RowActionBtn>
+              <RowActionBtn title="Batal" onClick={onCancelEdit}><X size={12} /></RowActionBtn>
+            </>
+          ) : (
+            <>
+              <RowActionBtn title="Pindah atas" disabled={idx === 0} onClick={() => onMove(-1)}><ChevronUp size={14} /></RowActionBtn>
+              <RowActionBtn title="Pindah bawah" disabled={idx === total - 1} onClick={() => onMove(1)}><ChevronDown size={14} /></RowActionBtn>
+              <RowActionBtn title="Rename" onClick={onStartEdit}><Pencil size={12} /></RowActionBtn>
+              <RowActionBtn title="Hapus" variant="danger" onClick={onDelete}><Trash2 size={12} /></RowActionBtn>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Inline "add facility" form ────────────────────────────────────────────
+
+const AddFacilityForm: React.FC<{ onSave: (name: string) => Promise<void> }> = ({ onSave }) => {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!name.trim()) return;
+    setBusy(true);
+    try {
+      await onSave(name.trim());
+      setName('');
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="px-4 py-2 flex items-center gap-2 bg-slate-50/40">
+      <input
+        type="text" value={name} onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') void submit(); }}
+        placeholder="Nama fasilitas baru"
+        className="flex-1 h-8 px-2 text-xs rounded border border-slate-300 bg-white focus:ring-1 focus:ring-emerald-400 focus:outline-none"
       />
+      <button
+        type="button" disabled={busy || !name.trim()} onClick={() => void submit()}
+        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+      >
+        <Plus size={13} /> Tambah
+      </button>
     </div>
   );
 };
