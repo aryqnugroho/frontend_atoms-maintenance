@@ -23,6 +23,9 @@ const CNSD_ACTIVE_ROUTES: Record<string, string> = {
   'CNSD-008': '/cnsd/localizer-meter',    // Localizer Meter Reading (ILS-LLZ)
   'CNSD-009': '/cnsd/tdme-meter',         // T-DME Meter Reading (FORM N-5)
   'CNSD-010': '/cnsd/dvor-meter',         // DVOR Meter Reading (FORM N-5)
+  'CNSD-011': '/cnsd/dme-meter',          // DME Meter Reading (FORM N-5)
+  'CNSD-012': '/cnsd/atc-system-meter',   // ATC SYSTEM Meter Reading (FORM A-1)
+  'CNSD-013': '/cnsd/atis-meter',         // ATIS Meter Reading (Reproducer ATIS)
 };
 
 /**

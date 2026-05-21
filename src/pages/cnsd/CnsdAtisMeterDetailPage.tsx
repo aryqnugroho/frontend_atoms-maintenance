@@ -6,9 +6,8 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
-  Lock as LockIcon,
   MapPin,
-  Mic as RecorderIcon,
+  Megaphone as AtisIcon,
   Printer,
   Save,
   Users,
@@ -20,15 +19,13 @@ import { Skeleton } from '@/components/common/Skeleton';
 import { Tabs } from '@/components/common/Tabs';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { cnsdRecorderMeterService } from '@/services/cnsdRecorderMeterService';
-import { CnsdRecorderMeterSignaturePanel } from './components/CnsdRecorderMeterSignaturePanel';
+import { cnsdAtisMeterService } from '@/services/cnsdAtisMeterService';
+import { CnsdAtisMeterSignaturePanel } from './components/CnsdAtisMeterSignaturePanel';
+import type { ShiftType } from '@/types';
 import type {
-  CnsdRecorderMeterItem,
-  CnsdRecorderMeterRecordDetail,
-  CnsdRecorderMeterSectionMeta,
-} from '@/types/cnsdRecorder';
-
-// ─── Constants ────────────────────────────────────────────────
+  CnsdAtisMeterItem,
+  CnsdAtisMeterRecordDetail,
+} from '@/types/cnsdAtis';
 
 const SHIFT_TIME_LABELS: Record<string, string> = {
   pagi:  '07:00 — 13:00',
@@ -36,30 +33,28 @@ const SHIFT_TIME_LABELS: Record<string, string> = {
   malam: '19:00 — 07:00',
 };
 
-// ─── Main component ───────────────────────────────────────────
+interface SectionMeta {
+  code: string;
+  name: string;
+  inputs_layout: string;
+  groups: Array<{ number: number | null; name: string | null }>;
+}
 
 /**
- * CNSD Recorder Meter Reading — detail / edit page.
+ * CNSD ATIS Meter Reading — detail / edit page (Reproducer ATIS).
  *
- * Mirrors the EQ-1 / Radar Meter Reading detail page for UI consistency:
- *   - GP-style header card (Sky icon, status pill, date / shift-time / facility /
- *     teknisi badges, Print + Save buttons, personnel 3-col grid)
- *   - Info Peralatan card with editable Merk / Type / SN (Manager/Supervisor only)
- *   - Tabs component, one per section_meta entry (A. PERALATAN, B. LINGKUNGAN KERJA)
- *   - Section A renders grouped rows (KVM, SERVER, POWER, CHANNEL) with
- *     NOMINAL | SERVER A | SERVER B | KETERANGAN columns.
- *     Blocked (U/S) rows render as a disabled red strip.
- *   - Section B renders single HASIL column.
- *   - Signature panel at the bottom.
+ * Mirrors paper 013_ATIS. 5-col layout (NO | PEMERIKSAAN | NOMINAL | READING |
+ * KETERANGAN). Two sections (TERMA RCM + TERMA ATIS PLUS SYSTEM) with grouped
+ * items (single READING column, no TX/M split).
  */
-export const CnsdRecorderMeterDetailPage: React.FC = () => {
+export const CnsdAtisMeterDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const recordId = Number(id);
 
-  const [record, setRecord] = useState<CnsdRecorderMeterRecordDetail | null>(null);
-  const [editedItems, setEditedItems] = useState<Record<number, Partial<CnsdRecorderMeterItem>>>({});
+  const [record, setRecord] = useState<CnsdAtisMeterRecordDetail | null>(null);
+  const [editedItems, setEditedItems] = useState<Record<number, Partial<CnsdAtisMeterItem>>>({});
   const [activeSectionCode, setActiveSectionCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -71,11 +66,8 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
   const [serialNumber, setSerialNumber] = useState('');
 
   const canEditMetadata =
-    user?.role === 'Admin' ||
-    user?.role === 'Manager Teknik' ||
-    user?.role === 'Supervisor CNSD';
+    user?.role === 'Admin' || user?.role === 'Manager Teknik' || user?.role === 'Supervisor CNSD';
 
-  // ─── Fetch ──────────────────────────────────────────────────
   const fetchRecord = useCallback(async () => {
     if (!recordId || Number.isNaN(recordId)) {
       setErrorMessage('ID form tidak valid.');
@@ -84,7 +76,7 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
     }
     setIsLoading(true);
     try {
-      const data = await cnsdRecorderMeterService.getRecord(recordId);
+      const data = await cnsdAtisMeterService.getRecord(recordId);
       setRecord(data);
       setEditedItems({});
       setMerk(data.merk ?? '');
@@ -92,17 +84,12 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
       setSerialNumber(data.serial_number ?? '');
       if (data.sections_meta.length > 0) {
         const stillExists = activeSectionCode && data.sections_meta.some((s) => s.code === activeSectionCode);
-        if (!stillExists) {
-          setActiveSectionCode(data.sections_meta[0].code);
-        }
+        if (!stillExists) setActiveSectionCode(data.sections_meta[0].code);
       }
       setErrorMessage(null);
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 404) {
-        setErrorMessage('Form tidak ditemukan.');
-      } else {
-        setErrorMessage('Gagal memuat data form.');
-      }
+      if (axios.isAxiosError(err) && err.response?.status === 404) setErrorMessage('Form tidak ditemukan.');
+      else setErrorMessage('Gagal memuat data form.');
       setRecord(null);
     } finally {
       setIsLoading(false);
@@ -110,14 +97,10 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recordId]);
 
-  useEffect(() => {
-    void fetchRecord();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordId]);
+  useEffect(() => { void fetchRecord(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [recordId]);
 
-  // ─── Derived ────────────────────────────────────────────────
   const itemsBySection = useMemo(() => {
-    const map: Record<string, CnsdRecorderMeterItem[]> = {};
+    const map: Record<string, CnsdAtisMeterItem[]> = {};
     if (!record) return map;
     record.items.forEach((it) => {
       const code = it.section_code ?? 'A';
@@ -127,31 +110,23 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
     return map;
   }, [record]);
 
-  const isCompleted = record?.status === 'completed';
-  const isReadOnly = isCompleted;
-  const metadataDirty =
-    !!record &&
-    (merk !== (record.merk ?? '') ||
-      type !== (record.type ?? '') ||
-      serialNumber !== (record.serial_number ?? ''));
+  const isReadOnly = record?.status === 'completed';
+  const metadataDirty = !!record && (
+    merk !== (record.merk ?? '') ||
+    type !== (record.type ?? '') ||
+    serialNumber !== (record.serial_number ?? '')
+  );
   const hasChanges = Object.keys(editedItems).length > 0 || metadataDirty;
 
-  const updateField = (
-    itemId: number,
-    field: keyof CnsdRecorderMeterItem,
-    value: string | null,
-  ) => {
+  const updateField = (itemId: number, field: keyof CnsdAtisMeterItem, value: string | null) => {
     if (isReadOnly) return;
     setEditedItems((prev) => ({
       ...prev,
-      [itemId]: {
-        ...(prev[itemId] ?? {}),
-        [field]: value === '' ? null : value,
-      },
+      [itemId]: { ...(prev[itemId] ?? {}), [field]: value === '' ? null : value },
     }));
   };
 
-  const getValue = (item: CnsdRecorderMeterItem, field: keyof CnsdRecorderMeterItem): string => {
+  const getValue = (item: CnsdAtisMeterItem, field: keyof CnsdAtisMeterItem): string => {
     const edited = editedItems[item.id];
     if (edited && field in edited) {
       const v = edited[field];
@@ -161,24 +136,18 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
     return original == null ? '' : String(original);
   };
 
-  // ─── Save ───────────────────────────────────────────────────
   const handleSave = async () => {
     if (!record || !hasChanges) return;
-
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
-
     const items = Object.entries(editedItems).map(([rawId, patch]) => ({
       id: Number(rawId),
-      hasil_server_a: 'hasil_server_a' in patch ? patch.hasil_server_a ?? null : undefined,
-      hasil_server_b: 'hasil_server_b' in patch ? patch.hasil_server_b ?? null : undefined,
-      hasil:          'hasil'          in patch ? patch.hasil          ?? null : undefined,
-      keterangan:     'keterangan'     in patch ? patch.keterangan     ?? null : undefined,
+      reading:    'reading'    in patch ? patch.reading    ?? null : undefined,
+      keterangan: 'keterangan' in patch ? patch.keterangan ?? null : undefined,
     }));
-
     try {
-      const updated = await cnsdRecorderMeterService.updateRecord(record.id, {
+      const updated = await cnsdAtisMeterService.updateRecord(record.id, {
         merk: metadataDirty ? merk || null : undefined,
         type: metadataDirty ? type || null : undefined,
         serial_number: metadataDirty ? serialNumber || null : undefined,
@@ -203,7 +172,6 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
     }
   };
 
-  // ─── Render ─────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
@@ -219,49 +187,42 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
       <div className="max-w-3xl mx-auto py-20 text-center space-y-4">
         <AlertCircle className="mx-auto h-12 w-12 text-slate-400" />
         <h2 className="text-lg font-semibold text-slate-700">{errorMessage ?? 'Form tidak ditemukan.'}</h2>
-        <Button variant="outline" onClick={() => navigate('/cnsd/recorder-meter')} className="gap-2">
-          <ArrowLeft size={16} />
-          Kembali ke Daftar
+        <Button variant="outline" onClick={() => navigate('/cnsd/atis-meter')} className="gap-2">
+          <ArrowLeft size={16} /> Kembali ke Daftar
         </Button>
       </div>
     );
   }
 
-  const activeSectionMeta = activeSectionCode
-    ? record.sections_meta.find((s) => s.code === activeSectionCode) ?? null
-    : null;
+  const activeSectionMeta = activeSectionCode ? record.sections_meta.find((s) => s.code === activeSectionCode) ?? null : null;
 
   return (
     <div className="max-w-full space-y-5 animate-fade-in pb-12">
-      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-slate-500">
         <button type="button" onClick={() => navigate('/cnsd')} className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors">
           <ArrowLeft size={14} /> CNSD
         </button>
         <span>/</span>
-        <button type="button" onClick={() => navigate('/cnsd/recorder-meter')} className="hover:text-slate-700 transition-colors">
-          Recorder Meter Reading
+        <button type="button" onClick={() => navigate('/cnsd/atis-meter')} className="hover:text-slate-700 transition-colors">
+          ATIS Meter Reading
         </button>
         <span>/</span>
         <span className="text-slate-700 font-mono font-medium">{record.form_number}</span>
       </div>
 
-      {/* Header card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="h-10 w-10 rounded-lg bg-sky-100 flex items-center justify-center shrink-0">
-              <RecorderIcon size={18} className="text-sky-600" />
+              <AtisIcon size={18} className="text-sky-600" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg font-bold text-slate-900">Meter Reading — Recorder</h1>
+                <h1 className="text-lg font-bold text-slate-900">Meter Reading — Reproducer ATIS</h1>
                 <StatusBadge status={record.status} variant="pill" />
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                CNSD &nbsp;·&nbsp;
-                <span className="font-mono">{record.form_number}</span>
-                {record.form_code && <> &nbsp;·&nbsp; <span className="font-mono">{record.form_code}</span></>}
+                CNSD &nbsp;·&nbsp;<span className="font-mono">{record.form_number}</span>
               </p>
             </div>
           </div>
@@ -275,7 +236,7 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
               <Clock size={13} className="text-slate-400" />
               <span className="font-medium font-mono">{SHIFT_TIME_LABELS[record.shift_type] ?? '—'}</span>
             </div>
-            <ShiftBadge shift={record.shift_type} />
+            <ShiftBadge shift={record.shift_type as ShiftType} />
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
               <MapPin size={13} className="text-slate-400" />
               <span>{record.facility}</span>
@@ -284,7 +245,7 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
               <Users size={13} className="text-slate-400" />
               <span>{record.technicians.length} Teknisi</span>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => navigate(`/cnsd/recorder-meter/${record.id}/print`)} className="gap-1.5 text-indigo-600 hover:bg-indigo-50">
+            <Button variant="ghost" size="sm" onClick={() => navigate(`/cnsd/atis-meter/${record.id}/print`)} className="gap-1.5 text-indigo-600 hover:bg-indigo-50">
               <Printer size={15} /> Print
             </Button>
             {!isReadOnly && (
@@ -295,19 +256,14 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Personnel summary */}
         <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <div>
             <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Manager Teknik</span>
-            <p className="mt-0.5 font-medium text-slate-700">
-              {record.manager?.name ?? <span className="text-slate-400 italic">Tidak ditugaskan</span>}
-            </p>
+            <p className="mt-0.5 font-medium text-slate-700">{record.manager?.name ?? <span className="text-slate-400 italic">Tidak ditugaskan</span>}</p>
           </div>
           <div>
             <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Supervisor CNSD</span>
-            <p className="mt-0.5 font-medium text-slate-700">
-              {record.supervisor?.name ?? <span className="text-slate-400 italic">Tidak ditugaskan</span>}
-            </p>
+            <p className="mt-0.5 font-medium text-slate-700">{record.supervisor?.name ?? <span className="text-slate-400 italic">Tidak ditugaskan</span>}</p>
           </div>
           <div>
             <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Teknisi CNSD</span>
@@ -318,7 +274,6 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Messages */}
       {errorMessage && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{errorMessage}</div>
       )}
@@ -326,7 +281,6 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{successMessage}</div>
       )}
 
-      {/* Info Peralatan card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
         <h2 className="text-sm font-bold text-slate-800">Informasi Peralatan</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
@@ -336,9 +290,9 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
           <InfoCell label="Tanggal" value={record.date} />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs pt-2 border-t border-slate-100">
-          <EditableMetaField label="Merk" value={merk} onChange={setMerk} disabled={isReadOnly || !canEditMetadata} placeholder="ATIS - UHER" />
-          <EditableMetaField label="Type" value={type} onChange={setType} disabled={isReadOnly || !canEditMetadata} placeholder="VC - MDx" />
-          <EditableMetaField label="Serial Number" value={serialNumber} onChange={setSerialNumber} disabled={isReadOnly || !canEditMetadata} placeholder="51" />
+          <EditableMetaField label="Merk" value={merk} onChange={setMerk} disabled={!!isReadOnly || !canEditMetadata} placeholder="TERMA" />
+          <EditableMetaField label="Type" value={type} onChange={setType} disabled={!!isReadOnly || !canEditMetadata} placeholder="—" />
+          <EditableMetaField label="Serial Number" value={serialNumber} onChange={setSerialNumber} disabled={!!isReadOnly || !canEditMetadata} placeholder="—" />
         </div>
         {!canEditMetadata && !isReadOnly && (
           <p className="text-[10px] text-slate-400 italic">
@@ -347,7 +301,6 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
         )}
       </div>
 
-      {/* Tabs */}
       {record.sections_meta.length > 0 && (
         <Tabs
           items={record.sections_meta.map((s) => ({ key: s.code, label: `${s.code}. ${s.name}` }))}
@@ -356,18 +309,16 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
         />
       )}
 
-      {/* Section content */}
       {activeSectionMeta && (
-        <RecorderSectionPanel
+        <AtisSectionPanel
           sectionMeta={activeSectionMeta}
           items={itemsBySection[activeSectionMeta.code] ?? []}
-          isReadOnly={isReadOnly}
+          isReadOnly={!!isReadOnly}
           getValue={getValue}
           onChange={updateField}
         />
       )}
 
-      {/* Pending-changes indicator */}
       {!isReadOnly && (
         <div className="flex items-center justify-end gap-3 pt-2">
           {hasChanges && (
@@ -384,45 +335,38 @@ export const CnsdRecorderMeterDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Signature panel */}
-      <CnsdRecorderMeterSignaturePanel record={record} onUpdated={(r) => setRecord(r)} />
+      <CnsdAtisMeterSignaturePanel record={record} onSignSuccess={(r) => setRecord(r)} />
     </div>
   );
 };
 
-// ─── Section panel ────────────────────────────────────────────
-
-interface RecorderSectionPanelProps {
-  sectionMeta: CnsdRecorderMeterSectionMeta;
-  items: CnsdRecorderMeterItem[];
+interface AtisSectionPanelProps {
+  sectionMeta: SectionMeta;
+  items: CnsdAtisMeterItem[];
   isReadOnly: boolean;
-  getValue: (item: CnsdRecorderMeterItem, field: keyof CnsdRecorderMeterItem) => string;
-  onChange: (itemId: number, field: keyof CnsdRecorderMeterItem, value: string | null) => void;
+  getValue: (item: CnsdAtisMeterItem, field: keyof CnsdAtisMeterItem) => string;
+  onChange: (itemId: number, field: keyof CnsdAtisMeterItem, value: string | null) => void;
 }
 
-const RecorderSectionPanel: React.FC<RecorderSectionPanelProps> = ({
+const AtisSectionPanel: React.FC<AtisSectionPanelProps> = ({
   sectionMeta, items, isReadOnly, getValue, onChange,
 }) => {
   const groups = useMemo(() => {
     const order: string[] = [];
-    const map: Record<string, CnsdRecorderMeterItem[]> = {};
+    const map: Record<string, CnsdAtisMeterItem[]> = {};
     items.forEach((it) => {
-      const key = it.group_name ?? '__ungrouped__';
-      if (!map[key]) {
-        map[key] = [];
-        order.push(key);
-      }
+      if (it.is_header) return;
+      const key = `${it.group_number ?? '0'}::${it.group_name ?? '__'}`;
+      if (!map[key]) { map[key] = []; order.push(key); }
       map[key].push(it);
     });
-    return order.map((key) => ({
-      number: items.find((i) => (i.group_name ?? '__ungrouped__') === key)?.group_number ?? null,
-      name: key === '__ungrouped__' ? null : key,
-      items: map[key],
-    }));
+    return order.map((key) => {
+      const first = items.find((i) => `${i.group_number ?? '0'}::${i.group_name ?? '__'}` === key);
+      return { number: first?.group_number ?? null, name: first?.group_name ?? null, items: map[key] };
+    });
   }, [items]);
 
-  const isServerDual = sectionMeta.inputs_layout === 'server_dual';
-  const colCount = isServerDual ? 6 : 5;
+  const colCount = 5;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -432,44 +376,25 @@ const RecorderSectionPanel: React.FC<RecorderSectionPanelProps> = ({
             {sectionMeta.code}. {sectionMeta.name}
           </h2>
           <p className="text-[11px] text-slate-500 mt-0.5">
-            {isServerDual
-              ? 'Isi hasil pengukuran SERVER A dan SERVER B per channel. Baris U/S (merah) tidak dapat diisi.'
-              : 'Isi kolom HASIL untuk tiap kegiatan pemeriksaan lingkungan kerja.'}
+            Isi kolom READING sesuai NOMINAL untuk tiap parameter pemeriksaan.
           </p>
         </div>
-        <span className="text-xs font-medium text-slate-400">{items.length} item</span>
+        <span className="text-xs font-medium text-slate-400">{items.filter((i) => !i.is_header).length} item</span>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse min-w-[760px]">
           <thead>
             <tr className="bg-slate-50 text-slate-700">
-              <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 w-24 text-[11px] uppercase tracking-wider">No</th>
-              <th className="px-3 py-2 text-left font-semibold border-b border-slate-200 min-w-[220px] text-[11px] uppercase tracking-wider">
-                {isServerDual ? 'Pembacaan Meter Reading' : 'Kegiatan'}
-              </th>
-              <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[130px] text-[11px] uppercase tracking-wider">
-                {isServerDual ? 'Nominal / Content' : 'Nominal'}
-              </th>
-              {isServerDual ? (
-                <>
-                  <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[110px] text-[11px] uppercase tracking-wider">
-                    {sectionMeta.columns_label_1 ?? 'Server A'}
-                  </th>
-                  <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[110px] text-[11px] uppercase tracking-wider">
-                    {sectionMeta.columns_label_2 ?? 'Server B'}
-                  </th>
-                </>
-              ) : (
-                <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[140px] text-[11px] uppercase tracking-wider">
-                  {sectionMeta.columns_label_1 ?? 'Hasil Pemeriksaan'}
-                </th>
-              )}
+              <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 w-12 text-[11px] uppercase tracking-wider">No</th>
+              <th className="px-3 py-2 text-left font-semibold border-b border-slate-200 min-w-[260px] text-[11px] uppercase tracking-wider">Pemeriksaan</th>
+              <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[120px] text-[11px] uppercase tracking-wider">Nominal</th>
+              <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[140px] text-[11px] uppercase tracking-wider">Reading</th>
               <th className="px-2 py-2 text-left font-semibold border-b border-slate-200 min-w-[140px] text-[11px] uppercase tracking-wider">Keterangan</th>
             </tr>
           </thead>
           <tbody>
-            {items.length === 0 ? (
+            {groups.length === 0 ? (
               <tr>
                 <td colSpan={colCount} className="px-4 py-8 text-center text-slate-400 text-sm">
                   Belum ada baris pada section ini.
@@ -485,15 +410,8 @@ const RecorderSectionPanel: React.FC<RecorderSectionPanelProps> = ({
                       </td>
                     </tr>
                   )}
-                  {group.items.map((item) => (
-                    <RecorderItemRow
-                      key={item.id}
-                      item={item}
-                      isServerDual={isServerDual}
-                      isReadOnly={isReadOnly}
-                      getValue={getValue}
-                      onChange={onChange}
-                    />
+                  {group.items.map((item, idx) => (
+                    <AtisItemRow key={item.id} item={item} rowIdx={idx + 1} isReadOnly={isReadOnly} getValue={getValue} onChange={onChange} />
                   ))}
                 </React.Fragment>
               ))
@@ -505,89 +423,34 @@ const RecorderSectionPanel: React.FC<RecorderSectionPanelProps> = ({
   );
 };
 
-// ─── Item row ─────────────────────────────────────────────────
-
-interface RecorderItemRowProps {
-  item: CnsdRecorderMeterItem;
-  isServerDual: boolean;
+interface AtisItemRowProps {
+  item: CnsdAtisMeterItem;
+  rowIdx: number;
   isReadOnly: boolean;
-  getValue: (item: CnsdRecorderMeterItem, field: keyof CnsdRecorderMeterItem) => string;
-  onChange: (itemId: number, field: keyof CnsdRecorderMeterItem, value: string | null) => void;
+  getValue: (item: CnsdAtisMeterItem, field: keyof CnsdAtisMeterItem) => string;
+  onChange: (itemId: number, field: keyof CnsdAtisMeterItem, value: string | null) => void;
 }
 
-const RecorderItemRow: React.FC<RecorderItemRowProps> = ({
-  item, isServerDual, isReadOnly, getValue, onChange,
-}) => {
+const AtisItemRow: React.FC<AtisItemRowProps> = ({ item, rowIdx, isReadOnly, getValue, onChange }) => {
   const inputClass = 'w-full h-8 px-2 text-xs rounded border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent disabled:bg-slate-50 disabled:text-slate-500';
-  const isBlocked = item.is_blocked;
-  const disabled = isReadOnly || isBlocked;
-
-  // Blocked U/S row: red strip across hasil columns
-  if (isBlocked) {
-    return (
-      <tr className="border-b border-slate-100 bg-red-50">
-        <td className="px-2 py-2 text-center text-slate-500 font-mono text-[11px] align-middle">
-          {item.item_number ?? ''}
-        </td>
-        <td className="px-3 py-2 align-middle text-slate-800 font-medium">
-          {item.item_name}
-        </td>
-        <td colSpan={isServerDual ? 3 : 2} className="px-3 py-2 align-middle text-center bg-red-500 text-white font-bold uppercase tracking-wider">
-          <span className="inline-flex items-center gap-1.5">
-            <LockIcon size={12} /> {item.block_reason ?? 'U/S'}
-          </span>
-        </td>
-        <td className="px-2 py-2 align-middle text-slate-400 italic text-[11px]">—</td>
-      </tr>
-    );
-  }
 
   return (
     <tr className="hover:bg-slate-50 transition-colors border-b border-slate-100">
-      <td className="px-2 py-2 text-center text-slate-500 font-mono text-[11px] align-middle">
-        {item.item_number ?? ''}
-      </td>
-      <td className="px-3 py-2 align-middle text-slate-800 font-medium">
-        {item.item_name}
-      </td>
+      <td className="px-2 py-2 text-center text-slate-500 font-mono text-[11px] align-middle">{rowIdx}</td>
+      <td className="px-3 py-2 align-middle text-slate-800 font-medium">- {item.item_name}</td>
       <td className={cn('px-2 py-2 align-middle text-center text-slate-600 text-[11px]', !item.nominal && 'text-slate-300')}>
         {item.nominal || '—'}
       </td>
-      {isServerDual ? (
-        <>
-          <td className="px-2 py-2 align-middle">
-            <input
-              type="text"
-              className={inputClass}
-              placeholder="..."
-              value={getValue(item, 'hasil_server_a')}
-              onChange={(e) => onChange(item.id, 'hasil_server_a', e.target.value)}
-              disabled={disabled}
-            />
-          </td>
-          <td className="px-2 py-2 align-middle">
-            <input
-              type="text"
-              className={inputClass}
-              placeholder="..."
-              value={getValue(item, 'hasil_server_b')}
-              onChange={(e) => onChange(item.id, 'hasil_server_b', e.target.value)}
-              disabled={disabled}
-            />
-          </td>
-        </>
-      ) : (
-        <td className="px-2 py-2 align-middle">
-          <input
-            type="text"
-            className={inputClass}
-            placeholder="..."
-            value={getValue(item, 'hasil')}
-            onChange={(e) => onChange(item.id, 'hasil', e.target.value)}
-            disabled={disabled}
-          />
-        </td>
-      )}
+      <td className="px-2 py-2 align-middle">
+        <input
+          type="text"
+          className={inputClass}
+          placeholder="..."
+          value={getValue(item, 'reading')}
+          onChange={(e) => onChange(item.id, 'reading', e.target.value)}
+          disabled={isReadOnly}
+        />
+      </td>
       <td className="px-2 py-2 align-middle">
         <input
           type="text"
@@ -595,14 +458,12 @@ const RecorderItemRow: React.FC<RecorderItemRowProps> = ({
           placeholder="Catatan"
           value={getValue(item, 'keterangan')}
           onChange={(e) => onChange(item.id, 'keterangan', e.target.value)}
-          disabled={disabled}
+          disabled={isReadOnly}
         />
       </td>
     </tr>
   );
 };
-
-// ─── Small subcomponents ──────────────────────────────────────
 
 const InfoCell: React.FC<{ label: string; value: string | null }> = ({ label, value }) => (
   <div>
@@ -625,14 +486,9 @@ const EditableMetaField: React.FC<EditableMetaFieldProps> = ({ label, value, onC
     {disabled ? (
       <p className="text-xs text-slate-700 font-medium">{value || '—'}</p>
     ) : (
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
         className="w-full h-9 px-3 text-xs rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-brand-primary focus:border-transparent focus:outline-none placeholder:text-slate-300"
-        maxLength={60}
-      />
+        maxLength={60} />
     )}
   </div>
 );

@@ -83,9 +83,12 @@ export interface CnsdDvorMeterCreatePayload {
 }
 
 export interface CnsdDvorMeterUpdatePayload {
-  tx1_mode?: 'MAIN' | 'STANDBY';
-  tx2_mode?: 'MAIN' | 'STANDBY';
-  items: Array<{
+  merk?: string | null;
+  type?: string | null;
+  serial_number?: string | null;
+  tx1_mode?: 'MAIN' | 'STANDBY' | null;
+  tx2_mode?: 'MAIN' | 'STANDBY' | null;
+  items?: Array<{
     id: number;
     hasil_pemeriksaan?: string | null;
     keterangan?: string | null;

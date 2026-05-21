@@ -120,7 +120,10 @@ export interface CnsdAmscMeterListParams {
 }
 
 export interface CnsdAmscMeterUpdatePayload {
-  items: Array<{
+  merk?: string | null;
+  type?: string | null;
+  serial_number?: string | null;
+  items?: Array<{
     id: number;
     hasil_a?: string | null;
     hasil_b?: string | null;

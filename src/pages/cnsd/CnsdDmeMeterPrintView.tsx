@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/common/Button';
-import { cnsdLocalizerMeterService } from '@/services/cnsdLocalizerMeterService';
+import { cnsdDmeMeterService } from '@/services/cnsdDmeMeterService';
 import type {
-  CnsdLocalizerMeterItem,
-  CnsdLocalizerMeterRecordDetail,
-} from '@/types/cnsdLocalizer';
+  CnsdDmeMeterItem,
+  CnsdDmeMeterRecordDetail,
+} from '@/types/cnsdDme';
 
 const SHIFT_TIME_LABELS: Record<string, string> = {
   pagi:  '07:00 — 13:00',
@@ -31,38 +31,34 @@ interface SectionMeta {
 
 interface PrintBlockProps {
   meta: SectionMeta;
-  items: CnsdLocalizerMeterItem[];
+  items: CnsdDmeMeterItem[];
 }
 
 const PrintBlock: React.FC<PrintBlockProps> = ({ meta, items }) => {
   const totalCols = 6;
   const isMeter = meta.inputs_layout === 'meter_reading';
 
-  const groups: { number: number | null; name: string | null; items: CnsdLocalizerMeterItem[] }[] = [];
+  const groups: { number: number | null; name: string | null; items: CnsdDmeMeterItem[] }[] = [];
   items.forEach((it) => {
     if (it.is_header) return;
     const key = `${it.group_number ?? '0'}::${it.group_name ?? ''}`;
     const last = groups[groups.length - 1];
     const lastKey = last ? `${last.number ?? '0'}::${last.name ?? ''}` : null;
-    if (lastKey === key && last) {
-      last.items.push(it);
-    } else {
-      groups.push({ number: it.group_number ?? null, name: it.group_name ?? null, items: [it] });
-    }
+    if (lastKey === key && last) last.items.push(it);
+    else groups.push({ number: it.group_number ?? null, name: it.group_name ?? null, items: [it] });
   });
 
   if (!isMeter) {
     return (
       <>
         <tr>
-          <td className="gc-section-bar text-center" style={{ verticalAlign: 'middle' }}>{meta.code}</td>
-          <td colSpan={totalCols - 1} className="gc-section-bar font-bold uppercase">{meta.name}</td>
+          <td colSpan={totalCols} className="gc-section-bar font-bold uppercase">{meta.name}</td>
         </tr>
         <tr>
           <td className="gc-group-bar text-center font-bold">NO</td>
           <td className="gc-group-bar font-bold">KEGIATAN</td>
           <td className="gc-group-bar text-center font-bold">Nominal</td>
-          <td colSpan={2} className="gc-group-bar text-center font-bold">HASIL</td>
+          <td colSpan={2} className="gc-group-bar text-center font-bold">HASIL PEMERIKSAAN</td>
           <td className="gc-group-bar font-bold">KETERANGAN</td>
         </tr>
         {groups.flatMap((g) =>
@@ -84,8 +80,6 @@ const PrintBlock: React.FC<PrintBlockProps> = ({ meta, items }) => {
     <>
       {groups.map((group, gIdx) => {
         const hasDual = group.items.some((i) => i.hasil_layout === 'dual');
-        // FRONT PANEL (group 1) uses TX1/TX2 labels; CL/DS/CLR/Near Field use M1/M2
-        const isFrontPanel = (group.name ?? '').toUpperCase() === 'FRONT PANEL';
         return (
           <React.Fragment key={`${meta.code}-grp-${gIdx}`}>
             <tr>
@@ -94,8 +88,8 @@ const PrintBlock: React.FC<PrintBlockProps> = ({ meta, items }) => {
               <td className="gc-group-bar text-center font-bold">Standart</td>
               {hasDual ? (
                 <>
-                  <td className="gc-group-bar text-center font-bold">{isFrontPanel ? 'TX1' : 'M1'}</td>
-                  <td className="gc-group-bar text-center font-bold">{isFrontPanel ? 'TX2' : 'M2'}</td>
+                  <td className="gc-group-bar text-center font-bold">TX1</td>
+                  <td className="gc-group-bar text-center font-bold">TX2</td>
                 </>
               ) : (
                 <td colSpan={2} className="gc-group-bar text-center font-bold">HASIL</td>
@@ -129,28 +123,25 @@ const PrintBlock: React.FC<PrintBlockProps> = ({ meta, items }) => {
 };
 
 /**
- * CNSD Localizer Meter Reading Print View — A4 portrait, B&W.
- * Mirrors paper 008_Localizer.
+ * CNSD DME Meter Reading Print View — A4 portrait, B&W. Mirrors paper 011_DME (FORM N-5).
  */
-export const CnsdLocalizerMeterPrintView: React.FC = () => {
+export const CnsdDmeMeterPrintView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [record, setRecord] = useState<CnsdLocalizerMeterRecordDetail | null>(null);
+  const [record, setRecord] = useState<CnsdDmeMeterRecordDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchRecord = async () => {
-      try {
-        const data = await cnsdLocalizerMeterService.getRecord(Number(id));
-        setRecord(data);
-      } catch { setRecord(null); }
+      try { setRecord(await cnsdDmeMeterService.getRecord(Number(id))); }
+      catch { setRecord(null); }
       finally { setIsLoading(false); }
     };
     void fetchRecord();
   }, [id]);
 
   const itemsBySection = useMemo(() => {
-    const map: Record<string, CnsdLocalizerMeterItem[]> = {};
+    const map: Record<string, CnsdDmeMeterItem[]> = {};
     record?.items.forEach((it) => {
       const code = it.section_code ?? 'A';
       if (!map[code]) map[code] = [];
@@ -171,7 +162,7 @@ export const CnsdLocalizerMeterPrintView: React.FC = () => {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4">
         <p className="text-sm text-slate-600">Form tidak ditemukan atau gagal memuat data.</p>
-        <Button variant="outline" onClick={() => navigate('/cnsd/localizer-meter')}>Kembali</Button>
+        <Button variant="outline" onClick={() => navigate('/cnsd/dme-meter')}>Kembali</Button>
       </div>
     );
   }
@@ -197,7 +188,7 @@ export const CnsdLocalizerMeterPrintView: React.FC = () => {
       `}</style>
 
       <div className="print-hide mx-auto mb-4 flex max-w-[210mm] items-center justify-between">
-        <Button variant="outline" className="gap-2" onClick={() => navigate(`/cnsd/localizer-meter/${record.id}`)}>
+        <Button variant="outline" className="gap-2" onClick={() => navigate(`/cnsd/dme-meter/${record.id}`)}>
           <ArrowLeft size={16} /> Kembali
         </Button>
         <Button className="gap-2" onClick={() => window.print()}>
@@ -211,7 +202,14 @@ export const CnsdLocalizerMeterPrintView: React.FC = () => {
             <img src="/assets/icon/logoairnav.svg" alt="AirNav Indonesia" style={{ height: '38px', width: 'auto' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             <div className="leading-tight">
               <div className="text-[11px] font-bold">AirNav Indonesia</div>
+              <div className="text-[8px] font-semibold uppercase">FAS CNS &amp; OTOMASI</div>
             </div>
+          </div>
+          <div className="text-right leading-tight text-[9px]">
+            <div className="font-bold text-[10px]">Perum LPPNPI</div>
+            <div>KANTOR CABANG SURABAYA</div>
+            <div>Telp (031) 8688456 Fax. (031) 8688536</div>
+            <div>email : sub@airnavindonesia.co.id</div>
           </div>
         </div>
 
@@ -223,7 +221,8 @@ export const CnsdLocalizerMeterPrintView: React.FC = () => {
           </colgroup>
           <tbody>
             <tr>
-              <td colSpan={3} className="text-center font-bold text-[14px] py-1">METER READING</td>
+              <td colSpan={2} className="text-center font-bold text-[14px] py-1">METER READING</td>
+              <td className="text-right font-bold text-[10px]">{text(record.form_code) || 'FORM N-5'}</td>
             </tr>
             <tr>
               <td className="align-top leading-tight">
@@ -242,27 +241,34 @@ export const CnsdLocalizerMeterPrintView: React.FC = () => {
                   </tbody>
                 </table>
               </td>
-              <td className="gc-section-bar text-center font-bold uppercase text-[12px]">
-                <div>ILS</div>
-                <div>LOCALIZER</div>
-              </td>
+              <td className="gc-section-bar text-center font-bold uppercase text-[12px]">DME</td>
               <td className="align-top leading-tight">
                 <table className="gc-meta text-[10px]">
                   <tbody>
                     <tr>
                       <td className="font-semibold pr-1" style={{ width: '40px' }}>MERK</td>
                       <td className="px-0.5">:</td>
-                      <td>{text(record.merk) || 'MOPENS'}</td>
+                      <td>{text(record.merk) || 'INTERSCAN'}</td>
                     </tr>
                     <tr>
                       <td className="font-semibold pr-1">TYPE</td>
                       <td className="px-0.5">:</td>
-                      <td>{text(record.type) || '500'}</td>
+                      <td>{text(record.type) || 'LDB 102'}</td>
                     </tr>
                     <tr>
-                      <td className="font-semibold pr-1">SN</td>
+                      <td className="font-semibold pr-1">S N</td>
                       <td className="px-0.5">:</td>
                       <td>{text(record.serial_number) || '-'}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-semibold pr-1">Tx 1</td>
+                      <td className="px-0.5">:</td>
+                      <td>{text(record.tx1_mode) || 'MAIN / STANDBY'}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-semibold pr-1">Tx 2</td>
+                      <td className="px-0.5">:</td>
+                      <td>{text(record.tx2_mode) || 'MAIN / STANDBY'}</td>
                     </tr>
                   </tbody>
                 </table>

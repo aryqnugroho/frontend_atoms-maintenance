@@ -1,148 +1,248 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import axios from 'axios';
 import {
-  Radio,
+  AlertCircle,
   ArrowLeft,
-  Save,
-  Printer,
-  Users,
   Calendar,
+  Clock,
   MapPin,
+  Printer,
+  Radio,
+  Save,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
-import { PageHeader } from '@/components/common/PageHeader';
-import { StatusBadge } from '@/components/common/StatusBadge';
 import { ShiftBadge } from '@/components/common/ShiftBadge';
+import { StatusBadge } from '@/components/common/StatusBadge';
+import type { ShiftType } from '@/types';
+import { Skeleton } from '@/components/common/Skeleton';
+import { Tabs } from '@/components/common/Tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { cnsdReceiverMeterService } from '@/services/cnsdReceiverMeterService';
 import { CnsdReceiverMeterSignaturePanel } from './components/CnsdReceiverMeterSignaturePanel';
-import type { CnsdReceiverMeterRecordDetail, CnsdReceiverMeterItem } from '@/types/cnsdReceiver';
+import type {
+  CnsdReceiverMeterItem,
+  CnsdReceiverMeterRecordDetail,
+} from '@/types/cnsdReceiver';
 
-type SectionTab = '1' | '2';
+// ─── Constants ─────────────────────────────────────────────────
 
-const SECTION_TABS: { code: SectionTab; label: string }[] = [
-  { code: '1', label: 'Receiver' },
-  { code: '2', label: 'Lingkungan Kerja' },
-];
+const SHIFT_TIME_LABELS: Record<string, string> = {
+  pagi:  '07:00 — 13:00',
+  siang: '13:00 — 19:00',
+  malam: '19:00 — 07:00',
+};
 
-// Status dropdown options for receiver items
 const STATUS_OPTIONS = ['ON LINE', 'OFF LINE'];
 
-// Environment dropdown options
-function getEnvDropdownOptions(item: CnsdReceiverMeterItem): string[] | null {
-  const nominal = item.nominal;
-  if (!nominal) return null;
-  if (nominal === '√') return ['√', '-'];
-  return null;
+interface SectionMeta {
+  code: string;
+  name: string;
+  inputs_layout: string;
+  groups: Array<{ number: number | null; name: string | null }>;
 }
 
+// ─── Main component ───────────────────────────────────────────
+
+/**
+ * CNSD Receiver Meter Reading — detail / edit page.
+ *
+ * Mirrors the EQ-1 / Radar Meter Reading detail page for UI consistency:
+ *   - GP-style header card (Sky icon, status pill, date / shift-time / facility /
+ *     teknisi badges, Print + Save buttons, personnel 3-col grid)
+ *   - Info Peralatan card with editable Merk / Type / SN (Manager/Supervisor only)
+ *   - Tabs component, one per section_meta entry (1. RECEIVER, 2. LINGKUNGAN KERJA)
+ *   - Section 1 (RECEIVER) renders grouped frequency rows with
+ *     STATUS A | STATUS B (ON LINE / OFF LINE dropdowns) | SEQUELSH ON | KETERANGAN
+ *   - Section 2 (LINGKUNGAN KERJA) renders KEGIATAN | NOMINAL | HASIL | KETERANGAN
+ *   - Signature panel at the bottom
+ *
+ * Completed records render fully read-only.
+ */
 export const CnsdReceiverMeterDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user: _user } = useAuth();
+  const { user } = useAuth();
+  const recordId = Number(id);
 
   const [record, setRecord] = useState<CnsdReceiverMeterRecordDetail | null>(null);
+  const [editedItems, setEditedItems] = useState<Record<number, Partial<CnsdReceiverMeterItem>>>({});
+  const [activeSectionCode, setActiveSectionCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<SectionTab>('1');
-  const [localItems, setLocalItems] = useState<CnsdReceiverMeterItem[]>([]);
 
+  // Editable equipment metadata (paper-form header). Flushed on Save alongside item edits.
+  const [merk, setMerk] = useState('');
+  const [type, setType] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
+
+  const canEditMetadata =
+    user?.role === 'Admin' ||
+    user?.role === 'Manager Teknik' ||
+    user?.role === 'Supervisor CNSD';
+
+  // ─── Fetch ──────────────────────────────────────────────────
   const fetchRecord = useCallback(async () => {
-    if (!id) return;
+    if (!recordId || Number.isNaN(recordId)) {
+      setErrorMessage('ID form tidak valid.');
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
-      const data = await cnsdReceiverMeterService.getRecord(Number(id));
+      const data = await cnsdReceiverMeterService.getRecord(recordId);
       setRecord(data);
-      setLocalItems(data.items);
+      setEditedItems({});
+      setMerk(data.merk ?? '');
+      setType(data.type ?? '');
+      setSerialNumber(data.serial_number ?? '');
+      if (data.sections_meta.length > 0) {
+        const stillExists = activeSectionCode && data.sections_meta.some((s) => s.code === activeSectionCode);
+        if (!stillExists) {
+          setActiveSectionCode(data.sections_meta[0].code);
+        }
+      }
       setErrorMessage(null);
-    } catch {
-      setErrorMessage('Gagal memuat data form Receiver.');
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 404) {
+        setErrorMessage('Form tidak ditemukan.');
+      } else {
+        setErrorMessage('Gagal memuat data form.');
+      }
+      setRecord(null);
     } finally {
       setIsLoading(false);
     }
-  }, [id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordId]);
 
   useEffect(() => {
     void fetchRecord();
-  }, [fetchRecord]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordId]);
 
-  const handleItemChange = (itemId: number, field: string, value: string | null) => {
-    setLocalItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, [field]: value } : it)));
+  // ─── Derived ────────────────────────────────────────────────
+  const itemsBySection = useMemo(() => {
+    const map: Record<string, CnsdReceiverMeterItem[]> = {};
+    if (!record) return map;
+    record.items.forEach((it) => {
+      const code = it.section_code ?? '1';
+      if (!map[code]) map[code] = [];
+      map[code].push(it);
+    });
+    return map;
+  }, [record]);
+
+  const isCompleted = record?.status === 'completed';
+  const isReadOnly = isCompleted;
+  const metadataDirty =
+    !!record &&
+    (merk !== (record.merk ?? '') ||
+      type !== (record.type ?? '') ||
+      serialNumber !== (record.serial_number ?? ''));
+  const hasChanges = Object.keys(editedItems).length > 0 || metadataDirty;
+
+  const updateField = (
+    itemId: number,
+    field: keyof CnsdReceiverMeterItem,
+    value: string | null,
+  ) => {
+    if (isReadOnly) return;
+    setEditedItems((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...(prev[itemId] ?? {}),
+        [field]: value === '' ? null : value,
+      },
+    }));
   };
 
+  const getValue = (item: CnsdReceiverMeterItem, field: keyof CnsdReceiverMeterItem): string => {
+    const edited = editedItems[item.id];
+    if (edited && field in edited) {
+      const v = edited[field];
+      return v == null ? '' : String(v);
+    }
+    const original = item[field];
+    return original == null ? '' : String(original);
+  };
+
+  // ─── Save ───────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!record) return;
+    if (!record || !hasChanges) return;
+
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+
+    const items = Object.entries(editedItems).map(([rawId, patch]) => ({
+      id: Number(rawId),
+      status_a:    'status_a'    in patch ? patch.status_a    ?? null : undefined,
+      status_b:    'status_b'    in patch ? patch.status_b    ?? null : undefined,
+      sequelsh_on: 'sequelsh_on' in patch ? patch.sequelsh_on ?? null : undefined,
+      hasil:       'hasil'       in patch ? patch.hasil       ?? null : undefined,
+      keterangan:  'keterangan'  in patch ? patch.keterangan  ?? null : undefined,
+    }));
+
     try {
       const updated = await cnsdReceiverMeterService.updateRecord(record.id, {
-        items: localItems.map((it) => ({
-          id: it.id,
-          status_a: it.status_a,
-          status_b: it.status_b,
-          sequelsh_on: it.sequelsh_on,
-          keterangan: it.keterangan,
-          hasil: it.hasil,
-        })),
+        merk: metadataDirty ? merk || null : undefined,
+        type: metadataDirty ? type || null : undefined,
+        serial_number: metadataDirty ? serialNumber || null : undefined,
+        items: items.length > 0 ? items : undefined,
       });
       setRecord(updated);
-      setLocalItems(updated.items);
-      setSuccessMessage('Perubahan berhasil disimpan.');
+      setEditedItems({});
+      const parts: string[] = [];
+      if (items.length > 0) parts.push(`${items.length} item`);
+      if (metadataDirty) parts.push('metadata peralatan');
+      setSuccessMessage(`${parts.join(' + ')} disimpan.`);
       setTimeout(() => setSuccessMessage(null), 3000);
-    } catch {
-      setErrorMessage('Gagal menyimpan perubahan.');
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response) {
+        const data = err.response.data as { message?: string };
+        setErrorMessage(data.message ?? 'Gagal menyimpan perubahan.');
+      } else {
+        setErrorMessage('Koneksi gagal, coba lagi.');
+      }
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleSignSuccess = (updated: CnsdReceiverMeterRecordDetail) => {
-    setRecord(updated);
-    setLocalItems(updated.items);
-  };
-
-  // Compute grouped items for section 1 — must be called unconditionally (Rules of Hooks)
-  const groupedItems = useMemo(() => {
-    if (activeTab !== '1') return null;
-    const groups: Map<number, CnsdReceiverMeterItem[]> = new Map();
-    const section1 = localItems.filter((it) => it.section_code === '1');
-    for (const item of section1) {
-      const gn = item.group_number ?? 0;
-      if (!groups.has(gn)) groups.set(gn, []);
-      groups.get(gn)!.push(item);
-    }
-    return groups;
-  }, [activeTab, localItems]);
-
+  // ─── Render ─────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto space-y-4 animate-fade-in">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-100 rounded w-1/3" />
-          <div className="h-64 bg-gray-100 rounded-2xl" />
-        </div>
+      <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
+        <Skeleton className="h-12 w-1/3" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-96 w-full" />
       </div>
     );
   }
 
   if (!record) {
     return (
-      <div className="max-w-7xl mx-auto">
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMessage ?? 'Form tidak ditemukan.'}
-        </div>
+      <div className="max-w-3xl mx-auto py-20 text-center space-y-4">
+        <AlertCircle className="mx-auto h-12 w-12 text-slate-400" />
+        <h2 className="text-lg font-semibold text-slate-700">{errorMessage ?? 'Form tidak ditemukan.'}</h2>
+        <Button variant="outline" onClick={() => navigate('/cnsd/receiver-meter')} className="gap-2">
+          <ArrowLeft size={16} />
+          Kembali ke Daftar
+        </Button>
       </div>
     );
   }
 
-  const isCompleted = record.status === 'completed';
-  const sectionItems = localItems.filter((it) => it.section_code === activeTab);
+  const activeSectionMeta = activeSectionCode
+    ? record.sections_meta.find((s) => s.code === activeSectionCode) ?? null
+    : null;
 
   return (
-    <div className="space-y-5 animate-fade-in max-w-7xl mx-auto">
+    <div className="max-w-full space-y-5 animate-fade-in pb-12">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-slate-500">
         <button
@@ -158,338 +258,425 @@ export const CnsdReceiverMeterDetailPage: React.FC = () => {
           onClick={() => navigate('/cnsd/receiver-meter')}
           className="hover:text-slate-700 transition-colors"
         >
-          Meter Reading Receiver
+          Receiver Meter Reading
         </button>
         <span>/</span>
-        <span className="text-slate-700 font-medium font-mono">{record.form_number}</span>
+        <span className="text-slate-700 font-mono font-medium">{record.form_number}</span>
       </div>
 
-      <PageHeader
-        icon={Radio}
-        iconBg="bg-sky-100"
-        iconColor="text-maintenance-cnsd"
-        title={`Meter Reading Receiver — ${record.form_number}`}
-        subtitle={`${record.form_code} · ${record.location}`}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate(`/cnsd/receiver-meter/${record.id}/print`)}
-              className="gap-2"
-            >
-              <Printer size={16} /> Print PDF
-            </Button>
-            {!isCompleted && (
-              <Button onClick={handleSave} isLoading={isSaving} className="gap-2">
-                <Save size={16} /> Simpan Perubahan
-              </Button>
-            )}
-          </div>
-        }
-      />
-
-      {/* Messages */}
-      {errorMessage && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-          {errorMessage}
-        </div>
-      )}
-      {successMessage && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700" role="status">
-          {successMessage}
-        </div>
-      )}
-
-      {/* Header info */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-          <div className="flex items-start gap-2">
-            <Calendar size={15} className="text-slate-400 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs text-slate-500">Tanggal</p>
-              <p className="font-medium text-slate-800">{record.date}</p>
+      {/* Header card */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-lg bg-sky-100 flex items-center justify-center shrink-0">
+              <Radio size={18} className="text-sky-600" />
             </div>
-          </div>
-          <div className="flex items-start gap-2">
             <div>
-              <p className="text-xs text-slate-500">Shift</p>
-              <ShiftBadge shift={record.shift_type as import('@/types').ShiftType} />
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <MapPin size={15} className="text-slate-400 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs text-slate-500">Lokasi</p>
-              <p className="font-medium text-slate-800">{record.location}</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <div>
-              <p className="text-xs text-slate-500">Status</p>
-              <StatusBadge status={record.status} variant="pill" />
-            </div>
-          </div>
-          {record.merk && (
-            <div>
-              <p className="text-xs text-slate-500">Merk</p>
-              <p className="font-medium text-slate-800">{record.merk}</p>
-            </div>
-          )}
-          {record.type && (
-            <div>
-              <p className="text-xs text-slate-500">Type</p>
-              <p className="font-medium text-slate-800">{record.type}</p>
-            </div>
-          )}
-          {record.serial_number && (
-            <div>
-              <p className="text-xs text-slate-500">S/N</p>
-              <p className="font-medium text-slate-800">{record.serial_number}</p>
-            </div>
-          )}
-          <div className="flex items-start gap-2">
-            <Users size={15} className="text-slate-400 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs text-slate-500">Teknisi</p>
-              <p className="font-medium text-slate-800">
-                {record.technicians.map((t) => t.technician_name).join(', ') || '—'}
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg font-bold text-slate-900">
+                  Meter Reading — Receiver
+                </h1>
+                <StatusBadge status={record.status} variant="pill" />
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                CNSD &nbsp;·&nbsp;
+                <span className="font-mono">{record.form_number}</span>
               </p>
             </div>
           </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+              <Calendar size={13} className="text-slate-400" />
+              <span>{record.date}</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg" title="Rentang waktu shift">
+              <Clock size={13} className="text-slate-400" />
+              <span className="font-medium font-mono">{SHIFT_TIME_LABELS[record.shift_type] ?? '—'}</span>
+            </div>
+            <ShiftBadge shift={record.shift_type as ShiftType} />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+              <MapPin size={13} className="text-slate-400" />
+              <span>{record.facility}</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+              <Users size={13} className="text-slate-400" />
+              <span>{record.technicians.length} Teknisi</span>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => navigate(`/cnsd/receiver-meter/${record.id}/print`)} className="gap-1.5 text-indigo-600 hover:bg-indigo-50">
+              <Printer size={15} /> Print
+            </Button>
+            {!isReadOnly && (
+              <Button size="sm" className="gap-1.5" onClick={() => void handleSave()} disabled={!hasChanges || isSaving} isLoading={isSaving}>
+                <Save size={14} /> Simpan
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Personnel summary */}
+        <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div>
+            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Manager Teknik</span>
+            <p className="mt-0.5 font-medium text-slate-700">
+              {record.manager?.name ?? <span className="text-slate-400 italic">Tidak ditugaskan</span>}
+            </p>
+          </div>
+          <div>
+            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Supervisor CNSD</span>
+            <p className="mt-0.5 font-medium text-slate-700">
+              {record.supervisor?.name ?? <span className="text-slate-400 italic">Tidak ditugaskan</span>}
+            </p>
+          </div>
+          <div>
+            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Teknisi CNSD</span>
+            <p className="mt-0.5 font-medium text-slate-700 truncate" title={record.technicians.map((t) => t.technician_name).join(', ')}>
+              {record.technicians.map((t) => t.technician_name).join(', ') || <span className="text-slate-400 italic">—</span>}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Section tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-        {SECTION_TABS.map((tab) => (
-          <button
-            key={tab.code}
-            onClick={() => setActiveTab(tab.code)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeTab === tab.code
-                ? 'bg-white text-slate-800 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
+      {/* Messages */}
+      {errorMessage && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{errorMessage}</div>
+      )}
+      {successMessage && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{successMessage}</div>
+      )}
+
+      {/* Info Peralatan card */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
+        <h2 className="text-sm font-bold text-slate-800">Informasi Peralatan</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+          <InfoCell label="Lokasi" value={record.location} />
+          <InfoCell label="Fasilitas" value={record.facility} />
+          <InfoCell label="Shift" value={SHIFT_TIME_LABELS[record.shift_type] ?? null} />
+          <InfoCell label="Tanggal" value={record.date} />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs pt-2 border-t border-slate-100">
+          <EditableMetaField
+            label="Merk"
+            value={merk}
+            onChange={setMerk}
+            disabled={isReadOnly || !canEditMetadata}
+            placeholder="OTE / PAE / TELERAD"
+          />
+          <EditableMetaField
+            label="Type"
+            value={type}
+            onChange={setType}
+            disabled={isReadOnly || !canEditMetadata}
+            placeholder="—"
+          />
+          <EditableMetaField
+            label="Serial Number"
+            value={serialNumber}
+            onChange={setSerialNumber}
+            disabled={isReadOnly || !canEditMetadata}
+            placeholder="—"
+          />
+        </div>
+        {!canEditMetadata && !isReadOnly && (
+          <p className="text-[10px] text-slate-400 italic">
+            Hanya Manager Teknik / Supervisor CNSD yang dapat mengubah identifikasi peralatan.
+          </p>
+        )}
+      </div>
+
+      {/* Tabs */}
+      {record.sections_meta.length > 0 && (
+        <Tabs
+          items={record.sections_meta.map((s) => ({
+            key: s.code,
+            label: `${s.code}. ${s.name}`,
+          }))}
+          defaultKey={activeSectionCode ?? record.sections_meta[0]?.code}
+          onChange={setActiveSectionCode}
+        />
+      )}
+
+      {/* Section content */}
+      {activeSectionMeta && (
+        <ReceiverSectionPanel
+          sectionMeta={activeSectionMeta}
+          items={itemsBySection[activeSectionMeta.code] ?? []}
+          isReadOnly={isReadOnly}
+          getValue={getValue}
+          onChange={updateField}
+        />
+      )}
+
+      {/* Pending-changes indicator */}
+      {!isReadOnly && (
+        <div className="flex items-center justify-end gap-3 pt-2">
+          {hasChanges && (
+            <span className="text-xs text-amber-600 font-medium">
+              {Object.keys(editedItems).length > 0 && `${Object.keys(editedItems).length} item`}
+              {Object.keys(editedItems).length > 0 && metadataDirty && ' + '}
+              {metadataDirty && 'metadata'}
+              {' belum disimpan'}
+            </span>
+          )}
+          <Button
+            onClick={() => void handleSave()}
+            disabled={!hasChanges}
+            isLoading={isSaving}
+            className="gap-2"
           >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Section 1 — Receiver */}
-      {activeTab === '1' && groupedItems && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs min-w-[700px]">
-              <thead>
-                <tr className="bg-sky-800 text-white">
-                  <th className="px-3 py-2 text-left w-10">NO</th>
-                  <th className="px-3 py-2 text-left">PEMERIKSAAN</th>
-                  <th className="px-3 py-2 text-center w-36">STATUS A</th>
-                  <th className="px-3 py-2 text-center w-36">STATUS B</th>
-                  <th className="px-3 py-2 text-center w-32">SEQUELSH ON</th>
-                  <th className="px-3 py-2 text-left w-40">KETERANGAN</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from(groupedItems.entries()).map(([, groupItems]) => {
-                  const headerRow = groupItems.find((it) => it.is_header);
-                  const dataRows = groupItems.filter((it) => !it.is_header);
-                  return (
-                    <React.Fragment key={headerRow?.id ?? groupItems[0]?.id}>
-                      {/* Group header */}
-                      {headerRow && (
-                        <tr className="bg-amber-100">
-                          <td colSpan={6} className="px-3 py-1.5 font-semibold text-slate-700 text-xs">
-                            {headerRow.group_name}
-                          </td>
-                        </tr>
-                      )}
-                      {/* Data rows */}
-                      {dataRows.map((item, idx) => (
-                        <tr
-                          key={item.id}
-                          className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}
-                        >
-                          <td className="px-3 py-2 text-slate-500 text-center">{idx + 1}</td>
-                          <td className="px-3 py-2 text-slate-700">{item.item_name}</td>
-                          <td className="px-3 py-2">
-                            {isCompleted ? (
-                              <span className={`text-xs font-medium ${item.status_a === 'ON LINE' ? 'text-emerald-700' : item.status_a === 'OFF LINE' ? 'text-red-600' : 'text-slate-500'}`}>
-                                {item.status_a ?? '—'}
-                              </span>
-                            ) : (
-                              <select
-                                value={item.status_a ?? ''}
-                                onChange={(e) => handleItemChange(item.id, 'status_a', e.target.value || null)}
-                                className={`w-full h-8 rounded border px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400 ${
-                                  item.status_a === 'ON LINE'
-                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                    : item.status_a === 'OFF LINE'
-                                    ? 'bg-red-50 border-red-200 text-red-700'
-                                    : 'bg-white border-gray-200 text-slate-600'
-                                }`}
-                                aria-label={`Status A ${item.item_name}`}
-                              >
-                                <option value="">— pilih —</option>
-                                {STATUS_OPTIONS.map((opt) => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            {isCompleted ? (
-                              <span className={`text-xs font-medium ${item.status_b === 'ON LINE' ? 'text-emerald-700' : item.status_b === 'OFF LINE' ? 'text-red-600' : 'text-slate-500'}`}>
-                                {item.status_b ?? '—'}
-                              </span>
-                            ) : (
-                              <select
-                                value={item.status_b ?? ''}
-                                onChange={(e) => handleItemChange(item.id, 'status_b', e.target.value || null)}
-                                className={`w-full h-8 rounded border px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400 ${
-                                  item.status_b === 'ON LINE'
-                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                    : item.status_b === 'OFF LINE'
-                                    ? 'bg-red-50 border-red-200 text-red-700'
-                                    : 'bg-white border-gray-200 text-slate-600'
-                                }`}
-                                aria-label={`Status B ${item.item_name}`}
-                              >
-                                <option value="">— pilih —</option>
-                                {STATUS_OPTIONS.map((opt) => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            {isCompleted ? (
-                              <span className="text-slate-700">{item.sequelsh_on ?? '—'}</span>
-                            ) : (
-                              <input
-                                type="text"
-                                value={item.sequelsh_on ?? ''}
-                                onChange={(e) => handleItemChange(item.id, 'sequelsh_on', e.target.value || null)}
-                                className="w-full h-8 rounded border border-gray-200 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400"
-                                placeholder="..."
-                                aria-label={`Sequelsh On ${item.item_name}`}
-                              />
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            {isCompleted ? (
-                              <span className="text-slate-700">{item.keterangan ?? '—'}</span>
-                            ) : (
-                              <input
-                                type="text"
-                                value={item.keterangan ?? ''}
-                                onChange={(e) => handleItemChange(item.id, 'keterangan', e.target.value || null)}
-                                className="w-full h-8 rounded border border-gray-200 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400"
-                                placeholder="Keterangan..."
-                                aria-label={`Keterangan ${item.item_name}`}
-                              />
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Section 2 — Lingkungan Kerja */}
-      {activeTab === '2' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs min-w-[500px]">
-              <thead>
-                <tr className="bg-amber-500 text-white">
-                  <th className="px-3 py-2 text-left w-10">NO</th>
-                  <th className="px-3 py-2 text-left">KEGIATAN</th>
-                  <th className="px-3 py-2 text-center w-28">NOMINAL</th>
-                  <th className="px-3 py-2 text-center w-36">HASIL</th>
-                  <th className="px-3 py-2 text-left w-40">KETERANGAN</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sectionItems.map((item, idx) => {
-                  const dropdownOpts = getEnvDropdownOptions(item);
-                  return (
-                    <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                      <td className="px-3 py-2 text-slate-500 text-center">{idx + 1}</td>
-                      <td className="px-3 py-2 text-slate-700">{item.item_name}</td>
-                      <td className="px-3 py-2 text-center text-slate-500">{item.nominal ?? '—'}</td>
-                      <td className="px-3 py-2">
-                        {isCompleted ? (
-                          <span className="text-slate-700">{item.hasil ?? '—'}</span>
-                        ) : dropdownOpts ? (
-                          <select
-                            value={item.hasil ?? ''}
-                            onChange={(e) => handleItemChange(item.id, 'hasil', e.target.value || null)}
-                            className={`w-full h-8 rounded border px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400 ${
-                              item.hasil === '√'
-                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                : item.hasil === '-'
-                                ? 'bg-red-50 border-red-200 text-red-700'
-                                : 'bg-white border-gray-200 text-slate-600'
-                            }`}
-                            aria-label={`Hasil ${item.item_name}`}
-                          >
-                            <option value="">— pilih —</option>
-                            {dropdownOpts.map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            value={item.hasil ?? ''}
-                            onChange={(e) => handleItemChange(item.id, 'hasil', e.target.value || null)}
-                            className="w-full h-8 rounded border border-gray-200 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400"
-                            placeholder="Hasil..."
-                            aria-label={`Hasil ${item.item_name}`}
-                          />
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        {isCompleted ? (
-                          <span className="text-slate-700">{item.keterangan ?? '—'}</span>
-                        ) : (
-                          <input
-                            type="text"
-                            value={item.keterangan ?? ''}
-                            onChange={(e) => handleItemChange(item.id, 'keterangan', e.target.value || null)}
-                            className="w-full h-8 rounded border border-gray-200 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400"
-                            placeholder="Keterangan..."
-                            aria-label={`Keterangan ${item.item_name}`}
-                          />
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Save button (bottom) */}
-      {!isCompleted && (
-        <div className="flex justify-end">
-          <Button onClick={handleSave} isLoading={isSaving} className="gap-2">
-            <Save size={16} /> Simpan Perubahan
+            <Save size={16} />
+            Simpan Perubahan
           </Button>
         </div>
       )}
 
       {/* Signature panel */}
-      <CnsdReceiverMeterSignaturePanel record={record} onSignSuccess={handleSignSuccess} />
+      <CnsdReceiverMeterSignaturePanel record={record} onSignSuccess={(r) => setRecord(r)} />
     </div>
   );
 };
+
+// ─── Section panel ────────────────────────────────────────────
+
+interface ReceiverSectionPanelProps {
+  sectionMeta: SectionMeta;
+  items: CnsdReceiverMeterItem[];
+  isReadOnly: boolean;
+  getValue: (item: CnsdReceiverMeterItem, field: keyof CnsdReceiverMeterItem) => string;
+  onChange: (itemId: number, field: keyof CnsdReceiverMeterItem, value: string | null) => void;
+}
+
+const ReceiverSectionPanel: React.FC<ReceiverSectionPanelProps> = ({
+  sectionMeta, items, isReadOnly, getValue, onChange,
+}) => {
+  // Group items by group_name; Section 1 has header rows we skip in body.
+  const groups = useMemo(() => {
+    const order: string[] = [];
+    const map: Record<string, CnsdReceiverMeterItem[]> = {};
+    items.forEach((it) => {
+      if (it.is_header) return; // skip explicit header rows; we'll render via group name bar
+      const key = it.group_name ?? '__ungrouped__';
+      if (!map[key]) {
+        map[key] = [];
+        order.push(key);
+      }
+      map[key].push(it);
+    });
+    return order.map((key) => ({
+      number: items.find((i) => (i.group_name ?? '__ungrouped__') === key)?.group_number ?? null,
+      name: key === '__ungrouped__' ? null : key,
+      items: map[key],
+    }));
+  }, [items]);
+
+  const isReceiver = sectionMeta.inputs_layout === 'receiver';
+  const colCount = isReceiver ? 6 : 5;
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-2 bg-slate-50/60">
+        <div>
+          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+            {sectionMeta.code}. {sectionMeta.name}
+          </h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {isReceiver
+              ? 'Pilih status ON LINE / OFF LINE untuk masing-masing channel A dan B per frekuensi.'
+              : 'Isi kolom HASIL untuk tiap kegiatan pemeriksaan lingkungan kerja.'}
+          </p>
+        </div>
+        <span className="text-xs font-medium text-slate-400">
+          {groups.reduce((sum, g) => sum + g.items.length, 0)} item
+        </span>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse min-w-[760px]">
+          <thead>
+            <tr className="bg-slate-50 text-slate-700">
+              <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 w-12 text-[11px] uppercase tracking-wider">No</th>
+              <th className="px-3 py-2 text-left font-semibold border-b border-slate-200 min-w-[240px] text-[11px] uppercase tracking-wider">
+                {isReceiver ? 'Pemeriksaan' : 'Kegiatan'}
+              </th>
+              {isReceiver ? (
+                <>
+                  <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[120px] text-[11px] uppercase tracking-wider">Status A</th>
+                  <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[120px] text-[11px] uppercase tracking-wider">Status B</th>
+                  <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[120px] text-[11px] uppercase tracking-wider">Sequelsh On</th>
+                </>
+              ) : (
+                <>
+                  <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[100px] text-[11px] uppercase tracking-wider">Nominal</th>
+                  <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[140px] text-[11px] uppercase tracking-wider">Hasil</th>
+                </>
+              )}
+              <th className="px-2 py-2 text-left font-semibold border-b border-slate-200 min-w-[140px] text-[11px] uppercase tracking-wider">Keterangan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.length === 0 ? (
+              <tr>
+                <td colSpan={colCount} className="px-4 py-8 text-center text-slate-400 text-sm">
+                  Belum ada baris pada section ini.
+                </td>
+              </tr>
+            ) : (
+              groups.map((group, gIdx) => (
+                <React.Fragment key={gIdx}>
+                  {group.name && isReceiver && (
+                    <tr className="bg-slate-100">
+                      <td colSpan={colCount} className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-700 border-b border-slate-200">
+                        {group.number ? `${group.number}. ` : ''}{group.name}
+                      </td>
+                    </tr>
+                  )}
+                  {group.items.map((item, idx) => (
+                    <ReceiverItemRow
+                      key={item.id}
+                      item={item}
+                      rowIdx={idx + 1}
+                      isReceiver={isReceiver}
+                      isReadOnly={isReadOnly}
+                      getValue={getValue}
+                      onChange={onChange}
+                    />
+                  ))}
+                </React.Fragment>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ─── Item row ─────────────────────────────────────────────────
+
+interface ReceiverItemRowProps {
+  item: CnsdReceiverMeterItem;
+  rowIdx: number;
+  isReceiver: boolean;
+  isReadOnly: boolean;
+  getValue: (item: CnsdReceiverMeterItem, field: keyof CnsdReceiverMeterItem) => string;
+  onChange: (itemId: number, field: keyof CnsdReceiverMeterItem, value: string | null) => void;
+}
+
+const ReceiverItemRow: React.FC<ReceiverItemRowProps> = ({
+  item, rowIdx, isReceiver, isReadOnly, getValue, onChange,
+}) => {
+  const inputClass = 'w-full h-8 px-2 text-xs rounded border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent disabled:bg-slate-50 disabled:text-slate-500';
+  const selectClass = inputClass + ' appearance-none cursor-pointer';
+
+  return (
+    <tr className="hover:bg-slate-50 transition-colors border-b border-slate-100">
+      <td className="px-2 py-2 text-center text-slate-500 font-mono text-[11px] align-middle">
+        {rowIdx}
+      </td>
+      <td className="px-3 py-2 align-middle text-slate-800 font-medium">
+        {item.item_name}
+      </td>
+      {isReceiver ? (
+        <>
+          <td className="px-2 py-2 align-middle">
+            <select
+              className={selectClass}
+              value={getValue(item, 'status_a')}
+              onChange={(e) => onChange(item.id, 'status_a', e.target.value || null)}
+              disabled={isReadOnly}
+            >
+              <option value="">—</option>
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </td>
+          <td className="px-2 py-2 align-middle">
+            <select
+              className={selectClass}
+              value={getValue(item, 'status_b')}
+              onChange={(e) => onChange(item.id, 'status_b', e.target.value || null)}
+              disabled={isReadOnly}
+            >
+              <option value="">—</option>
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </td>
+          <td className="px-2 py-2 align-middle">
+            <input
+              type="text"
+              className={inputClass}
+              placeholder="..."
+              value={getValue(item, 'sequelsh_on')}
+              onChange={(e) => onChange(item.id, 'sequelsh_on', e.target.value)}
+              disabled={isReadOnly}
+            />
+          </td>
+        </>
+      ) : (
+        <>
+          <td className="px-2 py-2 align-middle text-center text-slate-600 text-[11px]">
+            {item.nominal ?? '—'}
+          </td>
+          <td className="px-2 py-2 align-middle">
+            <input
+              type="text"
+              className={inputClass}
+              placeholder="..."
+              value={getValue(item, 'hasil')}
+              onChange={(e) => onChange(item.id, 'hasil', e.target.value)}
+              disabled={isReadOnly}
+            />
+          </td>
+        </>
+      )}
+      <td className="px-2 py-2 align-middle">
+        <input
+          type="text"
+          className={inputClass}
+          placeholder="Catatan"
+          value={getValue(item, 'keterangan')}
+          onChange={(e) => onChange(item.id, 'keterangan', e.target.value)}
+          disabled={isReadOnly}
+        />
+      </td>
+    </tr>
+  );
+};
+
+// ─── Small subcomponents ──────────────────────────────────────
+
+const InfoCell: React.FC<{ label: string; value: string | null }> = ({ label, value }) => (
+  <div>
+    <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">{label}</span>
+    <p className="mt-0.5 font-medium text-slate-700">{value ?? '—'}</p>
+  </div>
+);
+
+interface EditableMetaFieldProps {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  disabled: boolean;
+  placeholder?: string;
+}
+
+const EditableMetaField: React.FC<EditableMetaFieldProps> = ({ label, value, onChange, disabled, placeholder }) => (
+  <div>
+    <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">{label}</label>
+    {disabled ? (
+      <p className="text-xs text-slate-700 font-medium">{value || '—'}</p>
+    ) : (
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full h-9 px-3 text-xs rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-brand-primary focus:border-transparent focus:outline-none placeholder:text-slate-300"
+        maxLength={60}
+      />
+    )}
+  </div>
+);

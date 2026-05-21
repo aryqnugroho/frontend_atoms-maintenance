@@ -116,3 +116,30 @@ export interface CnsdReadinessUpdatePayload {
     keterangan?: string | null;
   }>;
 }
+
+// Payload to add a new item row under a section (Manager/Supervisor only)
+export interface CnsdReadinessAddItemPayload {
+  section_name: string;
+  item_number?: string | null;
+  equipment_name: string;
+  sub_equipment_name?: string | null;
+  status_peralatan?: string | null;
+  kondisi_operasional_1?: string | null;
+  kondisi_operasional_2?: string | null;
+  keterangan?: string | null;
+}
+
+// Structural edit (equipment name / numbering / sub-row label).
+export interface CnsdReadinessUpdateItemStructurePayload {
+  item_number?: string | null;
+  equipment_name?: string | null;
+  sub_equipment_name?: string | null;
+}
+
+// Rename a section heading + optionally its column labels.
+export interface CnsdReadinessRenameSectionPayload {
+  old_name: string;
+  name: string;
+  columns_label_1?: string | null;
+  columns_label_2?: string | null;
+}

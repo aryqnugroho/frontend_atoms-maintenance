@@ -7,6 +7,9 @@ import type {
   CnsdReadinessListParams,
   CnsdReadinessUpdatePayload,
   CnsdReadinessRoleKey,
+  CnsdReadinessAddItemPayload,
+  CnsdReadinessUpdateItemStructurePayload,
+  CnsdReadinessRenameSectionPayload,
 } from '@/types/cnsd';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
@@ -104,5 +107,42 @@ export const cnsdReadinessService = {
     await axios.delete(`${API_URL}/v1/cnsd/readiness/${id}`, {
       headers: getAuthHeaders(),
     });
+  },
+
+  // ─── Structural edits (Manager / Supervisor only) ──────────
+
+  async addItem(id: number, payload: CnsdReadinessAddItemPayload): Promise<CnsdReadinessRecordDetail> {
+    const response = await axios.post(`${API_URL}/v1/cnsd/readiness/${id}/items`, payload, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  async updateItemStructure(
+    id: number,
+    itemId: number,
+    payload: CnsdReadinessUpdateItemStructurePayload,
+  ): Promise<CnsdReadinessRecordDetail> {
+    const response = await axios.put(`${API_URL}/v1/cnsd/readiness/${id}/items/${itemId}`, payload, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  async deleteItem(id: number, itemId: number): Promise<CnsdReadinessRecordDetail> {
+    const response = await axios.delete(`${API_URL}/v1/cnsd/readiness/${id}/items/${itemId}`, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  async renameSection(
+    id: number,
+    payload: CnsdReadinessRenameSectionPayload,
+  ): Promise<CnsdReadinessRecordDetail> {
+    const response = await axios.put(`${API_URL}/v1/cnsd/readiness/${id}/sections`, payload, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
   },
 };

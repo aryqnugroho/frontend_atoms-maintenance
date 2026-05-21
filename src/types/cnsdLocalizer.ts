@@ -81,7 +81,10 @@ export interface CnsdLocalizerMeterCreatePayload {
 }
 
 export interface CnsdLocalizerMeterUpdatePayload {
-  items: Array<{
+  merk?: string | null;
+  type?: string | null;
+  serial_number?: string | null;
+  items?: Array<{
     id: number;
     hasil_1?: string | null;
     hasil_2?: string | null;

@@ -115,7 +115,10 @@ export interface CnsdRecorderMeterListParams {
 }
 
 export interface CnsdRecorderMeterUpdatePayload {
-  items: Array<{
+  merk?: string | null;
+  type?: string | null;
+  serial_number?: string | null;
+  items?: Array<{
     id: number;
     hasil_server_a?: string | null;
     hasil_server_b?: string | null;

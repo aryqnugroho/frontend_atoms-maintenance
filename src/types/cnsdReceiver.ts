@@ -85,7 +85,10 @@ export interface CnsdReceiverMeterCreatePayload {
 }
 
 export interface CnsdReceiverMeterUpdatePayload {
-  items: Array<{
+  merk?: string | null;
+  type?: string | null;
+  serial_number?: string | null;
+  items?: Array<{
     id: number;
     status_a?: string | null;
     status_b?: string | null;

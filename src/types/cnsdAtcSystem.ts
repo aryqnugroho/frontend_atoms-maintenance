@@ -1,6 +1,6 @@
-// ─── CNSD Glide Path Meter Reading — Type Definitions ─────────────────────────
+// ─── CNSD ATC SYSTEM Meter Reading — Type Definitions ────────────────────────
 
-export interface CnsdGlidepathMeterTechnician {
+export interface CnsdAtcSystemMeterTechnician {
   id: number;
   technician_id: number | null;
   technician_name: string;
@@ -10,23 +10,26 @@ export interface CnsdGlidepathMeterTechnician {
   sort_order: number;
 }
 
-export interface CnsdGlidepathMeterItem {
+export interface CnsdAtcSystemMeterItem {
   id: number;
-  section_code: string;   // 'A' = METER READING, 'B' = LINGKUNGAN KERJA
+  section_code: string;          // 'A'..'L'
   section_name: string;
   group_number: number | null;
   group_name: string | null;
   item_name: string | null;
+  sub_item_label: string | null;
   nominal: string | null;
-  hasil_layout: 'single' | 'dual'; // 'single' = one result col, 'dual' = M1/M2 or TX1/TX2
-  hasil_1: string | null;  // single result or TX1/M1
-  hasil_2: string | null;  // TX2/M2 (dual only)
+  value_1: string | null;
+  value_2: string | null;
+  value_3: string | null;
+  value_4: string | null;
+  status_flags: string | null;   // comma-separated multi-select (e.g. "C,M,F")
   keterangan: string | null;
   is_header: boolean;
   sort_order: number;
 }
 
-export interface CnsdGlidepathMeterSignerInfo {
+export interface CnsdAtcSystemMeterSignerInfo {
   id: number | null;
   name: string;
   signature: string | null;
@@ -34,12 +37,12 @@ export interface CnsdGlidepathMeterSignerInfo {
   signed_at: string | null;
 }
 
-export interface CnsdGlidepathMeterRecordSummary {
+export interface CnsdAtcSystemMeterRecordSummary {
   id: number;
   form_number: string;
   form_type: string;
   facility: string;
-  form_code: string;
+  form_code: string | null;
   merk: string | null;
   type: string | null;
   serial_number: string | null;
@@ -56,11 +59,11 @@ export interface CnsdGlidepathMeterRecordSummary {
   created_at: string;
 }
 
-export interface CnsdGlidepathMeterRecordDetail extends CnsdGlidepathMeterRecordSummary {
-  manager: CnsdGlidepathMeterSignerInfo | null;
-  supervisor: CnsdGlidepathMeterSignerInfo | null;
-  technicians: CnsdGlidepathMeterTechnician[];
-  items: CnsdGlidepathMeterItem[];
+export interface CnsdAtcSystemMeterRecordDetail extends CnsdAtcSystemMeterRecordSummary {
+  manager: CnsdAtcSystemMeterSignerInfo | null;
+  supervisor: CnsdAtcSystemMeterSignerInfo | null;
+  technicians: CnsdAtcSystemMeterTechnician[];
+  items: CnsdAtcSystemMeterItem[];
   sections_meta: Array<{
     code: string;
     name: string;
@@ -71,7 +74,7 @@ export interface CnsdGlidepathMeterRecordDetail extends CnsdGlidepathMeterRecord
   updated_at: string;
 }
 
-export interface CnsdGlidepathMeterCreatePayload {
+export interface CnsdAtcSystemMeterCreatePayload {
   date: string;
   shift_type: string;
   location?: string;
@@ -80,19 +83,22 @@ export interface CnsdGlidepathMeterCreatePayload {
   serial_number?: string;
 }
 
-export interface CnsdGlidepathMeterUpdatePayload {
+export interface CnsdAtcSystemMeterUpdatePayload {
   merk?: string | null;
   type?: string | null;
   serial_number?: string | null;
   items?: Array<{
     id: number;
-    hasil_1?: string | null;
-    hasil_2?: string | null;
+    value_1?: string | null;
+    value_2?: string | null;
+    value_3?: string | null;
+    value_4?: string | null;
+    status_flags?: string | null;
     keterangan?: string | null;
   }>;
 }
 
-export interface CnsdGlidepathMeterSignPayload {
+export interface CnsdAtcSystemMeterSignPayload {
   role: 'manager' | 'supervisor' | 'technician';
   signature: string;
   technician_row_id?: number;

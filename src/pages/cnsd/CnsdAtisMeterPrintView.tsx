@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/common/Button';
-import { cnsdLocalizerMeterService } from '@/services/cnsdLocalizerMeterService';
+import { cnsdAtisMeterService } from '@/services/cnsdAtisMeterService';
 import type {
-  CnsdLocalizerMeterItem,
-  CnsdLocalizerMeterRecordDetail,
-} from '@/types/cnsdLocalizer';
+  CnsdAtisMeterItem,
+  CnsdAtisMeterRecordDetail,
+} from '@/types/cnsdAtis';
 
 const SHIFT_TIME_LABELS: Record<string, string> = {
   pagi:  '07:00 — 13:00',
@@ -31,126 +31,69 @@ interface SectionMeta {
 
 interface PrintBlockProps {
   meta: SectionMeta;
-  items: CnsdLocalizerMeterItem[];
+  items: CnsdAtisMeterItem[];
 }
 
 const PrintBlock: React.FC<PrintBlockProps> = ({ meta, items }) => {
-  const totalCols = 6;
-  const isMeter = meta.inputs_layout === 'meter_reading';
+  const totalCols = 5;
 
-  const groups: { number: number | null; name: string | null; items: CnsdLocalizerMeterItem[] }[] = [];
+  const groups: { number: number | null; name: string | null; items: CnsdAtisMeterItem[] }[] = [];
   items.forEach((it) => {
     if (it.is_header) return;
     const key = `${it.group_number ?? '0'}::${it.group_name ?? ''}`;
     const last = groups[groups.length - 1];
     const lastKey = last ? `${last.number ?? '0'}::${last.name ?? ''}` : null;
-    if (lastKey === key && last) {
-      last.items.push(it);
-    } else {
-      groups.push({ number: it.group_number ?? null, name: it.group_name ?? null, items: [it] });
-    }
+    if (lastKey === key && last) last.items.push(it);
+    else groups.push({ number: it.group_number ?? null, name: it.group_name ?? null, items: [it] });
   });
-
-  if (!isMeter) {
-    return (
-      <>
-        <tr>
-          <td className="gc-section-bar text-center" style={{ verticalAlign: 'middle' }}>{meta.code}</td>
-          <td colSpan={totalCols - 1} className="gc-section-bar font-bold uppercase">{meta.name}</td>
-        </tr>
-        <tr>
-          <td className="gc-group-bar text-center font-bold">NO</td>
-          <td className="gc-group-bar font-bold">KEGIATAN</td>
-          <td className="gc-group-bar text-center font-bold">Nominal</td>
-          <td colSpan={2} className="gc-group-bar text-center font-bold">HASIL</td>
-          <td className="gc-group-bar font-bold">KETERANGAN</td>
-        </tr>
-        {groups.flatMap((g) =>
-          g.items.map((item, idx) => (
-            <tr key={item.id} className="text-[10px]">
-              <td className="text-center">{idx + 1}</td>
-              <td className="pl-1">{item.item_name}</td>
-              <td className="text-center">{text(item.nominal)}</td>
-              <td colSpan={2} className="text-center">{text(item.hasil_1)}</td>
-              <td>{text(item.keterangan)}</td>
-            </tr>
-          ))
-        )}
-      </>
-    );
-  }
 
   return (
     <>
-      {groups.map((group, gIdx) => {
-        const hasDual = group.items.some((i) => i.hasil_layout === 'dual');
-        // FRONT PANEL (group 1) uses TX1/TX2 labels; CL/DS/CLR/Near Field use M1/M2
-        const isFrontPanel = (group.name ?? '').toUpperCase() === 'FRONT PANEL';
-        return (
-          <React.Fragment key={`${meta.code}-grp-${gIdx}`}>
-            <tr>
-              <td className="text-center font-bold gc-group-bar">{group.number ?? ''}</td>
-              <td className="gc-group-bar font-bold uppercase">{group.name}</td>
-              <td className="gc-group-bar text-center font-bold">Standart</td>
-              {hasDual ? (
-                <>
-                  <td className="gc-group-bar text-center font-bold">{isFrontPanel ? 'TX1' : 'M1'}</td>
-                  <td className="gc-group-bar text-center font-bold">{isFrontPanel ? 'TX2' : 'M2'}</td>
-                </>
-              ) : (
-                <td colSpan={2} className="gc-group-bar text-center font-bold">HASIL</td>
-              )}
-              <td className="gc-group-bar font-bold">{/* KETERANGAN */}</td>
+      <tr>
+        <td className="gc-section-bar text-center" style={{ verticalAlign: 'middle' }}>{meta.code}</td>
+        <td colSpan={totalCols - 1} className="gc-section-bar font-bold uppercase">{meta.name}</td>
+      </tr>
+      {groups.map((group, gIdx) => (
+        <React.Fragment key={`${meta.code}-grp-${gIdx}`}>
+          <tr>
+            <td className="text-center font-bold gc-group-bar">{group.number ?? ''}</td>
+            <td colSpan={totalCols - 1} className="gc-group-bar font-bold uppercase">{group.name}</td>
+          </tr>
+          {group.items.map((item, idx) => (
+            <tr key={item.id} className="text-[10px]">
+              <td className="text-center">{idx + 1}.</td>
+              <td className="pl-2">- {item.item_name}</td>
+              <td className="text-center">{text(item.nominal)}</td>
+              <td className="text-center">{text(item.reading)}</td>
+              <td>{text(item.keterangan)}</td>
             </tr>
-            {group.items.map((item) => {
-              const isDual = item.hasil_layout === 'dual';
-              return (
-                <tr key={item.id} className="text-[10px]">
-                  <td className="text-center">&nbsp;</td>
-                  <td className="pl-2">{item.item_name}</td>
-                  <td className="text-center">{text(item.nominal)}</td>
-                  {isDual ? (
-                    <>
-                      <td className="text-center">{text(item.hasil_1)}</td>
-                      <td className="text-center">{text(item.hasil_2)}</td>
-                    </>
-                  ) : (
-                    <td colSpan={2} className="text-center">{text(item.hasil_1)}</td>
-                  )}
-                  <td>{text(item.keterangan)}</td>
-                </tr>
-              );
-            })}
-          </React.Fragment>
-        );
-      })}
+          ))}
+        </React.Fragment>
+      ))}
     </>
   );
 };
 
 /**
- * CNSD Localizer Meter Reading Print View — A4 portrait, B&W.
- * Mirrors paper 008_Localizer.
+ * CNSD ATIS Meter Reading Print View — A4 portrait, B&W. Mirrors paper 013_ATIS.
  */
-export const CnsdLocalizerMeterPrintView: React.FC = () => {
+export const CnsdAtisMeterPrintView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [record, setRecord] = useState<CnsdLocalizerMeterRecordDetail | null>(null);
+  const [record, setRecord] = useState<CnsdAtisMeterRecordDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchRecord = async () => {
-      try {
-        const data = await cnsdLocalizerMeterService.getRecord(Number(id));
-        setRecord(data);
-      } catch { setRecord(null); }
+      try { setRecord(await cnsdAtisMeterService.getRecord(Number(id))); }
+      catch { setRecord(null); }
       finally { setIsLoading(false); }
     };
     void fetchRecord();
   }, [id]);
 
   const itemsBySection = useMemo(() => {
-    const map: Record<string, CnsdLocalizerMeterItem[]> = {};
+    const map: Record<string, CnsdAtisMeterItem[]> = {};
     record?.items.forEach((it) => {
       const code = it.section_code ?? 'A';
       if (!map[code]) map[code] = [];
@@ -171,7 +114,7 @@ export const CnsdLocalizerMeterPrintView: React.FC = () => {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4">
         <p className="text-sm text-slate-600">Form tidak ditemukan atau gagal memuat data.</p>
-        <Button variant="outline" onClick={() => navigate('/cnsd/localizer-meter')}>Kembali</Button>
+        <Button variant="outline" onClick={() => navigate('/cnsd/atis-meter')}>Kembali</Button>
       </div>
     );
   }
@@ -197,7 +140,7 @@ export const CnsdLocalizerMeterPrintView: React.FC = () => {
       `}</style>
 
       <div className="print-hide mx-auto mb-4 flex max-w-[210mm] items-center justify-between">
-        <Button variant="outline" className="gap-2" onClick={() => navigate(`/cnsd/localizer-meter/${record.id}`)}>
+        <Button variant="outline" className="gap-2" onClick={() => navigate(`/cnsd/atis-meter/${record.id}`)}>
           <ArrowLeft size={16} /> Kembali
         </Button>
         <Button className="gap-2" onClick={() => window.print()}>
@@ -211,15 +154,22 @@ export const CnsdLocalizerMeterPrintView: React.FC = () => {
             <img src="/assets/icon/logoairnav.svg" alt="AirNav Indonesia" style={{ height: '38px', width: 'auto' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             <div className="leading-tight">
               <div className="text-[11px] font-bold">AirNav Indonesia</div>
+              <div className="text-[8px] font-semibold uppercase">FAS CNS &amp; OTOMASI</div>
             </div>
+          </div>
+          <div className="text-right leading-tight text-[9px]">
+            <div className="font-bold text-[10px]">Perum LPPNPI</div>
+            <div>KANTOR CABANG SURABAYA</div>
+            <div>Telp (031) 8688456 Fax. (031) 8688536</div>
+            <div>email : sub@airnavindonesia.co.id</div>
           </div>
         </div>
 
         <table className="gc-table mb-0">
           <colgroup>
-            <col style={{ width: '36%' }} />
+            <col style={{ width: '40%' }} />
             <col style={{ width: '34%' }} />
-            <col style={{ width: '30%' }} />
+            <col style={{ width: '26%' }} />
           </colgroup>
           <tbody>
             <tr>
@@ -242,25 +192,25 @@ export const CnsdLocalizerMeterPrintView: React.FC = () => {
                   </tbody>
                 </table>
               </td>
-              <td className="gc-section-bar text-center font-bold uppercase text-[12px]">
-                <div>ILS</div>
-                <div>LOCALIZER</div>
-              </td>
-              <td className="align-top leading-tight">
-                <table className="gc-meta text-[10px]">
+              <td className="gc-section-bar text-center font-bold uppercase text-[12px]">REPRODUCER ATIS</td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+              <td colSpan={3} className="align-top leading-tight">
+                <table className="gc-meta text-[10px]" style={{ width: '100%' }}>
                   <tbody>
                     <tr>
                       <td className="font-semibold pr-1" style={{ width: '40px' }}>MERK</td>
                       <td className="px-0.5">:</td>
-                      <td>{text(record.merk) || 'MOPENS'}</td>
+                      <td>{text(record.merk) || 'TERMA'}</td>
                     </tr>
                     <tr>
                       <td className="font-semibold pr-1">TYPE</td>
                       <td className="px-0.5">:</td>
-                      <td>{text(record.type) || '500'}</td>
+                      <td>{text(record.type) || '-'}</td>
                     </tr>
                     <tr>
-                      <td className="font-semibold pr-1">SN</td>
+                      <td className="font-semibold pr-1">S N</td>
                       <td className="px-0.5">:</td>
                       <td>{text(record.serial_number) || '-'}</td>
                     </tr>
@@ -273,20 +223,26 @@ export const CnsdLocalizerMeterPrintView: React.FC = () => {
 
         <table className="gc-table">
           <colgroup>
-            <col style={{ width: '5%' }} />
-            <col style={{ width: '30%' }} />
-            <col style={{ width: '15%' }} />
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '26%' }} />
+            <col style={{ width: '6%' }} />
+            <col style={{ width: '36%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '22%' }} />
           </colgroup>
           <thead>
             <tr className="text-center font-bold gc-section-bar">
               <th className="border border-black py-1">NO</th>
-              <th className="border border-black py-1">PEMBACAAN METER READING</th>
+              <th className="border border-black py-1">PEMERIKSAAN</th>
               <th className="border border-black py-1">NOMINAL</th>
-              <th colSpan={2} className="border border-black py-1">HASIL PEMERIKSAAN</th>
+              <th className="border border-black py-1">READING</th>
               <th className="border border-black py-1">KETERANGAN</th>
+            </tr>
+            <tr className="text-center font-bold text-[9px]" style={{ backgroundColor: '#e5e7eb' }}>
+              <th className="border border-black">1</th>
+              <th className="border border-black">2</th>
+              <th className="border border-black">3</th>
+              <th className="border border-black">4</th>
+              <th className="border border-black">5</th>
             </tr>
           </thead>
           <tbody>

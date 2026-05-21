@@ -1,442 +1,470 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Printer } from 'lucide-react';
+import { ArrowLeft, Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { cnsdReceiverMeterService } from '@/services/cnsdReceiverMeterService';
-import type { CnsdReceiverMeterRecordDetail, CnsdReceiverMeterItem } from '@/types/cnsdReceiver';
+import type {
+  CnsdReceiverMeterItem,
+  CnsdReceiverMeterRecordDetail,
+} from '@/types/cnsdReceiver';
 
-// ─── Helpers ───────────────────────────────────────────────
+const SHIFT_TIME_LABELS: Record<string, string> = {
+  pagi:  '07:00 — 13:00',
+  siang: '13:00 — 19:00',
+  malam: '19:00 — 07:00',
+};
 
-const formatDate = (dateStr: string | null | undefined): string => {
-  if (!dateStr) return '—';
+const formatDateID = (v?: string | null): string => {
+  if (!v) return '';
   try {
-    return new Date(dateStr).toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
+    return new Date(v).toLocaleDateString('id-ID', {
+      day: '2-digit', month: 'long', year: 'numeric',
     });
   } catch {
-    return dateStr;
+    return v;
   }
 };
 
-const formatSignedAt = (iso: string | null | undefined): string => {
-  if (!iso) return '';
-  try {
-    return new Date(iso).toLocaleString('id-ID', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return iso;
-  }
-};
+const text = (v: string | null | undefined): string =>
+  v == null || v === '' ? '' : String(v);
 
-const val = (v: string | null | undefined): string => v ?? '';
+interface SectionMeta {
+  code: string;
+  name: string;
+  inputs_layout: string;
+  groups: Array<{ number: number | null; name: string | null }>;
+}
 
-// ─── Status cell renderer ──────────────────────────────────
+// ─── Receiver section block ────────────────────────────────────
 
-const StatusCell: React.FC<{ value: string | null | undefined }> = ({ value }) => {
-  if (!value) return <span className="text-gray-400 text-[9px]">—</span>;
-  const isOnline = value === 'ON LINE';
-  return (
-    <span
-      className={`text-[9px] font-semibold px-1 py-0.5 rounded ${
-        isOnline ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-      }`}
-    >
-      {value}
-    </span>
-  );
-};
+interface ReceiverPrintBlockProps {
+  meta: SectionMeta;
+  items: CnsdReceiverMeterItem[];
+}
 
-// ─── Print View Component ──────────────────────────────────
-
-export const CnsdReceiverMeterPrintView: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-
-  const [record, setRecord] = useState<CnsdReceiverMeterRecordDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!id) return;
-    cnsdReceiverMeterService
-      .getRecord(Number(id))
-      .then((data) => {
-        setRecord(data);
-        setIsLoading(false);
-      })
-      .catch(() => {
-        setError('Gagal memuat data form Receiver.');
-        setIsLoading(false);
-      });
-  }, [id]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-600" />
-      </div>
-    );
-  }
-
-  if (error || !record) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-red-600">{error ?? 'Form tidak ditemukan.'}</p>
-      </div>
-    );
-  }
-
-  // Group section 1 items by group
-  const section1Items = record.items.filter((it) => it.section_code === '1');
-  const section2Items = record.items.filter((it) => it.section_code === '2');
-
-  // Build groups for section 1
-  const groups: Map<string, { header: CnsdReceiverMeterItem | null; rows: CnsdReceiverMeterItem[] }> = new Map();
-  for (const item of section1Items) {
-    const key = `${item.group_number}-${item.group_name}`;
-    if (!groups.has(key)) {
-      groups.set(key, { header: null, rows: [] });
-    }
-    const g = groups.get(key)!;
-    if (item.is_header) {
-      g.header = item;
+const ReceiverPrintBlock: React.FC<ReceiverPrintBlockProps> = ({ meta, items }) => {
+  // Group items (skipping header rows; group bars are rendered by group_name).
+  const groups: { number: number | null; name: string | null; items: CnsdReceiverMeterItem[] }[] = [];
+  items.forEach((it) => {
+    if (it.is_header) return;
+    const key = it.group_name ?? '__ungrouped__';
+    const last = groups[groups.length - 1];
+    if (last && (last.name ?? '__ungrouped__') === key) {
+      last.items.push(it);
     } else {
-      g.rows.push(item);
+      groups.push({
+        number: it.group_number ?? null,
+        name: it.group_name ?? null,
+        items: [it],
+      });
     }
-  }
+  });
 
-  const technicians = record.technicians;
-  const maxTechRows = Math.max(technicians.length, 4);
+  const isReceiver = meta.inputs_layout === 'receiver';
+  const totalCols = 6;
+
+  if (groups.length === 0) {
+    return (
+      <tr>
+        <td colSpan={totalCols} className="gc-section-bar text-center">
+          {meta.name}
+        </td>
+      </tr>
+    );
+  }
 
   return (
     <>
-      <style>
-        {`
-          @media print {
-            @page { size: A4 portrait; margin: 8mm 10mm; }
-            body { background: white !important; }
-            .print-hide { display: none !important; }
-            tr, td { page-break-inside: avoid; }
-          }
-          body { font-family: Arial, sans-serif; }
-        `}
-      </style>
+      {/* Section bar */}
+      <tr>
+        <td className="gc-section-bar text-center" style={{ verticalAlign: 'middle' }}>{meta.code}</td>
+        {isReceiver ? (
+          <>
+            <td colSpan={5} className="gc-section-bar font-bold uppercase">{meta.name}</td>
+          </>
+        ) : (
+          <td colSpan={5} className="gc-section-bar font-bold uppercase" style={{ backgroundColor: '#f4b400' }}>
+            {meta.name}
+          </td>
+        )}
+      </tr>
 
-      {/* Toolbar — screen only */}
-      <div className="print-hide mx-auto mb-4 flex max-w-[210mm] items-center justify-between px-2 pt-4">
-        <Button
-          variant="outline"
-          onClick={() => navigate(`/cnsd/receiver-meter/${record.id}`)}
-          className="gap-2"
-        >
-          <ArrowLeft size={16} /> Kembali
+      {/* Section sub-header for environment (NO | KEGIATAN | NOMINAL | HASIL | KETERANGAN) */}
+      {!isReceiver && (
+        <tr>
+          <td className="gc-group-bar text-center font-bold">NO</td>
+          <td className="gc-group-bar font-bold">KEGIATAN</td>
+          <td className="gc-group-bar text-center font-bold" colSpan={2}>NOMINAL</td>
+          <td className="gc-group-bar text-center font-bold">HASIL</td>
+          <td className="gc-group-bar font-bold">KETERANGAN</td>
+        </tr>
+      )}
+
+      {groups.map((group, gIdx) => (
+        <React.Fragment key={`${meta.code}-grp-${gIdx}`}>
+          {/* Group header bar (only for receiver section) */}
+          {group.name && isReceiver && (
+            <tr>
+              <td className="text-center font-bold gc-group-bar">{group.number ?? ''}</td>
+              <td colSpan={totalCols - 1} className="gc-group-bar font-bold uppercase">{group.name}</td>
+            </tr>
+          )}
+          {group.items.map((item, iIdx) => {
+            if (isReceiver) {
+              return (
+                <tr key={item.id} className="text-[10px]">
+                  <td className="text-center font-mono">{iIdx + 1}</td>
+                  <td className="pl-3">{item.item_name}</td>
+                  <td className="text-center">{text(item.status_a)}</td>
+                  <td className="text-center">{text(item.status_b)}</td>
+                  <td className="text-center">{text(item.sequelsh_on)}</td>
+                  <td>{text(item.keterangan)}</td>
+                </tr>
+              );
+            }
+            return (
+              <tr key={item.id} className="text-[10px]">
+                <td className="text-center font-mono">{iIdx + 1}</td>
+                <td className="pl-3">{item.item_name}</td>
+                <td className="text-center" colSpan={2}>{text(item.nominal)}</td>
+                <td className="text-center">{text(item.hasil)}</td>
+                <td>{text(item.keterangan)}</td>
+              </tr>
+            );
+          })}
+        </React.Fragment>
+      ))}
+    </>
+  );
+};
+
+/**
+ * CNSD Receiver Meter Reading Print View — A4 portrait, B&W.
+ *
+ * Layout mirrors the official "METER READING — RECEIVER" paper form 006_Receiver.jpg:
+ *   - Kop band: AirNav logo + "FAS CNS & OTOMASI" (left), Perum LPPNPI address block (right)
+ *   - Title METER READING centered
+ *   - Metadata band: LOKASI/TGL/JAM (left) · RECEIVER gray bar (center) · MERK/TYPE/SN (right)
+ *   - Item table 6 cols: NO | PEMERIKSAAN | STATUS A | STATUS B | SEQUELSH ON | KETERANGAN
+ *   - Section 2 (LINGKUNGAN KERJA) bar + sub-header: NO | KEGIATAN | NOMINAL | HASIL | KETERANGAN
+ *   - Footer 3-col: TEKNISI sub-table | SUPERVISOR | MANAGER TEKNIK
+ *
+ * Per project standard: NO form_number on print. Grayscale only.
+ */
+export const CnsdReceiverMeterPrintView: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [record, setRecord] = useState<CnsdReceiverMeterRecordDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRecord = async () => {
+      try {
+        const data = await cnsdReceiverMeterService.getRecord(Number(id));
+        setRecord(data);
+      } catch {
+        setRecord(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    void fetchRecord();
+  }, [id]);
+
+  const itemsBySection = useMemo(() => {
+    const map: Record<string, CnsdReceiverMeterItem[]> = {};
+    record?.items.forEach((it) => {
+      const code = it.section_code ?? '1';
+      if (!map[code]) map[code] = [];
+      map[code].push(it);
+    });
+    return map;
+  }, [record]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
+      </div>
+    );
+  }
+
+  if (!record) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4">
+        <p className="text-sm text-slate-600">Form tidak ditemukan atau gagal memuat data.</p>
+        <Button variant="outline" onClick={() => navigate('/cnsd/receiver-meter')}>Kembali</Button>
+      </div>
+    );
+  }
+
+  const tanggalLabel = `${formatDateID(record.date)}  /  ${SHIFT_TIME_LABELS[record.shift_type] ?? record.shift_type}`;
+
+  return (
+    <div className="min-h-screen w-full bg-slate-100 p-4 text-black print:bg-white print:p-0">
+      <style>{`
+        @media print {
+          @page { size: A4 portrait; margin: 7mm 7mm; }
+          body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .print-hide { display: none !important; }
+          tr, td, th { page-break-inside: avoid; }
+          img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+        .gc-paper {
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 10px;
+          color: #000;
+        }
+        .gc-table { border-collapse: collapse; width: 100%; }
+        .gc-table th, .gc-table td { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; }
+        .gc-section-bar {
+          background-color: #d1d5db !important;
+          font-weight: 700;
+          padding: 3px 6px !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .gc-group-bar {
+          background-color: #e5e7eb !important;
+          font-weight: 700;
+          padding: 2px 4px !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .gc-meta td { border: 0; padding: 0; vertical-align: top; }
+      `}</style>
+
+      {/* Toolbar (screen only) */}
+      <div className="print-hide mx-auto mb-4 flex max-w-[210mm] items-center justify-between">
+        <Button variant="outline" className="gap-2" onClick={() => navigate(`/cnsd/receiver-meter/${record.id}`)}>
+          <ArrowLeft size={16} />
+          Kembali
         </Button>
-        <Button onClick={() => window.print()} className="gap-2">
-          <Printer size={16} /> Print PDF
+        <Button className="gap-2" onClick={() => window.print()}>
+          <Printer size={16} />
+          Print PDF
         </Button>
       </div>
 
-      {/* A4 Document */}
-      <div className="mx-auto bg-white text-black" style={{ width: '210mm', minHeight: '297mm', padding: '8mm 10mm', fontSize: '9px' }}>
+      {/* A4 paper */}
+      <div
+        className="gc-paper mx-auto bg-white print:mx-0 print:w-full print:max-w-none"
+        style={{ width: '210mm', minHeight: '297mm', padding: '5mm' }}
+      >
+        {/* Kop band */}
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex items-center gap-2">
+            <img
+              src="/assets/icon/logoairnav.svg"
+              alt="AirNav Indonesia"
+              style={{ height: '38px', width: 'auto' }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+            <div className="leading-tight">
+              <div className="text-[11px] font-bold">AirNav Indonesia</div>
+              <div className="text-[8px] font-semibold uppercase">FAS CNS &amp; OTOMASI</div>
+            </div>
+          </div>
+          <div className="text-right leading-tight text-[9px]">
+            <div className="font-bold text-[10px]">Perum LPPNPI</div>
+            <div>KANTOR CABANG SURABAYA</div>
+            <div>Telp (031) 8688543 Fax. (031) 8688535</div>
+            <div>email : info@airnavindonesia.co.id</div>
+            <div>Web : www.airnavindonesia.co.id</div>
+          </div>
+        </div>
 
-        {/* ─── HEADER ─────────────────────────────────────────── */}
-        <table className="w-full border-collapse mb-1" style={{ borderBottom: '2px solid black' }}>
+        {/* Title band: LOKASI/TGL/JAM · RECEIVER · MERK/TYPE/SN */}
+        <table className="gc-table mb-0">
+          <colgroup>
+            <col style={{ width: '36%' }} />
+            <col style={{ width: '34%' }} />
+            <col style={{ width: '30%' }} />
+          </colgroup>
           <tbody>
             <tr>
-              {/* Logo + AirNav */}
-              <td className="align-middle" style={{ width: '120px', paddingBottom: '4px' }}>
-                <div className="flex items-center gap-2">
-                  <img
-                    src="/assets/icon/logoairnav.svg"
-                    alt="AirNav Indonesia"
-                    style={{ height: '40px', width: 'auto' }}
-                  />
-                  <div>
-                    <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#1a56db' }}>AirNav Indonesia</div>
-                    <div style={{ fontSize: '7px', color: '#1a56db', fontWeight: '600' }}>FAS CNS &amp; OTOMASI</div>
-                  </div>
-                </div>
-              </td>
-              {/* Center — title */}
-              <td className="text-center align-middle">
-                <div style={{ fontSize: '13px', fontWeight: 'bold', letterSpacing: '1px' }}>METER READING</div>
-              </td>
-              {/* Right — Perum info */}
-              <td className="text-right align-top" style={{ width: '160px', fontSize: '7px', lineHeight: '1.4' }}>
-                <div style={{ fontWeight: 'bold' }}>Perum</div>
-                <div style={{ fontWeight: 'bold', color: '#1a56db' }}>KANTOR CABANG SURABAYA</div>
-                <div>Telp. (031)8888456 Fax : (031) 8888538</div>
-                <div>email : sub@airnavindonesia.co.id</div>
-                <div>Web : www.airnavindonesia.co.id</div>
+              <td colSpan={3} className="text-center font-bold text-[14px] py-1">
+                METER READING
               </td>
             </tr>
-          </tbody>
-        </table>
-
-        {/* ─── LOKASI / TGL / RECEIVER TITLE ─────────────────── */}
-        <table className="w-full border-collapse" style={{ border: '1px solid black', marginBottom: '4px' }}>
-          <tbody>
             <tr>
-              <td style={{ border: '1px solid black', padding: '3px 6px', width: '55%' }}>
-                <div style={{ fontSize: '8px' }}>
-                  <span style={{ fontWeight: 'bold' }}>LOKASI</span>
-                  <span style={{ marginLeft: '8px' }}>: {record.location}</span>
-                </div>
+              <td rowSpan={2} className="align-top leading-tight">
+                <table className="gc-meta">
+                  <tbody>
+                    <tr>
+                      <td className="font-semibold pr-1" style={{ width: '60px' }}>LOKASI</td>
+                      <td className="px-0.5">:</td>
+                      <td className="uppercase">{text(record.location)}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-semibold pr-1">TGL/JAM</td>
+                      <td className="px-0.5">:</td>
+                      <td>{tanggalLabel}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </td>
-              <td
-                rowSpan={2}
-                className="text-center align-middle"
-                style={{ border: '1px solid black', padding: '4px', background: '#d0d0d0', fontWeight: 'bold', fontSize: '13px', letterSpacing: '1px' }}
-              >
+              <td rowSpan={2} className="gc-section-bar text-center font-bold uppercase text-[12px]">
                 RECEIVER
               </td>
-              <td style={{ border: '1px solid black', padding: '3px 6px' }}>
-                {/* form number */}
-                <div style={{ fontSize: '7px', color: '#555' }}>{record.form_number}</div>
+              <td className="align-top leading-tight">
+                <table className="gc-meta text-[10px]">
+                  <tbody>
+                    <tr>
+                      <td className="font-semibold pr-1" style={{ width: '40px' }}>MERK</td>
+                      <td className="px-0.5">:</td>
+                      <td>{text(record.merk) || 'OTE / PAE / TELERAD'}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-semibold pr-1">TYPE</td>
+                      <td className="px-0.5">:</td>
+                      <td>{text(record.type) || '-'}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-semibold pr-1">SN</td>
+                      <td className="px-0.5">:</td>
+                      <td>{text(record.serial_number) || '-'}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </td>
             </tr>
             <tr>
-              <td style={{ border: '1px solid black', padding: '3px 6px' }}>
-                <div style={{ fontSize: '8px' }}>
-                  <span style={{ fontWeight: 'bold' }}>TGL/JAM</span>
-                  <span style={{ marginLeft: '8px' }}>: {formatDate(record.date)} / {record.time_filled ?? '[diisi secara otomatis]'}</span>
-                </div>
-              </td>
-              <td style={{ border: '1px solid black', padding: '3px 6px' }}>
-                {/* empty */}
+              <td className="text-center font-semibold text-[9px] leading-tight">
+                COMMUNICATION NAVIGATION SURVEILLANCE AND DATA PROCESSING
               </td>
             </tr>
           </tbody>
         </table>
 
-        {/* ─── MERK / TYPE / SN ───────────────────────────────── */}
-        <table className="w-full border-collapse" style={{ border: '1px solid black', marginBottom: '4px' }}>
-          <tbody>
-            <tr>
-              <td style={{ border: '1px solid black', padding: '2px 6px', width: '33%' }}>
-                <span style={{ fontWeight: 'bold' }}>MERK</span>
-                <span style={{ marginLeft: '8px' }}>: {val(record.merk) || 'OTE / PAE / TELERAD'}</span>
-              </td>
-              <td style={{ border: '1px solid black', padding: '2px 6px', width: '33%' }}>
-                <span style={{ fontWeight: 'bold' }}>TYPE</span>
-                <span style={{ marginLeft: '8px' }}>: {val(record.type)}</span>
-              </td>
-              <td style={{ border: '1px solid black', padding: '2px 6px', width: '34%' }}>
-                <span style={{ fontWeight: 'bold' }}>S N</span>
-                <span style={{ marginLeft: '8px' }}>: {val(record.serial_number)}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* ─── SECTION I — RECEIVER TABLE ─────────────────────── */}
-        <table className="w-full border-collapse" style={{ border: '1px solid black', marginBottom: '4px' }}>
+        {/* Items table — 6 cols: NO | PEMERIKSAAN | STATUS A | STATUS B | SEQUELSH ON | KETERANGAN */}
+        <table className="gc-table">
+          <colgroup>
+            <col style={{ width: '5%' }} />
+            <col style={{ width: '34%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '23%' }} />
+          </colgroup>
           <thead>
-            <tr style={{ background: '#d0d0d0' }}>
-              <th style={{ border: '1px solid black', padding: '3px', width: '28px', textAlign: 'center' }}>NO</th>
-              <th style={{ border: '1px solid black', padding: '3px', textAlign: 'center' }}>PEMERIKSAAN</th>
-              <th colSpan={2} style={{ border: '1px solid black', padding: '3px', textAlign: 'center', width: '160px' }}>STATUS</th>
-              <th style={{ border: '1px solid black', padding: '3px', textAlign: 'center', width: '80px' }}>SEQUELSH ON</th>
-              <th style={{ border: '1px solid black', padding: '3px', textAlign: 'center', width: '100px' }}>KETERANGAN</th>
+            <tr className="text-center font-bold gc-section-bar">
+              <th className="border border-black py-1" rowSpan={2}>NO</th>
+              <th className="border border-black py-1" rowSpan={2}>PEMERIKSAAN</th>
+              <th colSpan={2} className="border border-black py-1">STATUS</th>
+              <th className="border border-black py-1" rowSpan={2}>SEQUELSH ON</th>
+              <th className="border border-black py-1" rowSpan={2}>KETERANGAN</th>
             </tr>
-            <tr style={{ background: '#e8e8e8' }}>
-              <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center' }}></th>
-              <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center' }}>2</th>
-              <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center', width: '80px' }}>A</th>
-              <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center', width: '80px' }}>B</th>
-              <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center' }}>5</th>
-              <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center' }}>6</th>
+            <tr className="text-center font-bold gc-section-bar">
+              <th className="border border-black py-1">A</th>
+              <th className="border border-black py-1">B</th>
+            </tr>
+            <tr className="text-center font-bold text-[9px]" style={{ backgroundColor: '#e5e7eb' }}>
+              <th className="border border-black">1</th>
+              <th className="border border-black">2</th>
+              <th className="border border-black">3</th>
+              <th className="border border-black">4</th>
+              <th className="border border-black">5</th>
+              <th className="border border-black">6</th>
             </tr>
           </thead>
           <tbody>
-            {Array.from(groups.entries()).map(([key, group], groupIdx) => (
-              <React.Fragment key={key}>
-                {/* Group header row */}
-                <tr style={{ background: '#c6efce' }}>
-                  <td style={{ border: '1px solid black', padding: '2px 4px', textAlign: 'center', fontWeight: 'bold' }}>
-                    {groupIdx + 1}
-                  </td>
-                  <td colSpan={5} style={{ border: '1px solid black', padding: '2px 6px', fontWeight: 'bold', fontSize: '9px' }}>
-                    {group.header?.group_name ?? ''}
-                  </td>
-                </tr>
-                {/* Data rows */}
-                {group.rows.map((item, rowIdx) => (
-                  <tr key={item.id} style={{ background: rowIdx % 2 === 0 ? 'white' : '#f9f9f9' }}>
-                    <td style={{ border: '1px solid black', padding: '2px 4px', textAlign: 'center' }}></td>
-                    <td style={{ border: '1px solid black', padding: '2px 6px' }}>{val(item.item_name)}</td>
-                    <td style={{ border: '1px solid black', padding: '2px 4px', textAlign: 'center' }}>
-                      <StatusCell value={item.status_a} />
-                    </td>
-                    <td style={{ border: '1px solid black', padding: '2px 4px', textAlign: 'center' }}>
-                      <StatusCell value={item.status_b} />
-                    </td>
-                    <td style={{ border: '1px solid black', padding: '2px 4px', textAlign: 'center' }}>
-                      {val(item.sequelsh_on)}
-                    </td>
-                    <td style={{ border: '1px solid black', padding: '2px 6px' }}>
-                      {val(item.keterangan)}
-                    </td>
-                  </tr>
-                ))}
-              </React.Fragment>
+            {record.sections_meta.map((meta) => (
+              <ReceiverPrintBlock
+                key={meta.code}
+                meta={meta}
+                items={itemsBySection[meta.code] ?? []}
+              />
             ))}
           </tbody>
         </table>
 
-        {/* ─── SECTION II — LINGKUNGAN KERJA ──────────────────── */}
-        <table className="w-full border-collapse" style={{ border: '1px solid black', marginBottom: '6px' }}>
+        {/* Footer signatures: TEKNISI | SUPERVISOR | MANAGER TEKNIK */}
+        <table className="gc-table">
+          <colgroup>
+            <col style={{ width: '44%' }} />
+            <col style={{ width: '28%' }} />
+            <col style={{ width: '28%' }} />
+          </colgroup>
           <thead>
-            <tr style={{ background: '#ffc000' }}>
-              <th colSpan={5} style={{ border: '1px solid black', padding: '3px 6px', textAlign: 'left', fontWeight: 'bold', fontSize: '9px' }}>
-                II &nbsp; LINGKUNGAN KERJA
-              </th>
-            </tr>
-            <tr style={{ background: '#d0d0d0' }}>
-              <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center', width: '28px' }}>NO</th>
-              <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center' }}>KEGIATAN</th>
-              <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center', width: '80px' }}>NOMINAL</th>
-              <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center', width: '80px' }}>HASIL</th>
-              <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center', width: '100px' }}>KETERANGAN</th>
+            <tr className="text-center font-bold gc-section-bar">
+              <th className="border border-black py-1">TEKNISI</th>
+              <th className="border border-black py-1">SUPERVISOR</th>
+              <th className="border border-black py-1">MANAGER TEKNIK</th>
             </tr>
           </thead>
           <tbody>
-            {section2Items.map((item, idx) => (
-              <tr key={item.id} style={{ background: idx % 2 === 0 ? 'white' : '#f9f9f9' }}>
-                <td style={{ border: '1px solid black', padding: '2px 4px', textAlign: 'center' }}>{idx + 1}</td>
-                <td style={{ border: '1px solid black', padding: '2px 6px' }}>{val(item.item_name)}</td>
-                <td style={{ border: '1px solid black', padding: '2px 4px', textAlign: 'center' }}>{val(item.nominal)}</td>
-                <td style={{ border: '1px solid black', padding: '2px 4px', textAlign: 'center' }}>{val(item.hasil)}</td>
-                <td style={{ border: '1px solid black', padding: '2px 6px' }}>{val(item.keterangan)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* ─── FOOTER — WAKTU PELAKSANAAN ─────────────────────── */}
-        <div style={{ border: '1px solid black', marginBottom: '0' }}>
-          {/* Waktu Pelaksanaan row */}
-          <div style={{ display: 'flex', borderBottom: '1px solid black', fontSize: '8px' }}>
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '60px 1fr', padding: '3px 6px', borderRight: '1px solid black' }}>
-              <span style={{ fontWeight: 'bold' }}>Hari</span>
-              <span>: {record.day_name ?? '—'}</span>
-            </div>
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '60px 1fr', padding: '3px 6px', borderRight: '1px solid black' }}>
-              <span style={{ fontWeight: 'bold' }}>Tanggal</span>
-              <span>: {formatDate(record.date)}</span>
-            </div>
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '40px 1fr', padding: '3px 6px' }}>
-              <span style={{ fontWeight: 'bold' }}>Jam</span>
-              <span>: {record.time_filled ?? '—'}</span>
-            </div>
-          </div>
-
-          {/* Signature row */}
-          <div style={{ display: 'flex' }}>
-            {/* Teknisi table */}
-            <div style={{ flex: 1, borderRight: '1px solid black' }}>
-              <div style={{ textAlign: 'center', fontWeight: 'bold', padding: '3px', borderBottom: '1px solid black', fontSize: '8px', background: '#f0f0f0' }}>
-                TEKNISI
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8px' }}>
-                <thead>
-                  <tr>
-                    <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center', width: '24px' }}>No</th>
-                    <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center' }}>Nama</th>
-                    <th style={{ border: '1px solid black', padding: '2px', textAlign: 'center', width: '60px' }}>Paraf</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from({ length: maxTechRows }).map((_, idx) => {
-                    const tech = technicians[idx];
-                    return (
-                      <tr key={idx} style={{ height: '36px' }}>
-                        <td style={{ border: '1px solid black', padding: '2px', textAlign: 'center' }}>{idx + 1}</td>
-                        <td style={{ border: '1px solid black', padding: '2px 4px' }}>{tech?.technician_name ?? ''}</td>
-                        <td style={{ border: '1px solid black', padding: '2px', textAlign: 'center', verticalAlign: 'middle' }}>
-                          {tech?.signature ? (
-                            <img src={tech.signature} alt="TTD" style={{ maxHeight: '30px', maxWidth: '55px', margin: '0 auto' }} />
-                          ) : tech ? (
-                            <span style={{ fontSize: '7px', color: '#999', fontStyle: 'italic' }}>Belum TTD</span>
-                          ) : null}
+            <tr>
+              <td className="align-top p-0">
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '12%', border: '1px solid #000', padding: '2px', fontWeight: 700, textAlign: 'center' }}>No</th>
+                      <th style={{ width: '58%', border: '1px solid #000', padding: '2px', fontWeight: 700, textAlign: 'center' }}>Nama</th>
+                      <th style={{ width: '30%', border: '1px solid #000', padding: '2px', fontWeight: 700, textAlign: 'center' }}>Paraf</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {record.technicians.map((t, idx) => (
+                      <tr key={t.id}>
+                        <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center' }}>{idx + 1}</td>
+                        <td style={{ border: '1px solid #000', padding: '2px' }} className="uppercase">{t.technician_name}</td>
+                        <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', height: '26px' }}>
+                          {t.signature ? (
+                            <img src={t.signature} alt="ttd" style={{ maxHeight: '20px', display: 'inline-block' }} />
+                          ) : ''}
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Supervisor */}
-            <div style={{ width: '24%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ textAlign: 'center', fontWeight: 'bold', padding: '3px', borderBottom: '1px solid black', fontSize: '8px', background: '#f0f0f0' }}>
-                SUPERVISOR
-              </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6px', minHeight: '80px' }}>
-                {record.supervisor ? (
-                  <>
-                    <div style={{ fontSize: '7px', color: '#555', marginBottom: '4px' }}>{record.supervisor.name}</div>
-                    {record.supervisor.signature ? (
-                      <>
-                        <img src={record.supervisor.signature} alt="TTD Supervisor" style={{ maxHeight: '50px', maxWidth: '90px' }} />
-                        <div style={{ fontSize: '6px', color: '#888', marginTop: '2px' }}>{formatSignedAt(record.supervisor.signed_at)}</div>
-                      </>
-                    ) : (
-                      <div style={{ border: '1px dashed #aaa', width: '80px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span style={{ fontSize: '7px', color: '#aaa', fontStyle: 'italic' }}>Belum TTD</span>
-                      </div>
+                    ))}
+                    {record.technicians.length === 0 && (
+                      <tr>
+                        <td colSpan={3} style={{ border: '1px solid #000', padding: '4px', textAlign: 'center', fontStyle: 'italic' }}>
+                          —
+                        </td>
+                      </tr>
                     )}
-                  </>
-                ) : (
-                  <span style={{ fontSize: '7px', color: '#aaa', fontStyle: 'italic', textAlign: 'center' }}>
-                    Tidak ada supervisor pada shift ini
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Manager Teknik */}
-            <div style={{ width: '24%', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ textAlign: 'center', fontWeight: 'bold', padding: '3px', borderBottom: '1px solid black', fontSize: '8px', background: '#f0f0f0' }}>
-                MANAGER TEKNIK
-              </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6px', minHeight: '80px' }}>
-                {record.manager ? (
-                  <>
-                    <div style={{ fontSize: '7px', color: '#555', marginBottom: '4px' }}>{record.manager.name}</div>
-                    {record.manager.signature ? (
-                      <>
-                        <img src={record.manager.signature} alt="TTD Manager" style={{ maxHeight: '50px', maxWidth: '90px' }} />
-                        <div style={{ fontSize: '6px', color: '#888', marginTop: '2px' }}>{formatSignedAt(record.manager.signed_at)}</div>
-                      </>
-                    ) : (
-                      <div style={{ border: '1px dashed #aaa', width: '80px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span style={{ fontSize: '7px', color: '#aaa', fontStyle: 'italic' }}>Belum TTD</span>
-                      </div>
+                    {record.technicians.length > 0 && record.technicians.length < 4 && (
+                      Array.from({ length: 4 - record.technicians.length }).map((_, i) => (
+                        <tr key={`empty-tech-${i}`}>
+                          <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', height: '22px' }}>&nbsp;</td>
+                          <td style={{ border: '1px solid #000', padding: '2px' }}>&nbsp;</td>
+                          <td style={{ border: '1px solid #000', padding: '2px' }}>&nbsp;</td>
+                        </tr>
+                      ))
                     )}
-                  </>
-                ) : (
-                  <span style={{ fontSize: '7px', color: '#aaa', fontStyle: 'italic', textAlign: 'center' }}>
-                    Manager Teknik tidak ditugaskan
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+                  </tbody>
+                </table>
+              </td>
 
-        {/* Note */}
-        <div style={{ marginTop: '4px', fontSize: '7px', color: '#555' }}>
-          (*) coret yang tidak perlu &nbsp;&nbsp; Kondisi: (√) Baik/Normal &nbsp;&nbsp; (x) Tidak Baik/Tidak Normal
-        </div>
+              <td className="text-center align-top" style={{ minHeight: '120px' }}>
+                <div style={{ minHeight: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}>
+                  {record.supervisor?.signature ? (
+                    <img src={record.supervisor.signature} alt="ttd" style={{ maxHeight: '60px', maxWidth: '120px', objectFit: 'contain' }} />
+                  ) : (
+                    <span>&nbsp;</span>
+                  )}
+                </div>
+                <div className="font-semibold uppercase border-t border-black pt-1 px-1">
+                  {text(record.supervisor?.name) || '—'}
+                </div>
+              </td>
+
+              <td className="text-center align-top" style={{ minHeight: '120px' }}>
+                <div style={{ minHeight: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}>
+                  {record.manager?.signature ? (
+                    <img src={record.manager.signature} alt="ttd" style={{ maxHeight: '60px', maxWidth: '120px', objectFit: 'contain' }} />
+                  ) : (
+                    <span>&nbsp;</span>
+                  )}
+                </div>
+                <div className="font-semibold uppercase border-t border-black pt-1 px-1">
+                  {text(record.manager?.name) || '—'}
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </>
+    </div>
   );
 };

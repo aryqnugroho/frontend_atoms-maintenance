@@ -1,46 +1,155 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { cnsdAmscMeterService } from '@/services/cnsdAmscMeterService';
-import type { CnsdAmscMeterRecordDetail } from '@/types/cnsdAmsc';
+import type {
+  CnsdAmscMeterItem,
+  CnsdAmscMeterRecordDetail,
+  CnsdAmscMeterSectionMeta,
+} from '@/types/cnsdAmsc';
 
-// ─── Helpers ──────────────────────────────────────────────────
-
-const formatDate = (v?: string | null): string => {
-  if (!v) return '-';
-  return new Date(v).toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
+const SHIFT_TIME_LABELS: Record<string, string> = {
+  pagi:  '07:00 — 13:00',
+  siang: '13:00 — 19:00',
+  malam: '19:00 — 07:00',
 };
 
-const formatDateTime = (v?: string | null): string => {
+const formatDateID = (v?: string | null): string => {
   if (!v) return '';
-  return new Date(v).toLocaleString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  try {
+    return new Date(v).toLocaleDateString('id-ID', {
+      day: '2-digit', month: 'long', year: 'numeric',
+    });
+  } catch {
+    return v;
+  }
 };
 
-const val = (v: string | null | undefined): string => (v == null || v === '' ? '' : v);
+const text = (v: string | null | undefined): string =>
+  v == null || v === '' ? '' : String(v);
+
+interface PrintSectionBlockProps {
+  meta: CnsdAmscMeterSectionMeta;
+  items: CnsdAmscMeterItem[];
+}
+
+const PrintSectionBlock: React.FC<PrintSectionBlockProps> = ({ meta, items }) => {
+  const totalCols = 6;
+  const layout = meta.inputs_layout;
+
+  // Section bar
+  return (
+    <>
+      {/* Section header with column sub-labels */}
+      {layout === 'dual_ab' && (
+        <tr>
+          <td className="text-center font-bold gc-group-bar">{meta.code}</td>
+          <td className="gc-group-bar font-bold uppercase">{meta.name}</td>
+          <td className="gc-group-bar text-center font-bold">Standart</td>
+          <td className="gc-group-bar text-center font-bold">A</td>
+          <td className="gc-group-bar text-center font-bold">B</td>
+          <td className="gc-group-bar font-bold">{/* KETERANGAN */}</td>
+        </tr>
+      )}
+      {layout === 'single_hasil' && (
+        <tr>
+          <td className="text-center font-bold gc-group-bar">{meta.code}</td>
+          <td className="gc-group-bar font-bold uppercase">{meta.name}</td>
+          <td className="gc-group-bar text-center font-bold">Standart</td>
+          <td colSpan={2} className="gc-group-bar text-center font-bold">HASIL</td>
+          <td className="gc-group-bar font-bold">{/* KETERANGAN */}</td>
+        </tr>
+      )}
+      {layout === 'channel' && (
+        <tr>
+          <td className="text-center font-bold gc-group-bar">{meta.code}</td>
+          <td className="gc-group-bar font-bold uppercase">{meta.name}</td>
+          <td className="gc-group-bar text-center font-bold">ADDRESS</td>
+          <td className="gc-group-bar text-center font-bold">STATUS</td>
+          <td className="gc-group-bar text-center font-bold">CCT</td>
+          <td className="gc-group-bar font-bold">{/* KETERANGAN */}</td>
+        </tr>
+      )}
+      {layout === 'environment' && (
+        <>
+          <tr>
+            <td colSpan={totalCols} className="gc-section-bar font-bold uppercase">{meta.name}</td>
+          </tr>
+          <tr>
+            <td className="text-center font-bold gc-group-bar">NO</td>
+            <td className="gc-group-bar font-bold">KEGIATAN</td>
+            <td className="gc-group-bar text-center font-bold">Nominal</td>
+            <td colSpan={2} className="gc-group-bar text-center font-bold">HASIL PEMERIKSAAN</td>
+            <td className="gc-group-bar font-bold">KETERANGAN</td>
+          </tr>
+        </>
+      )}
+
+      {items.map((item) => {
+        const rowNo = item.item_number && item.item_number.trim() !== '' ? item.item_number : '';
+        if (layout === 'dual_ab') {
+          return (
+            <tr key={item.id} className="text-[10px]">
+              <td className="text-center">{rowNo}</td>
+              <td className="pl-1">{item.item_name}</td>
+              <td className="text-center">{text(item.nominal)}</td>
+              <td className="text-center">{text(item.hasil_a)}</td>
+              <td className="text-center">{text(item.hasil_b)}</td>
+              <td>{text(item.keterangan)}</td>
+            </tr>
+          );
+        }
+        if (layout === 'single_hasil') {
+          return (
+            <tr key={item.id} className="text-[10px]">
+              <td className="text-center">{rowNo}</td>
+              <td className="pl-1">{item.item_name}</td>
+              <td style={{ backgroundColor: '#525252' }}>&nbsp;</td>
+              <td colSpan={2} className="text-center">{text(item.hasil)}</td>
+              <td>{text(item.keterangan)}</td>
+            </tr>
+          );
+        }
+        if (layout === 'channel') {
+          return (
+            <tr key={item.id} className="text-[10px]">
+              <td className="text-center">{rowNo}</td>
+              <td className="pl-1">{item.item_name}</td>
+              <td className="text-center">{text(item.address)}</td>
+              <td className="text-center">{text(item.status_value)}</td>
+              <td className="text-center">{text(item.cct)}</td>
+              <td>{text(item.keterangan)}</td>
+            </tr>
+          );
+        }
+        // environment
+        return (
+          <tr key={item.id} className="text-[10px]">
+            <td className="text-center">{rowNo}</td>
+            <td className="pl-1">{item.item_name}</td>
+            <td className="text-center">{text(item.nominal)}</td>
+            <td colSpan={2} className="text-center">{text(item.hasil)}</td>
+            <td>{text(item.keterangan)}</td>
+          </tr>
+        );
+      })}
+    </>
+  );
+};
 
 /**
- * CNSD AMSC Meter Reading Print View.
+ * CNSD AMSC Meter Reading Print View — A4 portrait, B&W.
  *
- * Layout follows the official AMSC paper form:
- * - Header: AirNav logo left, Perum LPPNPI right
- * - Title: METER READING — AMSC
- * - Equipment info: Merk, Type, SN
- * - Tables: Front Panel, Power Supply Unit, Channel AMSC, Lingkungan Kerja
- * - Footer: Waktu pelaksanaan (Hari/Tanggal/Jam) + Signature (Teknisi | Supervisor | Manager Teknik)
+ * Layout mirrors the official "METER READING — AMSC" paper form 004_AMSC:
+ *   - Kop band: AirNav logo + "FAS CNS & OTOMASI" (left), Perum LPPNPI (right)
+ *   - Title METER READING centered, AMSC gray bar middle
+ *   - Metadata band: LOKASI/TANGGAL (left) · AMSC (center) · MERK/TYPE/SN (right)
+ *   - Item table 6 cols, varies per section layout
+ *   - LINGKUNGAN KERJA section bar + sub-header
+ *   - Footer 3-col: TEKNISI sub-table | SUPERVISOR | MANAGER TEKNIK
  *
- * Footer pattern mirrors CnsdReadinessPrintView and CnsdRecorderMeterPrintView.
- * Print is manual only — no auto-print.
+ * Per project standard: NO form_number on print. Grayscale only.
  */
 export const CnsdAmscMeterPrintView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -62,6 +171,16 @@ export const CnsdAmscMeterPrintView: React.FC = () => {
     void fetchRecord();
   }, [id]);
 
+  const itemsBySection = useMemo(() => {
+    const map: Record<string, CnsdAmscMeterItem[]> = {};
+    record?.items.forEach((it) => {
+      const code = it.section_code ?? '1';
+      if (!map[code]) map[code] = [];
+      map[code].push(it);
+    });
+    return map;
+  }, [record]);
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -74,376 +193,249 @@ export const CnsdAmscMeterPrintView: React.FC = () => {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4">
         <p className="text-sm text-slate-600">Form tidak ditemukan atau gagal memuat data.</p>
-        <Button variant="outline" onClick={() => navigate('/cnsd/amsc-meter')}>
-          Kembali
-        </Button>
+        <Button variant="outline" onClick={() => navigate('/cnsd/amsc-meter')}>Kembali</Button>
       </div>
     );
   }
 
-  const frontPanelItems = record.items.filter((it) => it.section_code === '1');
-  const powerSupplyItems = record.items.filter((it) => it.section_code === '2');
-  const channelItems = record.items.filter((it) => it.section_code === '3');
-  const envItems = record.items.filter((it) => it.section_code === '4');
-
-  const shiftLabel: Record<string, string> = {
-    pagi: 'Pagi (07:00–13:00)',
-    siang: 'Siang (13:00–19:00)',
-    malam: 'Malam (19:00–07:00)',
-  };
+  const tanggalLabel = `${formatDateID(record.date)}  /  ${SHIFT_TIME_LABELS[record.shift_type] ?? record.shift_type}`;
 
   return (
     <div className="min-h-screen w-full bg-slate-100 p-4 text-black print:bg-white print:p-0">
-      <style>
-        {`
-          @media print {
-            @page { size: A4 portrait; margin: 8mm 10mm; }
-            body { background: white !important; }
-            .print-hide { display: none !important; }
-            tr, td { page-break-inside: avoid; }
-          }
-        `}
-      </style>
+      <style>{`
+        @media print {
+          @page { size: A4 portrait; margin: 7mm 7mm; }
+          body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .print-hide { display: none !important; }
+          tr, td, th { page-break-inside: avoid; }
+          img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+        .gc-paper { font-family: Arial, Helvetica, sans-serif; font-size: 9.5px; color: #000; }
+        .gc-table { border-collapse: collapse; width: 100%; }
+        .gc-table th, .gc-table td { border: 1px solid #000; padding: 1.5px 3px; vertical-align: middle; }
+        .gc-section-bar {
+          background-color: #d1d5db !important;
+          font-weight: 700; padding: 3px 6px !important;
+          -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        }
+        .gc-group-bar {
+          background-color: #e5e7eb !important;
+          font-weight: 700; padding: 2px 4px !important;
+          -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        }
+        .gc-meta td { border: 0; padding: 0; vertical-align: top; }
+      `}</style>
 
-      {/* ── Toolbar (screen only) ── */}
       <div className="print-hide mx-auto mb-4 flex max-w-[210mm] items-center justify-between">
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => navigate(`/cnsd/amsc-meter/${record.id}`)}
-        >
-          <ArrowLeft size={16} />
-          Kembali
+        <Button variant="outline" className="gap-2" onClick={() => navigate(`/cnsd/amsc-meter/${record.id}`)}>
+          <ArrowLeft size={16} /> Kembali
         </Button>
         <Button className="gap-2" onClick={() => window.print()}>
-          <Printer size={16} />
-          Print PDF
+          <Printer size={16} /> Print PDF
         </Button>
       </div>
 
-      {/* ── A4 paper ── */}
-      <div className="mx-auto max-w-[210mm] border border-black bg-white font-sans text-[11px] print:mx-0 print:w-full print:max-w-none print:border-0">
-
+      <div
+        className="gc-paper mx-auto bg-white print:mx-0 print:w-full print:max-w-none"
+        style={{ width: '210mm', minHeight: '297mm', padding: '5mm' }}
+      >
         {/* Kop */}
-        <div className="flex border-b border-black">
-          {/* Left: AirNav logo + name */}
-          <div className="flex w-[40%] items-center gap-2 border-r border-black p-3">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex items-center gap-2">
             <img
               src="/assets/icon/logoairnav.svg"
               alt="AirNav Indonesia"
-              className="h-12 w-auto"
+              style={{ height: '38px', width: 'auto' }}
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
             <div className="leading-tight">
-              <div className="text-[12px] font-black">AirNav Indonesia</div>
-              <div className="text-[8px] font-semibold text-gray-600">FAS CNS &amp; OTOMASI</div>
+              <div className="text-[11px] font-bold">AirNav Indonesia</div>
+              <div className="text-[8px] font-semibold uppercase">FAS CNS &amp; OTOMASI</div>
             </div>
           </div>
-
-          {/* Right: Perum LPPNPI identity */}
-          <div className="flex w-[60%] flex-col justify-center p-3 text-[9px] leading-tight">
-            <div className="font-bold text-[12px]">Perum LPPNPI</div>
-            <div className="font-semibold uppercase">Kantor Cabang Surabaya</div>
-            <div className="text-gray-600 mt-0.5">Telp. (031)8688456 Fax : (031)8688536</div>
-            <div className="text-gray-600">email : sub@airnavindonesia.co.id</div>
-            <div className="text-gray-600">Web : www.airnavindonesia.co.id</div>
+          <div className="text-right leading-tight text-[9px]">
+            <div className="font-bold text-[10px]">Perum LPPNPI</div>
+            <div>KANTOR CABANG SURABAYA</div>
+            <div>Telp (031) 8688456 Fax. (031) 8688536</div>
+            <div>email : sub@airnavindonesia.co.id</div>
+            <div>Web : www.airnavindonesia.co.id</div>
           </div>
         </div>
 
-        {/* Title row */}
-        <div className="flex border-b border-black">
-          <div className="w-[55%] border-r border-black flex items-center justify-center py-3">
-            <div className="text-[14px] font-black uppercase tracking-wider">METER READING</div>
-          </div>
-          <div className="w-[20%] border-r border-black flex items-center justify-center bg-green-700 py-3">
-            <div className="text-[16px] font-black uppercase text-white">AMSC</div>
-          </div>
-          <div className="w-[25%] flex flex-col justify-center px-2 py-1.5 text-[10px] leading-tight">
-            <div className="text-[10px] font-bold text-green-700">FAS CNS &amp; A</div>
-            <div className="text-[11px] font-mono text-green-700">{record.form_number}</div>
-          </div>
-        </div>
-
-        {/* Header metadata */}
-        <div className="flex border-b border-black">
-          <div className="w-[55%] border-r border-black">
-            <div className="grid grid-cols-[80px_1fr] gap-0.5 p-2 border-b border-black text-[10px]">
-              <span className="font-bold">LOKASI</span>
-              <span>: {record.location}</span>
-            </div>
-            <div className="grid grid-cols-[80px_1fr] gap-0.5 p-2 text-[10px]">
-              <span className="font-bold">TGL/SHIFT</span>
-              <span>: {formatDate(record.date)} — {shiftLabel[record.shift_type] ?? record.shift_type}</span>
-            </div>
-          </div>
-          <div className="w-[45%] p-2 text-[10px] leading-tight">
-            <div className="grid grid-cols-[60px_1fr]">
-              <span className="font-bold">MERK</span>
-              <span>: {val(record.merk)}</span>
-            </div>
-            <div className="grid grid-cols-[60px_1fr]">
-              <span className="font-bold">TYPE</span>
-              <span>: {val(record.type)}</span>
-            </div>
-            <div className="grid grid-cols-[60px_1fr]">
-              <span className="font-bold">S N</span>
-              <span>: {val(record.serial_number)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 1: Front Panel */}
-        <table className="w-full border-collapse text-[10px]">
-          <thead>
-            <tr className="bg-green-100">
-              <th className="border border-black px-1 py-1 w-8 text-center">NO</th>
-              <th className="border border-black px-1 py-1 text-left">PEMBACAAN METER READING</th>
-              <th className="border border-black px-1 py-1 w-20 text-center">NOMINAL</th>
-              <th className="border border-black px-1 py-1 w-14 text-center" colSpan={2}>HASIL</th>
-              <th className="border border-black px-1 py-1 w-24 text-center">KETERANGAN</th>
+        {/* Title band */}
+        <table className="gc-table mb-0">
+          <colgroup>
+            <col style={{ width: '36%' }} />
+            <col style={{ width: '34%' }} />
+            <col style={{ width: '30%' }} />
+          </colgroup>
+          <tbody>
+            <tr>
+              <td colSpan={3} className="text-center font-bold text-[14px] py-1">METER READING</td>
             </tr>
-            <tr className="bg-green-50">
-              <th className="border border-black px-1 py-0.5" colSpan={3}></th>
-              <th className="border border-black px-1 py-0.5 w-14 text-center font-bold">A</th>
-              <th className="border border-black px-1 py-0.5 w-14 text-center font-bold">B</th>
-              <th className="border border-black px-1 py-0.5"></th>
+            <tr>
+              <td rowSpan={2} className="align-top leading-tight">
+                <table className="gc-meta">
+                  <tbody>
+                    <tr>
+                      <td className="font-semibold pr-1" style={{ width: '60px' }}>LOKASI</td>
+                      <td className="px-0.5">:</td>
+                      <td className="uppercase">{text(record.location)}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-semibold pr-1">TANGGAL</td>
+                      <td className="px-0.5">:</td>
+                      <td>{tanggalLabel}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+              <td rowSpan={2} className="gc-section-bar text-center font-bold uppercase text-[12px]">
+                AMSC
+              </td>
+              <td className="align-top leading-tight">
+                <table className="gc-meta text-[10px]">
+                  <tbody>
+                    <tr>
+                      <td className="font-semibold pr-1" style={{ width: '40px' }}>MERK</td>
+                      <td className="px-0.5">:</td>
+                      <td>{text(record.merk) || 'ELSA'}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-semibold pr-1">TYPE</td>
+                      <td className="px-0.5">:</td>
+                      <td>{text(record.type) || '1003Qi+'}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-semibold pr-1">S N</td>
+                      <td className="px-0.5">:</td>
+                      <td>{text(record.serial_number) || '-'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td className="text-center font-semibold text-[9px] leading-tight">
+                COMMUNICATION NAVIGATION SURVEILLANCE AND DATA PROCESSING
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* Items table — 6 cols */}
+        <table className="gc-table">
+          <colgroup>
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '32%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '18%' }} />
+          </colgroup>
+          <thead>
+            <tr className="text-center font-bold gc-section-bar">
+              <th className="border border-black py-1">NO</th>
+              <th className="border border-black py-1">PEMBACAAN METER READING</th>
+              <th className="border border-black py-1">NOMINAL</th>
+              <th colSpan={2} className="border border-black py-1">HASIL</th>
+              <th className="border border-black py-1">KETERANGAN</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="bg-green-50">
-              <td className="border border-black px-1 py-1 text-center font-bold">1</td>
-              <td className="border border-black px-1 py-1 font-bold uppercase" colSpan={5}>FRONT PANEL</td>
-            </tr>
-            {frontPanelItems.map((item) => (
-              <tr key={item.id}>
-                <td className="border border-black px-1 py-0.5 text-center"></td>
-                <td className="border border-black px-1 py-0.5">{item.item_name}</td>
-                <td className="border border-black px-1 py-0.5 text-center">{item.nominal}</td>
-                <td className="border border-black px-1 py-0.5 text-center">{val(item.hasil_a)}</td>
-                <td className="border border-black px-1 py-0.5 text-center">{val(item.hasil_b)}</td>
-                <td className="border border-black px-1 py-0.5">{val(item.keterangan)}</td>
-              </tr>
+            {record.sections_meta.map((meta) => (
+              <PrintSectionBlock
+                key={meta.code}
+                meta={meta}
+                items={itemsBySection[meta.code] ?? []}
+              />
             ))}
           </tbody>
         </table>
 
-        {/* Section 2: Power Supply Unit */}
-        <table className="w-full border-collapse text-[10px] mt-0">
+        {/* Footer signatures */}
+        <table className="gc-table">
+          <colgroup>
+            <col style={{ width: '44%' }} />
+            <col style={{ width: '28%' }} />
+            <col style={{ width: '28%' }} />
+          </colgroup>
           <thead>
-            <tr className="bg-green-100">
-              <th className="border border-black px-1 py-1 w-8 text-center">NO</th>
-              <th className="border border-black px-1 py-1 text-left">PEMBACAAN METER READING</th>
-              <th className="border border-black px-1 py-1 w-20 text-center bg-slate-600 text-white">Standart</th>
-              <th className="border border-black px-1 py-1 w-20 text-center">HASIL</th>
-              <th className="border border-black px-1 py-1 w-24 text-center">KETERANGAN</th>
+            <tr className="text-center font-bold gc-section-bar">
+              <th className="border border-black py-1">TEKNISI</th>
+              <th className="border border-black py-1">SUPERVISOR</th>
+              <th className="border border-black py-1">MANAGER TEKNIK</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="bg-green-50">
-              <td className="border border-black px-1 py-1 text-center font-bold">2</td>
-              <td className="border border-black px-1 py-1 font-bold uppercase" colSpan={4}>POWER SUPPLY UNIT</td>
-            </tr>
-            {powerSupplyItems.map((item) => (
-              <tr key={item.id}>
-                <td className="border border-black px-1 py-0.5 text-center"></td>
-                <td className="border border-black px-1 py-0.5">{item.item_name}</td>
-                <td className="border border-black px-1 py-0.5 bg-slate-300"></td>
-                <td className="border border-black px-1 py-0.5 text-center">{val(item.hasil)}</td>
-                <td className="border border-black px-1 py-0.5">{val(item.keterangan)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* Section 3: Channel AMSC */}
-        <table className="w-full border-collapse text-[10px] mt-0">
-          <thead>
-            <tr className="bg-green-100">
-              <th className="border border-black px-1 py-1 w-8 text-center">NO</th>
-              <th className="border border-black px-1 py-1 text-left">PEMBACAAN METER READING</th>
-              <th className="border border-black px-1 py-1 w-20 text-center">ADDRESS</th>
-              <th className="border border-black px-1 py-1 w-14 text-center">STATUS</th>
-              <th className="border border-black px-1 py-1 w-14 text-center">CCT</th>
-              <th className="border border-black px-1 py-1 w-28 text-center">KETERANGAN</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="bg-green-50">
-              <td className="border border-black px-1 py-1 text-center font-bold">3</td>
-              <td className="border border-black px-1 py-1 font-bold uppercase" colSpan={5}>CHANNEL AMSC</td>
-            </tr>
-            {channelItems.map((item) => (
-              <tr key={item.id} className={item.status_value === 'U/S' ? 'bg-red-50' : ''}>
-                <td className="border border-black px-1 py-0.5 text-center"></td>
-                <td className="border border-black px-1 py-0.5">{item.item_name}</td>
-                <td className="border border-black px-1 py-0.5 text-center font-mono text-[8px]">{val(item.address)}</td>
-                <td className="border border-black px-1 py-0.5 text-center">{val(item.status_value)}</td>
-                <td className="border border-black px-1 py-0.5 text-center">{val(item.cct)}</td>
-                <td className="border border-black px-1 py-0.5">{val(item.keterangan)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* Section 4: Lingkungan Kerja */}
-        <div className="border-t border-black">
-          <div className="bg-green-100 px-2 py-1 text-[10px] font-bold uppercase border-b border-black">
-            LINGKUNGAN KERJA
-          </div>
-          <table className="w-full border-collapse text-[10px]">
-            <thead>
-              <tr className="bg-green-50 text-[10px] font-bold">
-                <td className="border border-black px-2 py-1 text-center w-10">NO</td>
-                <td className="border border-black px-2 py-1">KEGIATAN</td>
-                <td className="border border-black px-2 py-1 text-center w-28">Nominal</td>
-                <td className="border border-black px-2 py-1 text-center w-32">HASIL PEMERIKSAAN</td>
-                <td className="border border-black px-2 py-1">KETERANGAN</td>
-              </tr>
-            </thead>
-            <tbody>
-              {envItems.map((item, idx) => (
-                <tr key={item.id}>
-                  <td className="border border-black px-2 py-1 text-center font-mono">
-                    {item.item_number || idx + 1}
-                  </td>
-                  <td className="border border-black px-2 py-1">{item.item_name}</td>
-                  <td className="border border-black px-2 py-1 text-center">{val(item.nominal)}</td>
-                  <td className="border border-black px-2 py-1 text-center">{val(item.hasil)}</td>
-                  <td className="border border-black px-2 py-1">{val(item.keterangan)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* ── Footer: Waktu Pelaksanaan + Tanda Tangan ── */}
-        <div className="border-t border-black">
-
-          {/* Waktu pelaksanaan row */}
-          <div className="flex border-b border-black text-[10px]">
-            <div className="flex-1 grid grid-cols-[70px_1fr] gap-0.5 p-2 border-r border-black">
-              <span className="font-bold">Hari</span>
-              <span>: {record.day_name ?? '-'}</span>
-            </div>
-            <div className="flex-1 grid grid-cols-[70px_1fr] gap-0.5 p-2 border-r border-black">
-              <span className="font-bold">Tanggal</span>
-              <span>: {formatDate(record.date)}</span>
-            </div>
-            <div className="flex-1 grid grid-cols-[50px_1fr] gap-0.5 p-2">
-              <span className="font-bold">Jam</span>
-              <span>: {record.time_filled ?? '-'}</span>
-            </div>
-          </div>
-
-          {/* Signature columns */}
-          <div className="flex">
-            {/* Teknisi column */}
-            <div className="flex-1 border-r border-black p-2">
-              <div className="text-[10px] font-black text-center uppercase mb-2">TEKNISI</div>
-              <table className="w-full border-collapse text-[10px]">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border border-black px-1 py-1 w-8 text-center">No</th>
-                    <th className="border border-black px-1 py-1 text-left">Nama</th>
-                    <th className="border border-black px-1 py-1 w-24 text-center">Paraf</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {record.technicians.length > 0 ? (
-                    record.technicians.map((tech, idx) => (
-                      <tr key={tech.id}>
-                        <td className="border border-black px-1 py-1 text-center">{idx + 1}</td>
-                        <td className="border border-black px-1 py-1">{tech.technician_name}</td>
-                        <td className="border border-black px-1 py-1 text-center align-middle h-12">
-                          {tech.signature ? (
-                            <img
-                              src={tech.signature}
-                              alt={`TTD ${tech.technician_name}`}
-                              className="mx-auto max-h-10 max-w-[90px] object-contain"
-                            />
-                          ) : (
-                            <span className="text-[9px] text-gray-400 italic">Belum TTD</span>
-                          )}
+            <tr>
+              <td className="align-top p-0">
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '12%', border: '1px solid #000', padding: '2px', fontWeight: 700, textAlign: 'center' }}>No</th>
+                      <th style={{ width: '58%', border: '1px solid #000', padding: '2px', fontWeight: 700, textAlign: 'center' }}>Nama</th>
+                      <th style={{ width: '30%', border: '1px solid #000', padding: '2px', fontWeight: 700, textAlign: 'center' }}>Paraf</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {record.technicians.map((t, idx) => (
+                      <tr key={t.id}>
+                        <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center' }}>{idx + 1}</td>
+                        <td style={{ border: '1px solid #000', padding: '2px' }} className="uppercase">{t.technician_name}</td>
+                        <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', height: '26px' }}>
+                          {t.signature ? (
+                            <img src={t.signature} alt="ttd" style={{ maxHeight: '20px', display: 'inline-block' }} />
+                          ) : ''}
                         </td>
                       </tr>
-                    ))
+                    ))}
+                    {record.technicians.length === 0 && (
+                      <tr>
+                        <td colSpan={3} style={{ border: '1px solid #000', padding: '4px', textAlign: 'center', fontStyle: 'italic' }}>—</td>
+                      </tr>
+                    )}
+                    {record.technicians.length > 0 && record.technicians.length < 5 && (
+                      Array.from({ length: 5 - record.technicians.length }).map((_, i) => (
+                        <tr key={`empty-tech-${i}`}>
+                          <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', height: '22px' }}>&nbsp;</td>
+                          <td style={{ border: '1px solid #000', padding: '2px' }}>&nbsp;</td>
+                          <td style={{ border: '1px solid #000', padding: '2px' }}>&nbsp;</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </td>
+
+              <td className="text-center align-top" style={{ minHeight: '120px' }}>
+                <div style={{ minHeight: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}>
+                  {record.supervisor?.signature ? (
+                    <img src={record.supervisor.signature} alt="ttd" style={{ maxHeight: '60px', maxWidth: '120px', objectFit: 'contain' }} />
                   ) : (
-                    <tr>
-                      <td colSpan={3} className="border border-black px-1 py-2 text-center text-gray-400">
-                        Tidak ada teknisi
-                      </td>
-                    </tr>
+                    <span>&nbsp;</span>
                   )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Supervisor column */}
-            <div className="flex w-[28%] flex-col items-center border-r border-black p-2 text-center min-h-[140px]">
-              <div className="text-[10px] font-black uppercase mb-1">SUPERVISOR</div>
-              <div className="flex flex-1 items-center justify-center w-full mt-1">
-                {record.supervisor ? (
-                  record.supervisor.signature ? (
-                    <img
-                      src={record.supervisor.signature}
-                      alt="TTD Supervisor"
-                      className="max-h-16 max-w-[110px] object-contain"
-                    />
-                  ) : (
-                    <div className="h-14 w-24 border border-dashed border-gray-400 flex items-center justify-center text-[9px] text-gray-400">
-                      Belum TTD
-                    </div>
-                  )
-                ) : (
-                  <span className="text-[9px] text-gray-400 italic">
-                    Tidak ada supervisor pada shift ini
-                  </span>
-                )}
-              </div>
-              <div className="mt-auto text-[11px] font-semibold">
-                {record.supervisor?.name ?? '—'}
-              </div>
-              {record.supervisor?.signed_at && (
-                <div className="text-[9px] text-gray-500">
-                  {formatDateTime(record.supervisor.signed_at)}
                 </div>
-              )}
-            </div>
-
-            {/* Manager Teknik column */}
-            <div className="flex w-[28%] flex-col items-center p-2 text-center min-h-[140px]">
-              <div className="text-[10px] font-black uppercase mb-1">MANAGER TEKNIK</div>
-              <div className="flex flex-1 items-center justify-center w-full mt-1">
-                {record.manager ? (
-                  record.manager.signature ? (
-                    <img
-                      src={record.manager.signature}
-                      alt="TTD Manager"
-                      className="max-h-16 max-w-[110px] object-contain"
-                    />
-                  ) : (
-                    <div className="h-14 w-24 border border-dashed border-gray-400 flex items-center justify-center text-[9px] text-gray-400">
-                      Belum TTD
-                    </div>
-                  )
-                ) : (
-                  <span className="text-[9px] text-gray-400 italic">
-                    Manager Teknik tidak ditugaskan
-                  </span>
-                )}
-              </div>
-              <div className="mt-auto text-[11px] font-semibold">
-                {record.manager?.name ?? '—'}
-              </div>
-              {record.manager?.signed_at && (
-                <div className="text-[9px] text-gray-500">
-                  {formatDateTime(record.manager.signed_at)}
+                <div className="font-semibold uppercase border-t border-black pt-1 px-1">
+                  {text(record.supervisor?.name) || '—'}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
+              </td>
 
+              <td className="text-center align-top" style={{ minHeight: '120px' }}>
+                <div style={{ minHeight: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}>
+                  {record.manager?.signature ? (
+                    <img src={record.manager.signature} alt="ttd" style={{ maxHeight: '60px', maxWidth: '120px', objectFit: 'contain' }} />
+                  ) : (
+                    <span>&nbsp;</span>
+                  )}
+                </div>
+                <div className="font-semibold uppercase border-t border-black pt-1 px-1">
+                  {text(record.manager?.name) || '—'}
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );

@@ -85,7 +85,12 @@ export interface CnsdTdmeMeterCreatePayload {
 }
 
 export interface CnsdTdmeMeterUpdatePayload {
-  items: Array<{
+  merk?: string | null;
+  type?: string | null;
+  serial_number?: string | null;
+  tx1_mode?: string | null;
+  tx2_mode?: string | null;
+  items?: Array<{
     id: number;
     hasil_1?: string | null;
     hasil_2?: string | null;

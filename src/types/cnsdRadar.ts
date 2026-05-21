@@ -111,6 +111,10 @@ export interface CnsdRadarMeterListParams {
 }
 
 export interface CnsdRadarMeterUpdatePayload {
+  // Equipment metadata (paper-form header). Editable by Manager / Supervisor.
+  merk?: string | null;
+  type?: string | null;
+  serial_number?: string | null;
   items: Array<{
     id: number;
     kondisi_teknis_tx1?: string | null;

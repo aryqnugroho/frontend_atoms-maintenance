@@ -2,40 +2,70 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import {
+  AlertCircle,
   ArrowLeft,
   Calendar,
-  Radar as RadarIcon,
+  Clock,
   MapPin,
   Printer,
+  Radar as RadarIcon,
   Save,
   Users,
-  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Card';
 import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Skeleton } from '@/components/common/Skeleton';
+import { Tabs } from '@/components/common/Tabs';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 import { cnsdRadarMeterService } from '@/services/cnsdRadarMeterService';
 import { CnsdRadarMeterSignaturePanel } from '@/pages/cnsd/components/CnsdRadarMeterSignaturePanel';
-import { cn } from '@/lib/utils';
 import type {
   CnsdRadarMeterItem,
   CnsdRadarMeterRecordDetail,
   CnsdRadarMeterSectionMeta,
 } from '@/types/cnsdRadar';
 
+// ─── Helpers / constants ──────────────────────────────────────
+
+const SHIFT_TIME_LABELS: Record<string, string> = {
+  pagi:  '07:00 — 13:00',
+  siang: '13:00 — 19:00',
+  malam: '19:00 — 07:00',
+};
+
+/** Items whose item_name starts with `*` render as sub-section header rows. */
+const isSubHeader = (item: CnsdRadarMeterItem): boolean =>
+  typeof item.item_name === 'string' && item.item_name.trim().startsWith('*');
+
+/** Strip the leading `*` marker from a sub-header label. */
+const subHeaderLabel = (item: CnsdRadarMeterItem): string =>
+  item.item_name.replace(/^\*\s*/, '');
+
+// ─── Main component ───────────────────────────────────────────
+
 /**
- * Detail / edit page for a single CNSD Radar Meter record.
+ * CNSD Radar Meter Reading — detail / edit page.
  *
- * Section A (TERMONITOR DI LCMS) renders TX I + TX II columns inside groups.
- * Section C (LINGKUNGAN KERJA) renders a single HASIL column.
+ * Mirrors the EQ-1 readiness detail page for UI consistency:
+ *   - Breadcrumb → header card (Sky-blue icon, status pill, date badge,
+ *     fixed shift-time label, ShiftBadge, facility, technicians count,
+ *     Print + Save buttons, personnel 3-col grid)
+ *   - Info Peralatan card with editable Merk / Type / SN (Manager/Supervisor)
+ *   - Tabs component (one per section_meta entry) — LCMS / LINGKUNGAN KERJA
+ *   - Section A (LCMS) renders grouped rows with TX I + TX II inputs;
+ *     items with `*` prefix render as gray sub-section banner rows
+ *     (e.g. "* GPS Receiver").
+ *   - Section B (LINGKUNGAN KERJA) renders a single HASIL column.
+ *   - Signature panel at the bottom.
  *
- * Completed records render as read-only.
+ * Completed records render fully read-only.
  */
 export const CnsdRadarMeterDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const recordId = Number(id);
 
   const [record, setRecord] = useState<CnsdRadarMeterRecordDetail | null>(null);
@@ -46,6 +76,19 @@ export const CnsdRadarMeterDetailPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Editable equipment metadata (paper-form header). Local state mirrors the
+  // record's persisted values; flushed on Save together with item edits.
+  const [merk, setMerk] = useState('');
+  const [type, setType] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
+
+  // Only Manager / Supervisor / Admin can edit equipment metadata.
+  const canEditMetadata =
+    user?.role === 'Admin' ||
+    user?.role === 'Manager Teknik' ||
+    user?.role === 'Supervisor CNSD';
+
+  // ─── Fetch ──────────────────────────────────────────────────
   const fetchRecord = useCallback(async () => {
     if (!recordId || Number.isNaN(recordId)) {
       setErrorMessage('ID form tidak valid.');
@@ -57,8 +100,14 @@ export const CnsdRadarMeterDetailPage: React.FC = () => {
       const data = await cnsdRadarMeterService.getRecord(recordId);
       setRecord(data);
       setEditedItems({});
-      if (data.sections_meta.length > 0 && !activeSectionCode) {
-        setActiveSectionCode(data.sections_meta[0].code);
+      setMerk(data.merk ?? '');
+      setType(data.type ?? '');
+      setSerialNumber(data.serial_number ?? '');
+      if (data.sections_meta.length > 0) {
+        const stillExists = activeSectionCode && data.sections_meta.some((s) => s.code === activeSectionCode);
+        if (!stillExists) {
+          setActiveSectionCode(data.sections_meta[0].code);
+        }
       }
       setErrorMessage(null);
     } catch (err) {
@@ -71,14 +120,15 @@ export const CnsdRadarMeterDetailPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [recordId, activeSectionCode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordId]);
 
   useEffect(() => {
     void fetchRecord();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recordId]);
 
-  // Group items by section_code, preserving template order from sections_meta
+  // ─── Derived ────────────────────────────────────────────────
   const itemsBySection = useMemo(() => {
     const map: Record<string, CnsdRadarMeterItem[]> = {};
     if (!record) return map;
@@ -89,9 +139,15 @@ export const CnsdRadarMeterDetailPage: React.FC = () => {
     });
     return map;
   }, [record]);
+
   const isCompleted = record?.status === 'completed';
   const isReadOnly = isCompleted;
-  const hasChanges = Object.keys(editedItems).length > 0;
+  const metadataDirty =
+    !!record &&
+    (merk !== (record.merk ?? '') ||
+      type !== (record.type ?? '') ||
+      serialNumber !== (record.serial_number ?? ''));
+  const hasChanges = Object.keys(editedItems).length > 0 || metadataDirty;
 
   const updateField = (
     itemId: number,
@@ -118,6 +174,7 @@ export const CnsdRadarMeterDetailPage: React.FC = () => {
     return original == null ? '' : String(original);
   };
 
+  // ─── Save ───────────────────────────────────────────────────
   const handleSave = async () => {
     if (!record || !hasChanges) return;
 
@@ -134,10 +191,18 @@ export const CnsdRadarMeterDetailPage: React.FC = () => {
     }));
 
     try {
-      const updated = await cnsdRadarMeterService.updateRecord(record.id, { items });
+      const updated = await cnsdRadarMeterService.updateRecord(record.id, {
+        merk: metadataDirty ? merk || null : undefined,
+        type: metadataDirty ? type || null : undefined,
+        serial_number: metadataDirty ? serialNumber || null : undefined,
+        items,
+      });
       setRecord(updated);
       setEditedItems({});
-      setSuccessMessage(`${items.length} item disimpan.`);
+      const parts: string[] = [];
+      if (items.length > 0) parts.push(`${items.length} item`);
+      if (metadataDirty) parts.push('metadata peralatan');
+      setSuccessMessage(`${parts.join(' + ')} disimpan.`);
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
@@ -151,6 +216,7 @@ export const CnsdRadarMeterDetailPage: React.FC = () => {
     }
   };
 
+  // ─── Render ─────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
@@ -174,18 +240,20 @@ export const CnsdRadarMeterDetailPage: React.FC = () => {
     );
   }
 
-  const activeSection = record.sections_meta.find((m) => m.code === activeSectionCode) ?? null;
+  const activeSectionMeta = activeSectionCode
+    ? record.sections_meta.find((s) => s.code === activeSectionCode) ?? null
+    : null;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-12">
+    <div className="max-w-full space-y-5 animate-fade-in pb-12">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-slate-500">
         <button
           type="button"
           onClick={() => navigate('/cnsd')}
-          className="hover:text-slate-700 transition-colors"
+          className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors"
         >
-          CNSD
+          <ArrowLeft size={14} /> CNSD
         </button>
         <span>/</span>
         <button
@@ -193,148 +261,164 @@ export const CnsdRadarMeterDetailPage: React.FC = () => {
           onClick={() => navigate('/cnsd/radar-meter')}
           className="hover:text-slate-700 transition-colors"
         >
-          Meter Reading Radar
+          Radar Meter Reading
         </button>
         <span>/</span>
-        <span className="text-slate-700 font-medium font-mono">{record.form_number}</span>
+        <span className="text-slate-700 font-mono font-medium">{record.form_number}</span>
       </div>
 
-      {/* Header card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/cnsd/radar-meter')}
-                className="gap-1.5 -ml-2"
-              >
-                <ArrowLeft size={16} />
-                <span className="hidden sm:inline">Kembali</span>
-              </Button>
-              <div className="space-y-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <RadarIcon size={18} className="text-maintenance-cnsd" />
-                  <h1 className="text-xl font-bold text-slate-900">Meter Reading Radar</h1>
-                  <StatusBadge status={record.status} variant="pill" />
-                </div>
-                <p className="text-xs font-mono text-slate-500">{record.form_number}</p>
-                <p className="text-sm text-slate-500">
-                  {record.location} — Merk {record.merk} / Type {record.type}
-                  {record.serial_number && ` — SN: ${record.serial_number}`}
-                </p>
+      {/* Header card (GP-style) */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-lg bg-sky-100 flex items-center justify-center shrink-0">
+              <RadarIcon size={18} className="text-sky-600" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg font-bold text-slate-900">
+                  Meter Reading — Radar
+                </h1>
+                <StatusBadge status={record.status} variant="pill" />
               </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                CNSD &nbsp;·&nbsp;
+                <span className="font-mono">{record.form_number}</span>
+              </p>
             </div>
+          </div>
 
-            <div className="flex flex-wrap gap-2 lg:justify-end">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700">
-                <Calendar size={14} className="text-slate-400" />
-                {record.date}
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-sm">
-                <ShiftBadge shift={record.shift_type} />
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700">
-                <MapPin size={14} className="text-slate-400" />
-                {record.facility}
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700">
-                <Users size={14} className="text-slate-400" />
-                {record.technicians.length} Teknisi
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate(`/cnsd/radar-meter/${record.id}/print`)}
-                className="gap-1.5 shrink-0"
-                title="Print / Cetak Form Meter Reading Radar"
-              >
-                <Printer size={14} />
-                <span className="hidden sm:inline">Print</span>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+              <Calendar size={13} className="text-slate-400" />
+              <span>{record.date}</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg" title="Rentang waktu shift">
+              <Clock size={13} className="text-slate-400" />
+              <span className="font-medium font-mono">{SHIFT_TIME_LABELS[record.shift_type] ?? '—'}</span>
+            </div>
+            <ShiftBadge shift={record.shift_type} />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+              <MapPin size={13} className="text-slate-400" />
+              <span>{record.facility}</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+              <Users size={13} className="text-slate-400" />
+              <span>{record.technicians.length} Teknisi</span>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => navigate(`/cnsd/radar-meter/${record.id}/print`)} className="gap-1.5 text-indigo-600 hover:bg-indigo-50">
+              <Printer size={15} /> Print
+            </Button>
+            {!isReadOnly && (
+              <Button size="sm" className="gap-1.5" onClick={() => void handleSave()} disabled={!hasChanges || isSaving} isLoading={isSaving}>
+                <Save size={14} /> Simpan
               </Button>
-            </div>
+            )}
           </div>
-
-          <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Manager Teknik</p>
-              <p className="mt-0.5 text-slate-800 font-medium">
-                {record.manager?.name ?? <span className="text-slate-400 font-normal">Tidak ditugaskan</span>}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Supervisor CNSD</p>
-              <p className="mt-0.5 text-slate-800 font-medium">
-                {record.supervisor?.name ?? <span className="text-slate-400 font-normal">Tidak ditugaskan</span>}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Teknisi CNSD</p>
-              <p className="mt-0.5 text-slate-800 font-medium truncate" title={record.technicians.map((t) => t.technician_name).join(', ')}>
-                {record.technicians.map((t) => t.technician_name).join(', ') || <span className="text-slate-400 font-normal">—</span>}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {errorMessage && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-          {errorMessage}
         </div>
+
+        {/* Personnel summary */}
+        <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div>
+            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Manager Teknik</span>
+            <p className="mt-0.5 font-medium text-slate-700">
+              {record.manager?.name ?? <span className="text-slate-400 italic">Tidak ditugaskan</span>}
+            </p>
+          </div>
+          <div>
+            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Supervisor CNSD</span>
+            <p className="mt-0.5 font-medium text-slate-700">
+              {record.supervisor?.name ?? <span className="text-slate-400 italic">Tidak ditugaskan</span>}
+            </p>
+          </div>
+          <div>
+            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Teknisi CNSD</span>
+            <p className="mt-0.5 font-medium text-slate-700 truncate" title={record.technicians.map((t) => t.technician_name).join(', ')}>
+              {record.technicians.map((t) => t.technician_name).join(', ') || <span className="text-slate-400 italic">—</span>}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      {errorMessage && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{errorMessage}</div>
       )}
       {successMessage && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700" role="status">
-          {successMessage}
-        </div>
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{successMessage}</div>
       )}
 
-      {/* Section tabs */}
-      <div className="grid grid-cols-2 gap-2">
-        {record.sections_meta.map((s) => (
-          <button
-            key={s.code}
-            onClick={() => setActiveSectionCode(s.code)}
-            className={cn(
-              'rounded-xl border-2 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all duration-150 text-center',
-              activeSectionCode === s.code
-                ? 'bg-slate-900 border-slate-900 text-white shadow-md'
-                : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200 hover:text-slate-700'
-            )}
-          >
-            {s.code}. {s.name}
-          </button>
-        ))}
+      {/* Info Peralatan card (with editable Merk / Type / SN for Manager/Supervisor) */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
+        <h2 className="text-sm font-bold text-slate-800">Informasi Peralatan</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+          <InfoCell label="Lokasi" value={record.location} />
+          <InfoCell label="Fasilitas" value={record.facility} />
+          <InfoCell label="Shift" value={SHIFT_TIME_LABELS[record.shift_type] ?? null} />
+          <InfoCell label="Tanggal" value={record.date} />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs pt-2 border-t border-slate-100">
+          <EditableMetaField
+            label="Merk"
+            value={merk}
+            onChange={setMerk}
+            disabled={isReadOnly || !canEditMetadata}
+            placeholder="ELDIS"
+          />
+          <EditableMetaField
+            label="Type"
+            value={type}
+            onChange={setType}
+            disabled={isReadOnly || !canEditMetadata}
+            placeholder="5SR-N-I FL2000"
+          />
+          <EditableMetaField
+            label="Serial Number"
+            value={serialNumber}
+            onChange={setSerialNumber}
+            disabled={isReadOnly || !canEditMetadata}
+            placeholder="—"
+          />
+        </div>
+        {!canEditMetadata && !isReadOnly && (
+          <p className="text-[10px] text-slate-400 italic">
+            Hanya Manager Teknik / Supervisor CNSD yang dapat mengubah identifikasi peralatan.
+          </p>
+        )}
       </div>
 
-      {/* Active section table */}
-      {activeSection && (
-        activeSection.inputs_layout === 'tx_dual' ? (
-          <RadarTxDualSection
-            sectionMeta={activeSection}
-            items={itemsBySection[activeSection.code] ?? []}
-            isReadOnly={isReadOnly}
-            getValue={getValue}
-            onChange={updateField}
-          />
-        ) : (
-          <RadarEnvironmentSection
-            sectionMeta={activeSection}
-            items={itemsBySection[activeSection.code] ?? []}
-            isReadOnly={isReadOnly}
-            getValue={getValue}
-            onChange={updateField}
-          />
-        )
+      {/* Tabs */}
+      {record.sections_meta.length > 0 && (
+        <Tabs
+          items={record.sections_meta.map((s) => ({
+            key: s.code,
+            label: `${s.code}. ${s.name}`,
+          }))}
+          defaultKey={activeSectionCode ?? record.sections_meta[0]?.code}
+          onChange={setActiveSectionCode}
+        />
       )}
 
-      {/* Save button */}
+      {/* Section content */}
+      {activeSectionMeta && (
+        <RadarSectionPanel
+          sectionMeta={activeSectionMeta}
+          items={itemsBySection[activeSectionMeta.code] ?? []}
+          isReadOnly={isReadOnly}
+          getValue={getValue}
+          onChange={updateField}
+        />
+      )}
+
+      {/* Pending-changes indicator */}
       {!isReadOnly && (
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+        <div className="flex items-center justify-end gap-3 pt-2">
           {hasChanges && (
             <span className="text-xs text-amber-600 font-medium">
-              {Object.keys(editedItems).length} item belum disimpan
+              {Object.keys(editedItems).length > 0 && `${Object.keys(editedItems).length} item`}
+              {Object.keys(editedItems).length > 0 && metadataDirty && ' + '}
+              {metadataDirty && 'metadata'}
+              {' belum disimpan'}
             </span>
           )}
           <Button
@@ -355,10 +439,9 @@ export const CnsdRadarMeterDetailPage: React.FC = () => {
   );
 };
 
-// ────────────────────────────────────────────────────────
-// Section renderers
+// ─── Section panel ────────────────────────────────────────────
 
-interface SectionProps {
+interface RadarSectionPanelProps {
   sectionMeta: CnsdRadarMeterSectionMeta;
   items: CnsdRadarMeterItem[];
   isReadOnly: boolean;
@@ -366,286 +449,232 @@ interface SectionProps {
   onChange: (itemId: number, field: keyof CnsdRadarMeterItem, value: string | null) => void;
 }
 
-/**
- * Detect a sub-header marker row (item_name starts with "* ").
- * Sub-headers were seeded as inline group titles inside SSR EXTRACTOR / AILAN /
- * RADAR CONTROL. They should be rendered as a labeled separator, not as an
- * editable row.
- * NOTE: "Antenna" in RADAR CONTROL is NOT a sub-header — it is an editable
- * row where users type the actual RPM values for TX I and TX II.
- */
-const isSubHeader = (it: CnsdRadarMeterItem): boolean => it.item_name.trim().startsWith('* ');
+const RadarSectionPanel: React.FC<RadarSectionPanelProps> = ({
+  sectionMeta, items, isReadOnly, getValue, onChange,
+}) => {
+  // Group items by group_name (Section A only has subgroups; Section B has none).
+  const groups = useMemo(() => {
+    const order: string[] = [];
+    const map: Record<string, CnsdRadarMeterItem[]> = {};
+    items.forEach((it) => {
+      const key = it.group_name ?? '__ungrouped__';
+      if (!map[key]) {
+        map[key] = [];
+        order.push(key);
+      }
+      map[key].push(it);
+    });
+    return order.map((key) => ({
+      number: items.find((i) => (i.group_name ?? '__ungrouped__') === key)?.group_number ?? null,
+      name: key === '__ungrouped__' ? null : key,
+      items: map[key],
+    }));
+  }, [items]);
 
-const inputClass = 'w-full h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-slate-50 disabled:text-slate-500';
-
-/** True when this item is the Antenna row (input RPM, not Green checkbox) */
-const isAntennaRpmRow = (it: CnsdRadarMeterItem): boolean =>
-  it.item_name.trim().toLowerCase() === 'antenna';
-
-/**
- * True when the item should use a Green/Red dropdown instead of free text.
- * Rule: standard === 'Green' (exact match, case-sensitive per template).
- * Items with other standards (e.g. ">2500 W", "+- 0", "5,6", "Max 22°C")
- * keep their free-text inputs.
- */
-const isGreenStandard = (it: CnsdRadarMeterItem): boolean => it.standard === 'Green';
-
-const GREEN_OPTIONS = ['', 'Green', 'Red'] as const;
-
-/**
- * Shared input renderer for a single TX field (TX I or TX II).
- * Uses a styled dropdown when standard === 'Green', otherwise free text.
- */
-const TxInput: React.FC<{
-  item: CnsdRadarMeterItem;
-  field: keyof CnsdRadarMeterItem;
-  value: string;
-  placeholder: string;
-  isReadOnly: boolean;
-  onChange: (itemId: number, field: keyof CnsdRadarMeterItem, value: string | null) => void;
-}> = ({ item, field, value, placeholder, isReadOnly, onChange }) => {
-  if (isGreenStandard(item)) {
-    const colorCls =
-      value === 'Green'
-        ? 'bg-emerald-50 text-emerald-700'
-        : value === 'Red'
-        ? 'bg-red-50 text-red-700'
-        : 'bg-white text-slate-700';
-
-    return (
-      <select
-        className={`w-full h-9 rounded-lg border border-slate-200 px-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-slate-50 disabled:text-slate-500 ${colorCls}`}
-        value={value}
-        onChange={(e) => onChange(item.id, field, e.target.value === '' ? null : e.target.value)}
-        disabled={isReadOnly}
-      >
-        {GREEN_OPTIONS.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt === '' ? '—' : opt}
-          </option>
-        ))}
-      </select>
-    );
-  }
+  const isTxDual = sectionMeta.inputs_layout === 'tx_dual';
+  const colCount = isTxDual ? 6 : 5;
 
   return (
-    <input
-      type="text"
-      className={inputClass}
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(item.id, field, e.target.value)}
-      disabled={isReadOnly}
-    />
-  );
-};
-
-/**
- * Section A — Termonitor di LCMS. Renders TX I + TX II columns inside groups.
- */
-const RadarTxDualSection: React.FC<SectionProps> = ({ sectionMeta, items, isReadOnly, getValue, onChange }) => {
-  if (items.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-10 text-center text-sm text-slate-400">
-          Tidak ada item pada section ini.
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Group items by group_number, preserving order
-  const groups: { number: number | null; name: string | null; items: CnsdRadarMeterItem[] }[] = [];
-  items.forEach((it) => {
-    const last = groups[groups.length - 1];
-    if (last && last.number === it.group_number && last.name === it.group_name) {
-      last.items.push(it);
-    } else {
-      groups.push({ number: it.group_number, name: it.group_name, items: [it] });
-    }
-  });
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm uppercase tracking-wider">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-2 bg-slate-50/60">
+        <div>
+          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
             {sectionMeta.code}. {sectionMeta.name}
-          </CardTitle>
-          <span className="text-xs font-medium text-slate-400">{items.length} item</span>
+          </h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {isTxDual
+              ? 'Isi nilai TX I dan TX II untuk tiap parameter. Baris dengan tanda `*` adalah sub-heading (tidak diisi).'
+              : 'Isi kolom HASIL untuk tiap kegiatan pemeriksaan.'}
+          </p>
         </div>
-      </CardHeader>
-      <CardContent className="p-0 overflow-x-auto">
-        <table className="w-full text-sm">
+        <span className="text-xs font-medium text-slate-400">{items.length} item</span>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse min-w-[760px]">
           <thead>
-            <tr className="bg-slate-50 border-y border-slate-200 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-              <th className="px-4 py-3 text-left w-10">No</th>
-              <th className="px-4 py-3 text-left w-72">Pemeriksaan</th>
-              <th className="px-4 py-3 text-left w-36">Standart</th>
-              <th className="px-4 py-3 text-left">{sectionMeta.columns_label_1 ?? 'TX I'}</th>
-              <th className="px-4 py-3 text-left">{sectionMeta.columns_label_2 ?? 'TX II'}</th>
-              <th className="px-4 py-3 text-left w-48">Keterangan</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {groups.map((g, gIdx) => (
-              <React.Fragment key={`group-${gIdx}`}>
-                {(g.number !== null || g.name !== null) && (
-                  <tr className="bg-emerald-50/40 border-y border-emerald-100">
-                    <td className="px-4 py-2 text-xs font-bold text-emerald-800">{g.number ?? '—'}</td>
-                    <td colSpan={5} className="px-4 py-2 text-xs font-bold text-emerald-800 uppercase tracking-wider">
-                      {g.name}
-                    </td>
-                  </tr>
-                )}
-                {g.items.map((item, iIdx) => {
-                  if (isSubHeader(item)) {
-                    return (
-                      <tr key={item.id} className="bg-slate-50/60">
-                        <td className="px-4 py-2 text-slate-400 font-mono text-xs">—</td>
-                        <td colSpan={5} className="px-4 py-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
-                          {item.item_name}
-                        </td>
-                      </tr>
-                    );
-                  }
-
-                  // Antenna row: show "10 RPM / 15 RPM" as standard label and
-                  // RPM-specific placeholders to prompt the user to enter the
-                  // actual measured RPM value for TX I and TX II.
-                  const rpmPlaceholder = isAntennaRpmRow(item) ? '... RPM' : '...';
-
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 text-slate-400 font-mono text-xs whitespace-nowrap">
-                        {item.item_number || iIdx + 1}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-slate-800 font-semibold">{item.item_name}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-slate-600">{item.standard ?? '—'}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <TxInput
-                          item={item}
-                          field="kondisi_teknis_tx1"
-                          value={getValue(item, 'kondisi_teknis_tx1')}
-                          placeholder={isAntennaRpmRow(item) ? '... RPM' : rpmPlaceholder}
-                          isReadOnly={isReadOnly}
-                          onChange={onChange}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <TxInput
-                          item={item}
-                          field="kondisi_teknis_tx2"
-                          value={getValue(item, 'kondisi_teknis_tx2')}
-                          placeholder={isAntennaRpmRow(item) ? '... RPM' : rpmPlaceholder}
-                          isReadOnly={isReadOnly}
-                          onChange={onChange}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="text"
-                          className={inputClass}
-                          placeholder="Catatan"
-                          value={getValue(item, 'keterangan')}
-                          onChange={(e) => onChange(item.id, 'keterangan', e.target.value)}
-                          disabled={isReadOnly}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-      </CardContent>
-    </Card>
-  );
-};
-
-/**
- * Section B — Lingkungan Kerja. Renders single HASIL column.
- * Tabel ini berdiri sendiri (terpisah dari section A) dengan header berwarna
- * amber sesuai paper form referensi.
- */
-const RadarEnvironmentSection: React.FC<SectionProps> = ({ sectionMeta, items, isReadOnly, getValue, onChange }) => {
-  if (items.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-10 text-center text-sm text-slate-400">
-          Tidak ada item pada section ini.
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader className="bg-amber-50 border-b border-amber-200">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm uppercase tracking-wider text-amber-900">
-            {sectionMeta.code}. {sectionMeta.name}
-          </CardTitle>
-          <span className="text-xs font-medium text-amber-700">{items.length} item</span>
-        </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-amber-50 border-b border-amber-200 text-[10px] text-amber-800 font-bold uppercase tracking-widest">
-              <th className="px-4 py-3 text-center w-14 border-r border-amber-200">No</th>
-              <th className="px-4 py-3 text-left border-r border-amber-200">Kegiatan</th>
-              <th className="px-4 py-3 text-center w-32 border-r border-amber-200">Standart</th>
-              <th className="px-4 py-3 text-center w-36 border-r border-amber-200">
-                {sectionMeta.columns_label_1 ?? 'Hasil'}
+            <tr className="bg-slate-50 text-slate-700">
+              <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 w-12 text-[11px] uppercase tracking-wider">No</th>
+              <th className="px-3 py-2 text-left font-semibold border-b border-slate-200 min-w-[260px] text-[11px] uppercase tracking-wider">
+                {isTxDual ? 'Pemeriksaan' : 'Kegiatan'}
               </th>
-              <th className="px-4 py-3 text-left w-56">Keterangan</th>
+              <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[110px] text-[11px] uppercase tracking-wider">Standart</th>
+              {isTxDual ? (
+                <>
+                  <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[130px] text-[11px] uppercase tracking-wider">
+                    {sectionMeta.columns_label_1 ?? 'TX I'}
+                  </th>
+                  <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[130px] text-[11px] uppercase tracking-wider">
+                    {sectionMeta.columns_label_2 ?? 'TX II'}
+                  </th>
+                </>
+              ) : (
+                <th className="px-2 py-2 text-center font-semibold border-b border-slate-200 min-w-[140px] text-[11px] uppercase tracking-wider">
+                  {sectionMeta.columns_label_1 ?? 'Hasil'}
+                </th>
+              )}
+              <th className="px-2 py-2 text-left font-semibold border-b border-slate-200 min-w-[140px] text-[11px] uppercase tracking-wider">Keterangan</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {items.map((item, idx) => (
-              <tr key={item.id} className="hover:bg-amber-50/30 transition-colors">
-                <td className="px-4 py-3 text-center text-slate-500 font-mono text-xs border-r border-slate-100">
-                  {item.item_number || idx + 1}
-                </td>
-                <td className="px-4 py-3 border-r border-slate-100">
-                  <div className="text-slate-800 font-medium">{item.item_name}</div>
-                </td>
-                <td className="px-4 py-3 text-center border-r border-slate-100">
-                  <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                    {item.standard ?? '—'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 border-r border-slate-100">
-                  <input
-                    type="text"
-                    className={inputClass}
-                    placeholder="Isi hasil"
-                    value={getValue(item, 'hasil')}
-                    onChange={(e) => onChange(item.id, 'hasil', e.target.value)}
-                    disabled={isReadOnly}
-                  />
-                </td>
-                <td className="px-4 py-3">
-                  <input
-                    type="text"
-                    className={inputClass}
-                    placeholder="Catatan"
-                    value={getValue(item, 'keterangan')}
-                    onChange={(e) => onChange(item.id, 'keterangan', e.target.value)}
-                    disabled={isReadOnly}
-                  />
+          <tbody>
+            {items.length === 0 ? (
+              <tr>
+                <td colSpan={colCount} className="px-4 py-8 text-center text-slate-400 text-sm">
+                  Belum ada baris pada section ini.
                 </td>
               </tr>
-            ))}
+            ) : (
+              groups.map((group, gIdx) => (
+                <React.Fragment key={gIdx}>
+                  {group.name && (
+                    <tr className="bg-slate-100">
+                      <td colSpan={colCount} className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-700 border-b border-slate-200">
+                        {group.number ? `${group.number}. ` : ''}{group.name}
+                      </td>
+                    </tr>
+                  )}
+                  {group.items.map((item) => {
+                    if (isSubHeader(item)) {
+                      return (
+                        <tr key={item.id} className="bg-slate-50/70">
+                          <td className="px-2 py-1.5 text-slate-400 text-center text-[10px]">—</td>
+                          <td colSpan={colCount - 1} className="px-3 py-1.5 text-[11px] italic text-slate-600 border-b border-slate-100">
+                            {subHeaderLabel(item)}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return (
+                      <RadarItemRow
+                        key={item.id}
+                        item={item}
+                        isTxDual={isTxDual}
+                        isReadOnly={isReadOnly}
+                        getValue={getValue}
+                        onChange={onChange}
+                      />
+                    );
+                  })}
+                </React.Fragment>
+              ))
+            )}
           </tbody>
         </table>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
+
+// ─── Item row ─────────────────────────────────────────────────
+
+interface RadarItemRowProps {
+  item: CnsdRadarMeterItem;
+  isTxDual: boolean;
+  isReadOnly: boolean;
+  getValue: (item: CnsdRadarMeterItem, field: keyof CnsdRadarMeterItem) => string;
+  onChange: (itemId: number, field: keyof CnsdRadarMeterItem, value: string | null) => void;
+}
+
+const RadarItemRow: React.FC<RadarItemRowProps> = ({
+  item, isTxDual, isReadOnly, getValue, onChange,
+}) => {
+  const inputClass = 'w-full h-8 px-2 text-xs rounded border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent disabled:bg-slate-50 disabled:text-slate-500';
+  const standardCell = item.standard ?? '';
+
+  return (
+    <tr className="hover:bg-slate-50 transition-colors border-b border-slate-100">
+      <td className="px-2 py-2 text-center text-slate-500 font-mono text-[11px] align-middle">
+        {item.item_number ?? ''}
+      </td>
+      <td className="px-3 py-2 align-middle text-slate-800 font-medium">
+        {item.item_name}
+      </td>
+      <td className={cn(
+        'px-2 py-2 align-middle text-center text-slate-600 text-[11px]',
+        standardCell === '' && 'text-slate-300',
+      )}>
+        {standardCell || '—'}
+      </td>
+      {isTxDual ? (
+        <>
+          <td className="px-2 py-2 align-middle">
+            <input
+              type="text"
+              className={inputClass}
+              placeholder="..."
+              value={getValue(item, 'kondisi_teknis_tx1')}
+              onChange={(e) => onChange(item.id, 'kondisi_teknis_tx1', e.target.value)}
+              disabled={isReadOnly}
+            />
+          </td>
+          <td className="px-2 py-2 align-middle">
+            <input
+              type="text"
+              className={inputClass}
+              placeholder="..."
+              value={getValue(item, 'kondisi_teknis_tx2')}
+              onChange={(e) => onChange(item.id, 'kondisi_teknis_tx2', e.target.value)}
+              disabled={isReadOnly}
+            />
+          </td>
+        </>
+      ) : (
+        <td className="px-2 py-2 align-middle">
+          <input
+            type="text"
+            className={inputClass}
+            placeholder="..."
+            value={getValue(item, 'hasil')}
+            onChange={(e) => onChange(item.id, 'hasil', e.target.value)}
+            disabled={isReadOnly}
+          />
+        </td>
+      )}
+      <td className="px-2 py-2 align-middle">
+        <input
+          type="text"
+          className={inputClass}
+          placeholder="Catatan"
+          value={getValue(item, 'keterangan')}
+          onChange={(e) => onChange(item.id, 'keterangan', e.target.value)}
+          disabled={isReadOnly}
+        />
+      </td>
+    </tr>
+  );
+};
+
+// ─── Small subcomponents ──────────────────────────────────────
+
+const InfoCell: React.FC<{ label: string; value: string | null }> = ({ label, value }) => (
+  <div>
+    <span className="text-slate-400 uppercase tracking-wider text-[10px] font-semibold">{label}</span>
+    <p className="mt-0.5 font-medium text-slate-700">{value ?? '—'}</p>
+  </div>
+);
+
+interface EditableMetaFieldProps {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  disabled: boolean;
+  placeholder?: string;
+}
+
+const EditableMetaField: React.FC<EditableMetaFieldProps> = ({ label, value, onChange, disabled, placeholder }) => (
+  <div>
+    <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">{label}</label>
+    {disabled ? (
+      <p className="text-xs text-slate-700 font-medium">{value || '—'}</p>
+    ) : (
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full h-9 px-3 text-xs rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-brand-primary focus:border-transparent focus:outline-none placeholder:text-slate-300"
+        maxLength={60}
+      />
+    )}
+  </div>
+);
