@@ -29,7 +29,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useNotification } from '@/hooks/useNotification';
 import { workOrderService } from '@/services/workOrderService';
 import { reportingDamageReportService } from '@/services/reportingDamageReportService';
-import { dashboardService, type ChecklistItem, type ShiftChecklistResponse } from '@/services/dashboardService';
+import { dashboardService, type ChecklistItem, type ShiftChecklistResponse, type LogbookSummaryResponse } from '@/services/dashboardService';
 import { getCurrentShiftType, getCurrentShiftDate, getShiftLabel } from '@/lib/shiftUtils';
 import type { Notification, ShiftContextResponse, WorkOrder } from '@/types';
 import type { ReportingDamageReportSummary } from '@/types/reporting';
@@ -328,6 +328,32 @@ export const DashboardPage: React.FC = () => {
     .filter((i) => i.category === 'wajib' && visibleDivisions.has(i.division));
   const currentShiftItems: ChecklistItem[] = (checklist?.items ?? [])
     .filter((i) => i.category === 'shift' && i.shift === currentShift && visibleDivisions.has(i.division));
+
+  // ─── Logbook summary card (combined CNSD + TFP timeline) ───
+  const [logbookSummary, setLogbookSummary] = useState<LogbookSummaryResponse | null>(null);
+  const [logbookLoading, setLogbookLoading] = useState(true);
+
+  const fetchLogbookSummary = useCallback(async () => {
+    try {
+      const data = await dashboardService.getLogbookSummary(filterDate, 8);
+      setLogbookSummary(data);
+    } catch {
+      setLogbookSummary(null);
+    } finally {
+      setLogbookLoading(false);
+    }
+  }, [filterDate]);
+
+  useEffect(() => {
+    void fetchLogbookSummary();
+    const interval = setInterval(() => { void fetchLogbookSummary(); }, 60_000);
+    const onFocus = () => { void fetchLogbookSummary(); };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [fetchLogbookSummary]);
 
   // ─── Welcome Popup (removed — now handled by WelcomeModal in AppShell) ───
 
@@ -829,6 +855,114 @@ export const DashboardPage: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* ─── Ringkasan Logbook (Combined CNSD + TFP timeline) ──────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BookOpen size={20} className="text-rose-700" />
+            <h3 className="text-base font-bold text-slate-800">Ringkasan Logbook</h3>
+            {logbookSummary?.is_fallback && (
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                Shift {logbookSummary.fallback_shift} kemarin
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {!logbookLoading && logbookSummary && (logbookSummary.cnsd_count + logbookSummary.tfp_count) > 0 && (
+              <span className="text-[11px] text-slate-500">
+                <span className="font-semibold text-sky-700">{logbookSummary.cnsd_count}</span> CNSD ·{' '}
+                <span className="font-semibold text-emerald-700">{logbookSummary.tfp_count}</span> TFP
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate('/logbooks')}
+              className="text-xs font-semibold text-rose-700 hover:text-rose-800 inline-flex items-center gap-0.5"
+            >
+              Lihat semua <ChevronRight size={12} />
+            </button>
+          </div>
+        </div>
+        <div className="p-6">
+          {logbookLoading ? (
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-12 bg-gray-100 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : !logbookSummary || logbookSummary.notes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+              <BookOpen size={28} className="text-slate-300" />
+              <p className="text-sm font-medium text-slate-500">Belum ada catatan logbook hari ini</p>
+              <p className="text-xs text-slate-400">
+                Catatan akan muncul otomatis saat form diisi atau ditambahkan manual dari halaman Logbook.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/logbooks')}
+                className="mt-2 text-xs font-semibold text-rose-700 hover:underline"
+              >
+                Buka Logbook →
+              </button>
+            </div>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {logbookSummary.notes.map((note) => {
+                const targetRoute = note.division === 'CNSD'
+                  ? `/logbooks/cnsd/${note.logbook_id}`
+                  : `/logbooks/tfp/${note.logbook_id}`;
+                const shiftMeta = getShiftLabel(note.shift);
+                const divisionChip = note.division === 'CNSD'
+                  ? 'bg-sky-100 text-sky-800'
+                  : 'bg-emerald-100 text-emerald-800';
+
+                return (
+                  <li key={`${note.division}-${note.note_id}`}>
+                    <button
+                      type="button"
+                      onClick={() => navigate(targetRoute)}
+                      className="w-full flex items-center gap-3 px-2 py-2.5 text-left rounded-lg hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-inset"
+                    >
+                      {/* Shift indicator (emoji + time stacked) */}
+                      <div className="flex flex-col items-center w-14 shrink-0">
+                        <span className="text-base leading-none" aria-hidden="true">{shiftMeta.emoji}</span>
+                        <span className="text-[10px] font-mono text-slate-500 mt-0.5">
+                          {note.time ?? '--:--'}
+                        </span>
+                      </div>
+
+                      {/* Division chip + activity text */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${divisionChip}`}>
+                            {note.division}
+                          </span>
+                          {note.is_auto && (
+                            <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                              Auto
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">
+                            {shiftMeta.label}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-700 truncate">
+                          {note.is_auto
+                            ? note.activity.replace(/^\[Auto\]\s*/, '')
+                            : note.activity}
+                        </p>
+                      </div>
+
+                      <ChevronRight size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
 

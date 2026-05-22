@@ -41,11 +41,40 @@ export interface ShiftChecklistResponse {
   };
 }
 
+export interface LogbookNote {
+  division: ChecklistDivision;
+  shift: ShiftType;
+  time: string | null;
+  activity: string;
+  is_auto: boolean;
+  logbook_id: number;
+  note_id: number;
+}
+
+export interface LogbookSummaryResponse {
+  date: string;
+  source_date: string;
+  is_fallback: boolean;
+  fallback_shift: ShiftType | null;
+  total_count: number;
+  cnsd_count: number;
+  tfp_count: number;
+  notes: LogbookNote[];
+}
+
 export const dashboardService = {
   async getShiftChecklist(date: string, shiftType: ShiftType): Promise<ShiftChecklistResponse> {
     const response = await axios.get(`${API_URL}/v1/dashboard/shift-checklist`, {
       headers: getAuthHeaders(),
       params: { date, shift_type: shiftType },
+    });
+    return response.data.data;
+  },
+
+  async getLogbookSummary(date: string, limit = 8): Promise<LogbookSummaryResponse> {
+    const response = await axios.get(`${API_URL}/v1/dashboard/logbook-summary`, {
+      headers: getAuthHeaders(),
+      params: { date, limit },
     });
     return response.data.data;
   },
