@@ -19,19 +19,17 @@ import {
   RefreshCw,
   Gauge,
   AlertTriangle,
+  Check,
 } from 'lucide-react';
 import type { ShiftType } from '@/types';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Button } from '@/components/common/Button';
-import { Modal } from '@/components/common/Modal';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotification } from '@/hooks/useNotification';
-import {
-  mockChecklist,
-} from '@/data/mockData';
 import { workOrderService } from '@/services/workOrderService';
 import { reportingDamageReportService } from '@/services/reportingDamageReportService';
+import { dashboardService, type ChecklistItem, type ShiftChecklistResponse } from '@/services/dashboardService';
 import { getCurrentShiftType, getCurrentShiftDate, getShiftLabel } from '@/lib/shiftUtils';
 import type { Notification, ShiftContextResponse, WorkOrder } from '@/types';
 import type { ReportingDamageReportSummary } from '@/types/reporting';
@@ -44,10 +42,10 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 // matching meter-reading list page so a technician can jump straight in.
 interface ReminderItem { label: string; route: string; }
 
-const ALWAYS_REMINDERS: ReminderItem[] = [
-  { label: 'Kesiapan Peralatan CNSD',          route: '/cnsd/readiness' },
-  { label: 'Performance Check AOB Lt. Ground', route: '/tfp/aob-ground' },
-];
+// Note: the "Wajib di setiap shift" + current-shift sections of the
+// dashboard card are now driven by the dashboard/shift-checklist API, which
+// returns real has_record status per form. SHIFT_REMINDERS below still acts
+// as the static catalog for the OTHER (collapsed) shifts.
 
 const SHIFT_REMINDERS: Record<ShiftType, ReminderItem[]> = {
   pagi: [
@@ -86,6 +84,18 @@ function toDivision(employeeType: string): string {
   if (employeeType === 'CNS') return 'CNSD';
   if (employeeType === 'Support') return 'TFP';
   return 'Management';
+}
+
+// ─── Helper: which divisions can this role see in the checklist? ──
+function visibleDivisionsFor(role?: string): Set<'CNSD' | 'TFP'> {
+  if (role === 'Supervisor CNSD' || role === 'Teknisi CNSD') {
+    return new Set(['CNSD']);
+  }
+  if (role === 'Supervisor TFP' || role === 'Teknisi TFP') {
+    return new Set(['TFP']);
+  }
+  // Admin, Manager Teknik, unknown → see both
+  return new Set(['CNSD', 'TFP']);
 }
 
 // ─── Helper: format relative time ──────────────────────────
@@ -288,87 +298,41 @@ export const DashboardPage: React.FC = () => {
   };
   const otherShifts: ShiftType[] = (['pagi', 'siang', 'malam'] as const).filter((s) => s !== currentShift);
 
-  // ─── Welcome Popup ─────────────────────────────────────────
-  const [showWelcome, setShowWelcome] = useState(false);
-  const pendingChecklist = mockChecklist.filter((c) => c.is_active && !c.is_completed);
+  // ─── Shift checklist (real-time has_record per form) ───
+  const [checklist, setChecklist] = useState<ShiftChecklistResponse | null>(null);
+  const visibleDivisions = visibleDivisionsFor(user?.role);
+
+  const fetchChecklist = useCallback(async () => {
+    try {
+      const data = await dashboardService.getShiftChecklist(filterDate, currentShift);
+      setChecklist(data);
+    } catch {
+      setChecklist(null);
+    }
+  }, [filterDate, currentShift]);
 
   useEffect(() => {
-    const hasShown = sessionStorage.getItem('atoms_welcome_shown');
-    if (!hasShown) {
-      const timer = setTimeout(() => {
-        setShowWelcome(true);
-        sessionStorage.setItem('atoms_welcome_shown', 'true');
-      }, 800);
-      return () => clearTimeout(timer);
-    }
-  }, []);
+    void fetchChecklist();
+    const interval = setInterval(() => { void fetchChecklist(); }, 60_000);
+    const onFocus = () => { void fetchChecklist(); };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [fetchChecklist]);
+
+  // Per-section filtered + role-filtered item lists derived from the checklist.
+  // Used to render WAJIB + CURRENT-SHIFT sections with real has_record state.
+  const wajibItems: ChecklistItem[] = (checklist?.items ?? [])
+    .filter((i) => i.category === 'wajib' && visibleDivisions.has(i.division));
+  const currentShiftItems: ChecklistItem[] = (checklist?.items ?? [])
+    .filter((i) => i.category === 'shift' && i.shift === currentShift && visibleDivisions.has(i.division));
+
+  // ─── Welcome Popup (removed — now handled by WelcomeModal in AppShell) ───
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
-      {/* ─── Welcome Popup Modal ─────────────────────── */}
-      <Modal isOpen={showWelcome} onClose={() => setShowWelcome(false)} size="sm" hideCloseButton>
-        {/* Gradient Navy Header */}
-        <div className="-mx-6 -mt-4 px-6 pt-6 pb-5 bg-gradient-to-br from-[#222E6A] to-[#454D7C] text-white mb-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center text-xl font-bold">
-              {user?.name?.charAt(0) ?? 'U'}
-            </div>
-            <div>
-              <p className="text-white/70 text-sm">Selamat datang kembali 👋</p>
-              <h2 className="text-white font-bold text-lg leading-tight">{user?.name}</h2>
-              <p className="text-white/80 text-sm">{user?.role}</p>
-            </div>
-          </div>
-          <div className="bg-white/10 rounded-lg px-3 py-2 flex items-center gap-2">
-            <span className="text-lg">{shiftInfo.emoji}</span>
-            <span className="text-white text-sm font-medium">
-              {shiftInfo.label} — {shiftStart} s/d {shiftEnd} WIB
-            </span>
-          </div>
-        </div>
-
-        {/* Body: Checklist Reminder */}
-        <div>
-          <p className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-            <span>📋</span> Checklist shift ini yang perlu diselesaikan:
-          </p>
-          <div className="space-y-2">
-            {pendingChecklist.length > 0 ? (
-              pendingChecklist.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                  <div className="h-2 w-2 rounded-full bg-amber-400 flex-shrink-0" />
-                  <span className="text-sm text-slate-700">{item.label}</span>
-                  <span className="ml-auto text-xs text-amber-600 font-medium">Belum</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-green-600 text-center py-2">✅ Semua checklist sudah selesai!</p>
-            )}
-          </div>
-          <p className="text-xs text-slate-400 mt-3 text-center">
-            Data checklist diperbarui secara real-time
-          </p>
-        </div>
-
-        {/* Footer Buttons */}
-        <div className="flex gap-2 mt-4">
-          <Button variant="outline" className="flex-1" onClick={() => setShowWelcome(false)}>
-            Tutup
-          </Button>
-          <Button
-            className="flex-1 bg-[#222E6A] hover:bg-[#454D7C] text-white"
-            onClick={() => {
-              setShowWelcome(false);
-              if (pendingChecklist.length > 0 && pendingChecklist[0].route) {
-                navigate(pendingChecklist[0].route);
-              }
-            }}
-          >
-            Mulai Pengecekan →
-          </Button>
-        </div>
-      </Modal>
-
       {/* ─── Page Header ─────────────────────────────────────── */}
       <PageHeader
         icon={LayoutDashboard}
@@ -545,76 +509,125 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           <div className="p-6 space-y-4">
-            {/* Wajib semua shift */}
-            <section className="rounded-xl border border-amber-200 bg-amber-50/50">
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-amber-200/70">
-                <AlertTriangle size={14} className="text-amber-700" aria-hidden="true" />
-                <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
-                  Wajib di setiap shift
-                </p>
-              </div>
-              <ul className="divide-y divide-amber-100">
-                {ALWAYS_REMINDERS.map((item) => (
-                  <li key={item.route}>
-                    <button
-                      type="button"
-                      onClick={() => navigate(item.route)}
-                      className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-amber-100/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-inset"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="h-7 w-7 rounded-md bg-amber-100 flex items-center justify-center shrink-0">
-                          <CheckSquare size={14} className="text-amber-700" aria-hidden="true" />
-                        </span>
-                        <span className="text-sm font-medium text-slate-800 truncate">{item.label}</span>
-                      </div>
-                      <ChevronRight size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-
-            {/* Current shift — expanded */}
-            <section className="rounded-xl border border-blue-200 bg-blue-50/40">
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-blue-200/70">
-                <div className="flex items-center gap-2">
-                  <span aria-hidden="true">{getShiftLabel(currentShift).emoji}</span>
-                  <p className="text-xs font-bold uppercase tracking-wider text-blue-800">
-                    {getShiftLabel(currentShift).label}
+            {/* Wajib semua shift — items with real has_record from API */}
+            {wajibItems.length > 0 && (
+              <section className="rounded-xl border border-amber-200 bg-amber-50/50">
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-amber-200/70">
+                  <AlertTriangle size={14} className="text-amber-700" aria-hidden="true" />
+                  <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                    Wajib di setiap shift
                   </p>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
-                    Aktif
+                </div>
+                <ul className="divide-y divide-amber-100">
+                  {wajibItems.map((item) => {
+                    const done = item.has_record;
+                    const targetRoute = done && item.record_id
+                      ? `${item.route}/${item.record_id}`
+                      : item.route;
+                    return (
+                      <li key={item.key}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(targetRoute)}
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-amber-100/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-inset"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`h-7 w-7 rounded-md flex items-center justify-center shrink-0 ${
+                              done ? 'bg-emerald-100' : 'bg-amber-100'
+                            }`}>
+                              {done
+                                ? <Check size={14} className="text-emerald-700" aria-hidden="true" />
+                                : <CheckSquare size={14} className="text-amber-700" aria-hidden="true" />}
+                            </span>
+                            <span className={`text-sm font-medium truncate ${
+                              done ? 'text-slate-500' : 'text-slate-800'
+                            }`}>
+                              {item.label}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {done && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-700">
+                                <Check size={11} aria-hidden="true" /> Sudah
+                              </span>
+                            )}
+                            <ChevronRight size={14} className="text-slate-400" aria-hidden="true" />
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
+
+            {/* Current shift — expanded, with real has_record from API */}
+            {currentShiftItems.length > 0 && (
+              <section className="rounded-xl border border-blue-200 bg-blue-50/40">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-blue-200/70">
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden="true">{getShiftLabel(currentShift).emoji}</span>
+                    <p className="text-xs font-bold uppercase tracking-wider text-blue-800">
+                      {getShiftLabel(currentShift).label}
+                    </p>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                      Aktif
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-medium text-blue-700/80">
+                    {currentShiftItems.filter((i) => i.has_record).length}/{currentShiftItems.length} item
                   </span>
                 </div>
-                <span className="text-[11px] font-medium text-blue-700/80">
-                  {SHIFT_REMINDERS[currentShift].length} item
-                </span>
-              </div>
-              <ul className="divide-y divide-blue-100">
-                {SHIFT_REMINDERS[currentShift].map((item) => (
-                  <li key={item.route}>
-                    <button
-                      type="button"
-                      onClick={() => navigate(item.route)}
-                      className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-blue-100/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="h-7 w-7 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
-                          <Gauge size={14} className="text-blue-700" aria-hidden="true" />
-                        </span>
-                        <span className="text-sm font-medium text-slate-800 truncate">{item.label}</span>
-                      </div>
-                      <ChevronRight size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
+                <ul className="divide-y divide-blue-100">
+                  {currentShiftItems.map((item) => {
+                    const done = item.has_record;
+                    const targetRoute = done && item.record_id
+                      ? `${item.route}/${item.record_id}`
+                      : item.route;
+                    return (
+                      <li key={item.key}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(targetRoute)}
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-blue-100/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`h-7 w-7 rounded-md flex items-center justify-center shrink-0 ${
+                              done ? 'bg-emerald-100' : 'bg-blue-100'
+                            }`}>
+                              {done
+                                ? <Check size={14} className="text-emerald-700" aria-hidden="true" />
+                                : <Gauge size={14} className="text-blue-700" aria-hidden="true" />}
+                            </span>
+                            <span className={`text-sm font-medium truncate ${
+                              done ? 'text-slate-500' : 'text-slate-800'
+                            }`}>
+                              {item.label}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {done && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-700">
+                                <Check size={11} aria-hidden="true" /> Sudah
+                              </span>
+                            )}
+                            <ChevronRight size={14} className="text-slate-400" aria-hidden="true" />
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
 
-            {/* Other shifts — collapsed by default */}
+            {/* Other shifts — collapsed by default, role-filtered, no status indicator */}
             <div className="space-y-2">
               {otherShifts.map((shift) => {
-                const items = SHIFT_REMINDERS[shift];
+                // SHIFT_REMINDERS is CNSD-only, so hide this section entirely
+                // when the user's role isn't allowed to see CNSD items.
+                const items = visibleDivisions.has('CNSD') ? SHIFT_REMINDERS[shift] : [];
+                if (items.length === 0) return null;
                 const meta = getShiftLabel(shift);
                 const open = expandedShifts.has(shift);
                 return (
@@ -666,6 +679,13 @@ export const DashboardPage: React.FC = () => {
                 );
               })}
             </div>
+
+            {/* Empty state — when role filter hides everything */}
+            {wajibItems.length === 0 && currentShiftItems.length === 0 && !visibleDivisions.has('CNSD') && (
+              <div className="text-center py-6 text-sm text-slate-400">
+                Tidak ada pengingat untuk role Anda pada shift ini.
+              </div>
+            )}
           </div>
         </div>
       </div>
