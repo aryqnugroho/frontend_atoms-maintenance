@@ -3,7 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { Activity, ChevronRight, MapPin } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ComingSoonCard } from '@/components/common/ComingSoonCard';
-import { mockTfpCategories } from '@/data/mockData';
+import type { TfpCategory } from '@/types';
+
+/**
+ * Static catalog of TFP module cards rendered on the index page. Inlined
+ * (no longer in mockData) because each card maps 1:1 with a hardcoded
+ * frontend route — adding a card requires adding a route.
+ */
+const TFP_CATEGORIES: TfpCategory[] = [
+  { id: 1, code: 'TFP-001', name: 'Performance Check AOB Lantai Ground', location: 'AOB Lantai Ground', is_active_mvp: true, sort_order: 1 },
+  { id: 2, code: 'TFP-002', name: 'AOB Lantai 1 & 2',                    location: 'AOB Lantai 1-2',    is_active_mvp: true, sort_order: 2 },
+  { id: 3, code: 'TFP-003', name: 'Transmitter (TFP)',                   location: 'Gedung Transmitter', is_active_mvp: true, sort_order: 3 },
+  { id: 4, code: 'TFP-004', name: 'Radar (TFP)',                         location: 'Gedung Radar',       is_active_mvp: true, sort_order: 4 },
+  { id: 5, code: 'TFP-005', name: 'Tower',                               location: 'ATC Tower',          is_active_mvp: true, sort_order: 5 },
+  { id: 6, code: 'TFP-006', name: 'VOR (TFP)',                           location: 'Shelter VOR',        is_active_mvp: true, sort_order: 6 },
+  { id: 7, code: 'TFP-007', name: 'Localizer (TFP)',                     location: 'Shelter Localizer',  is_active_mvp: true, sort_order: 7 },
+  { id: 8, code: 'TFP-008', name: 'Glide Path (TFP)',                    location: 'Shelter Glide Path', is_active_mvp: true, sort_order: 8 },
+];
 
 /**
  * Map TFP category code → frontend route.
@@ -45,7 +61,7 @@ export const TfpIndexPage: React.FC = () => {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {mockTfpCategories.map((cat) => {
+        {TFP_CATEGORIES.map((cat) => {
           const route = TFP_ACTIVE_ROUTES[cat.code];
           const isActive = cat.is_active_mvp && !!route;
 
