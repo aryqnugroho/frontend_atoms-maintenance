@@ -4,6 +4,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
+import { SettingsChecklistPage } from '@/pages/settings/SettingsChecklistPage';
 import { WorkOrderListPage } from '@/pages/work-order/WorkOrderListPage';
 import { WorkOrderDetailPage } from '@/pages/work-order/WorkOrderDetailPage';
 import { WorkOrderPrintView } from '@/pages/work-order/WorkOrderPrintView';
@@ -47,6 +48,15 @@ import { CnsdAtisMeterPrintView } from '@/pages/cnsd/CnsdAtisMeterPrintView';
 import { CnsdAtcSystemMeterListPage } from '@/pages/cnsd/CnsdAtcSystemMeterListPage';
 import { CnsdAtcSystemMeterDetailPage } from '@/pages/cnsd/CnsdAtcSystemMeterDetailPage';
 import { CnsdAtcSystemMeterPrintView } from '@/pages/cnsd/CnsdAtcSystemMeterPrintView';
+import { CnsdVccsMeterListPage } from '@/pages/cnsd/CnsdVccsMeterListPage';
+import { CnsdVccsMeterDetailPage } from '@/pages/cnsd/CnsdVccsMeterDetailPage';
+import { CnsdVccsMeterPrintView } from '@/pages/cnsd/CnsdVccsMeterPrintView';
+import { CnsdVccsFreqMeterListPage } from '@/pages/cnsd/CnsdVccsFreqMeterListPage';
+import { CnsdVccsFreqMeterDetailPage } from '@/pages/cnsd/CnsdVccsFreqMeterDetailPage';
+import { CnsdVccsFreqMeterPrintView } from '@/pages/cnsd/CnsdVccsFreqMeterPrintView';
+import { CnsdAsmgcsMeterListPage } from '@/pages/cnsd/CnsdAsmgcsMeterListPage';
+import { CnsdAsmgcsMeterDetailPage } from '@/pages/cnsd/CnsdAsmgcsMeterDetailPage';
+import { CnsdAsmgcsMeterPrintView } from '@/pages/cnsd/CnsdAsmgcsMeterPrintView';
 import { TfpIndexPage } from '@/pages/tfp/TfpIndexPage';
 import { TfpAobGroundListPage } from '@/pages/tfp/TfpAobGroundListPage';
 import { TfpAobGroundDetailPage } from '@/pages/tfp/TfpAobGroundDetailPage';
@@ -101,12 +111,19 @@ import { LogbookCnsdPrintView } from '@/pages/logbook/LogbookCnsdPrintView';
 import { LogbookTfp } from '@/pages/logbook/LogbookTfp';
 import { LogbookTfpDetail } from '@/pages/logbook/LogbookTfpDetail';
 import { LogbookTfpPrintView } from '@/pages/logbook/LogbookTfpPrintView';
+import { MonitorPage } from '@/pages/monitor/MonitorPage';
 import { ComingSoonPage } from '@/pages/shared/ComingSoonPage';
 
 export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />
+  },
+  {
+    // Workshop TV monitor — intentionally OUTSIDE ProtectedRoute so the kiosk
+    // does not need an SSO session. The page itself shows a password gate.
+    path: '/monitor',
+    element: <MonitorPage />,
   },
   {
     element: <ProtectedRoute />,
@@ -125,6 +142,9 @@ export const router = createBrowserRouter([
       { path: '/cnsd/dme-meter/:id/print', element: <CnsdDmeMeterPrintView /> },
       { path: '/cnsd/atis-meter/:id/print', element: <CnsdAtisMeterPrintView /> },
       { path: '/cnsd/atc-system-meter/:id/print', element: <CnsdAtcSystemMeterPrintView /> },
+      { path: '/cnsd/vccs-meter/:id/print', element: <CnsdVccsMeterPrintView /> },
+      { path: '/cnsd/vccs-freq-meter/:id/print', element: <CnsdVccsFreqMeterPrintView /> },
+      { path: '/cnsd/asmgcs-meter/:id/print', element: <CnsdAsmgcsMeterPrintView /> },
       { path: '/grounding/reports/:id/print', element: <GroundingReportPrintView /> },
       { path: '/reporting/damage-reports/:id/print', element: <ReportingDamagePrintView /> },
       { path: '/tfp/aob-ground/:id/print', element: <TfpAobGroundPrintView /> },
@@ -146,6 +166,7 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { path: '/dashboard', element: <DashboardPage /> },
+          { path: '/settings/checklist', element: <SettingsChecklistPage /> },
           { path: '/', element: <Navigate to="/dashboard" replace /> },
 
           // Work Order
@@ -193,6 +214,15 @@ export const router = createBrowserRouter([
           // Active module 14: ATC SYSTEM Meter Reading (Approach System / Tern ATS System)
           { path: '/cnsd/atc-system-meter', element: <CnsdAtcSystemMeterListPage /> },
           { path: '/cnsd/atc-system-meter/:id', element: <CnsdAtcSystemMeterDetailPage /> },
+          // Active module 15: VCCS LES Meter Reading
+          { path: '/cnsd/vccs-meter', element: <CnsdVccsMeterListPage /> },
+          { path: '/cnsd/vccs-meter/:id', element: <CnsdVccsMeterDetailPage /> },
+          // Active module 16: VCCS Frequentis Meter Reading
+          { path: '/cnsd/vccs-freq-meter', element: <CnsdVccsFreqMeterListPage /> },
+          { path: '/cnsd/vccs-freq-meter/:id', element: <CnsdVccsFreqMeterDetailPage /> },
+          // Active module 17: ASMGCS (SAAB) Meter Reading
+          { path: '/cnsd/asmgcs-meter', element: <CnsdAsmgcsMeterListPage /> },
+          { path: '/cnsd/asmgcs-meter/:id', element: <CnsdAsmgcsMeterDetailPage /> },
           // Backward-compat: legacy /cnsd/eq-1 link redirects to new list
           { path: '/cnsd/eq-1', element: <Navigate to="/cnsd/readiness" replace /> },
           { path: '/cnsd/:code/coming-soon', element: <ComingSoonPage /> },
