@@ -4,7 +4,6 @@ import {
   FileText,
   Plus,
   Search,
-  Edit2,
   Trash2,
   Printer,
   X,
@@ -16,7 +15,7 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { Badge } from '@/components/common/Badge';
 import { WorkOrderFormModal } from '@/pages/work-order/components/WorkOrderFormModal';
-import { mockWorkOrders } from '@/data/mockData';
+import { WorkOrderGmDirectiveModal } from '@/pages/work-order/components/WorkOrderGmDirectiveModal';
 import { workOrderService } from '@/services/workOrderService';
 import { useAuth } from '@/hooks/useAuth';
 import type { WorkOrder } from '@/types';
@@ -37,7 +36,18 @@ const STATUS_LABELS: Record<string, string> = {
 export const WorkOrderListPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canDelete = user?.role === 'Admin' || user?.role === 'Manager Teknik';
+  const isGm = user?.role === 'General Manager';
+  const isTeknisi = user?.role === 'Teknisi CNSD' || user?.role === 'Teknisi TFP';
+  // Admin / Manager Teknik / Supervisor (MT-equivalent) can delete any WO.
+  // General Manager can delete only their own ongoing gm_directive WOs.
+  // Teknisi cannot delete.
+  const canDeleteAny =
+    user?.role === 'Admin' ||
+    user?.role === 'Manager Teknik' ||
+    user?.role === 'Supervisor CNSD' ||
+    user?.role === 'Supervisor TFP';
+  // Teknisi cannot create WO. Everyone else with WO access can.
+  const canCreateWo = !!user?.role && !isTeknisi;
 
   // ── Filter state ───────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,7 +61,7 @@ export const WorkOrderListPage: React.FC = () => {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isApiAvailable, setIsApiAvailable] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState<number | null>(null);
 
   // ── Modal state ────────────────────────────────────────
@@ -98,16 +108,15 @@ export const WorkOrderListPage: React.FC = () => {
       const data = response.data ?? [];
       setWorkOrders(data);
       setTotalCount(response.total ?? data.length);
-      setIsApiAvailable(true);
+      setLoadError(null);
     } catch {
-      if (!isApiAvailable) {
-        setWorkOrders(mockWorkOrders);
-        setTotalCount(mockWorkOrders.length);
-      }
+      setWorkOrders([]);
+      setTotalCount(0);
+      setLoadError('Gagal memuat daftar Work Order. Periksa koneksi ke server.');
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearch, dateFilter, yearFilter, divisionFilter, shiftFilter, statusFilter, isApiAvailable]);
+  }, [debouncedSearch, dateFilter, yearFilter, divisionFilter, shiftFilter, statusFilter]);
 
   useEffect(() => {
     void fetchWorkOrders();
@@ -138,12 +147,7 @@ export const WorkOrderListPage: React.FC = () => {
   const handleDelete = async (id: number) => {
     if (!confirm('Apakah Anda yakin ingin menghapus Work Order ini?')) return;
     try {
-      if (isApiAvailable) {
-        await workOrderService.deleteWorkOrder(id);
-      } else {
-        const { deleteMockWorkOrder } = await import('@/data/mockData');
-        deleteMockWorkOrder(id);
-      }
+      await workOrderService.deleteWorkOrder(id);
       void fetchWorkOrders();
     } catch {
       alert('Gagal menghapus Work Order.');
@@ -165,23 +169,11 @@ export const WorkOrderListPage: React.FC = () => {
   if (statusFilter) activeFilters.push({ key: 'status', label: STATUS_LABELS[statusFilter] ?? statusFilter, clear: () => setStatusFilter('') });
   const hasActiveFilters = activeFilters.length > 0;
 
-  // Client-side filter when API unavailable
-  const displayed = isApiAvailable
-    ? workOrders
-    : workOrders.filter((wo) => {
-        const q = debouncedSearch.toLowerCase();
-        if (q && !wo.wo_number.toLowerCase().includes(q) && !wo.description.toLowerCase().includes(q)) return false;
-        if (divisionFilter && wo.division !== divisionFilter) return false;
-        if (shiftFilter && wo.shift_type !== shiftFilter) return false;
-        if (statusFilter && wo.status !== statusFilter) return false;
-        if (dateFilter && wo.shift_date !== dateFilter) return false;
-        if (yearFilter && !wo.shift_date?.startsWith(yearFilter)) return false;
-        return true;
-      });
-
-  const resultCount = isApiAvailable ? (totalCount ?? displayed.length) : displayed.length;
-  const isDBEmpty = !isLoading && !hasActiveFilters && displayed.length === 0;
-  const isFilterEmpty = !isLoading && hasActiveFilters && displayed.length === 0;
+  // All filtering is server-side via getWorkOrders params.
+  const displayed = workOrders;
+  const resultCount = totalCount ?? displayed.length;
+  const isDBEmpty = !isLoading && !loadError && !hasActiveFilters && displayed.length === 0;
+  const isFilterEmpty = !isLoading && !loadError && hasActiveFilters && displayed.length === 0;
 
   const selectClass = 'h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent min-w-0';
 
@@ -195,12 +187,23 @@ export const WorkOrderListPage: React.FC = () => {
         title="Work Order"
         subtitle="Kelola perintah kerja dan tugas operasional"
         actions={
-          <Button onClick={handleOpenCreate} className="gap-2 shrink-0">
-            <Plus size={16} />
-            Buat Work Order
-          </Button>
+          canCreateWo ? (
+            <Button onClick={handleOpenCreate} className="gap-2 shrink-0">
+              <Plus size={16} />
+              Buat Work Order
+            </Button>
+          ) : undefined
         }
       />
+
+      {loadError && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {loadError}
+        </div>
+      )}
 
       {/* ─── Filter Bar ──────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-3">
@@ -344,12 +347,16 @@ export const WorkOrderListPage: React.FC = () => {
             </div>
             <p className="text-base font-semibold text-slate-700">Belum ada Work Order</p>
             <p className="text-sm text-slate-400 max-w-xs">
-              Klik tombol <strong>Buat Work Order</strong> di atas untuk membuat data pertama.
+              {canCreateWo
+                ? <>Klik tombol <strong>Buat Work Order</strong> di atas untuk membuat data pertama.</>
+                : 'Belum ada perintah kerja yang dibuat untuk divisi Anda.'}
             </p>
-            <Button onClick={handleOpenCreate} className="gap-2 mt-2">
-              <Plus size={15} />
-              Buat Work Order
-            </Button>
+            {canCreateWo && (
+              <Button onClick={handleOpenCreate} className="gap-2 mt-2">
+                <Plus size={15} />
+                Buat Work Order
+              </Button>
+            )}
           </div>
         ) : isFilterEmpty ? (
           /* Empty state — filter produced no results */
@@ -397,11 +404,22 @@ export const WorkOrderListPage: React.FC = () => {
                     role="button"
                     className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary"
                   >
-                    <td className="px-6 py-4 font-mono text-slate-700 text-xs whitespace-nowrap">{wo.wo_number}</td>
+                    <td className="px-6 py-4 font-mono text-slate-700 text-xs whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <span>{wo.wo_number}</span>
+                        {wo.creator?.role === 'General Manager' && (
+                          <Badge variant="gm" className="text-[10px]">Dari GM</Badge>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4">
-                      <Badge variant={wo.wo_type === 'shift' ? 'shift' : 'personal'}>
-                        {wo.wo_type === 'shift' ? '👥 Shift' : '👤 Personal'}
-                      </Badge>
+                      {wo.wo_type === 'gm_directive' ? (
+                        <Badge variant="gm">Directive GM</Badge>
+                      ) : wo.wo_type === 'shift' ? (
+                        <Badge variant="shift">Shift</Badge>
+                      ) : (
+                        <Badge variant="personal">Personal</Badge>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <Badge variant={wo.division === 'CNSD' ? 'cnsd' : 'tfp'}>{wo.division}</Badge>
@@ -420,13 +438,18 @@ export const WorkOrderListPage: React.FC = () => {
                         className="flex items-center justify-center gap-2"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <button
-                          onClick={() => handleOpenEdit(wo.id)}
-                          className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 size={16} />
-                        </button>
+                        {(!isGm ||
+                          (wo.wo_type === 'gm_directive'
+                            && wo.created_by === user?.id
+                            && wo.status === 'ongoing')) && (
+                          <button
+                            onClick={() => handleOpenEdit(wo.id)}
+                            className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
+                            title={isGm ? 'Edit Directive' : 'Tambah Perintah'}
+                          >
+                            <Plus size={16} />
+                          </button>
+                        )}
                         <button
                           onClick={() => navigate(`/work-orders/${wo.id}/print`)}
                           className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
@@ -434,7 +457,11 @@ export const WorkOrderListPage: React.FC = () => {
                         >
                           <Printer size={16} />
                         </button>
-                        {canDelete && (
+                        {(canDeleteAny ||
+                          (isGm
+                            && wo.wo_type === 'gm_directive'
+                            && wo.created_by === user?.id
+                            && wo.status === 'ongoing')) && (
                           <button
                             onClick={() => handleDelete(wo.id)}
                             className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -453,11 +480,19 @@ export const WorkOrderListPage: React.FC = () => {
         )}
       </div>
 
-      <WorkOrderFormModal
-        isOpen={isModalOpen}
-        onClose={handleModalClose}
-        workOrderId={editingWoId}
-      />
+      {isGm ? (
+        <WorkOrderGmDirectiveModal
+          isOpen={isModalOpen}
+          onClose={handleModalClose}
+          workOrderId={editingWoId}
+        />
+      ) : (
+        <WorkOrderFormModal
+          isOpen={isModalOpen}
+          onClose={handleModalClose}
+          workOrderId={editingWoId}
+        />
+      )}
     </div>
   );
 };

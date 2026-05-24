@@ -448,20 +448,35 @@ export const LogbookTfpDetail: React.FC = () => {
 
   useEffect(() => { void loadRecord(); }, [loadRecord]);
 
+  // ── Read-only role gates ─────────────────────────────────────────────────
+  // General Manager always sees this page read-only for oversight.
+  // Teknisi CNSD can READ a TFP logbook but must not be able to write to it
+  //   (their write scope is CNSD logbook only).
+  const isGmReadOnly = user?.role === 'General Manager';
+  const isCrossDivisionTeknisi = user?.role === 'Teknisi CNSD';
+  const isReadOnlyViewer = isGmReadOnly || isCrossDivisionTeknisi;
+
   const isFullySigned = !!record?.is_fully_signed;
+  const isLocked = isFullySigned || isReadOnlyViewer;
   const shiftLocked = {
-    pagi: !!record?.is_signed_pagi,
-    siang: !!record?.is_signed_siang,
-    malam: !!record?.is_signed_malam,
+    pagi: !!record?.is_signed_pagi || isReadOnlyViewer,
+    siang: !!record?.is_signed_siang || isReadOnlyViewer,
+    malam: !!record?.is_signed_malam || isReadOnlyViewer,
   };
   const canSign = user?.role === 'Manager Teknik';
-  const canDelete = user?.role === 'Manager Teknik' || user?.role === 'Admin';
-  // Equipment management: Manager Teknik + Supervisor TFP/CNSD + Admin
-  const canManageEquipment =
+  // Delete logbook: Admin / MT / Supervisor (lintas divisi, MT-equivalent).
+  const canDelete =
+    user?.role === 'Admin' ||
     user?.role === 'Manager Teknik' ||
-    user?.role === 'Supervisor TFP' ||
     user?.role === 'Supervisor CNSD' ||
-    user?.role === 'Admin';
+    user?.role === 'Supervisor TFP';
+  // Equipment management (add/edit/delete equipment rows) — same as canDelete:
+  // never includes teknisi, supervisor included lintas divisi.
+  const canManageEquipment =
+    user?.role === 'Admin' ||
+    user?.role === 'Manager Teknik' ||
+    user?.role === 'Supervisor CNSD' ||
+    user?.role === 'Supervisor TFP';
 
   const handleStatusChange = (
     itemId: number,
@@ -901,7 +916,7 @@ export const LogbookTfpDetail: React.FC = () => {
                   onDeleteItem={handleDeleteEquipment}
                   onAddItem={setAddingCategory}
                   canManage={canManageEquipment}
-                  disabled={isFullySigned}
+                  disabled={isLocked}
                   shiftLocked={shiftLocked}
                   defaultOpen={idx === 0}
                 />

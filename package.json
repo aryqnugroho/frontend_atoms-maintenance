@@ -13,12 +13,9 @@
     "@react-pdf/renderer": "^4.4.0",
     "axios": "^1.15.0",
     "clsx": "^2.1.1",
-    "laravel-echo": "^2.3.4",
     "lucide-react": "^1.8.0",
-    "pusher-js": "^8.5.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-hook-form": "^7.75.0",
     "react-router-dom": "^7.14.0",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.5.0"

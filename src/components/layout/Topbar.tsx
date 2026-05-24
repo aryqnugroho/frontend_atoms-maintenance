@@ -1,14 +1,25 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Bell, LogOut, Menu, X, Clock,
   LayoutDashboard, FileText, CheckSquare, Activity,
   Plane, Zap, Users, ClipboardList, BookOpen, Inbox,
+  Monitor as MonitorIcon, ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotification } from '@/hooks/useNotification';
 import { cn } from '@/lib/utils';
+import { MonitorSettingsModal } from '@/components/layout/MonitorSettingsModal';
 import type { Notification } from '@/types';
+
+// Roles allowed to rotate the kiosk monitor password (must match backend
+// route middleware: `role:Admin,Manager Teknik,Supervisor CNSD,Supervisor TFP`).
+const MONITOR_SETTINGS_ROLES = [
+  'Admin',
+  'Manager Teknik',
+  'Supervisor CNSD',
+  'Supervisor TFP',
+];
 
 // ─── Env ──────────────────────────────────────────────────────
 // ─── Nav definition ───────────────────────────────────────────
@@ -19,15 +30,22 @@ interface NavItem {
   roles: string[];
 }
 
+// Nav visibility per role:
+//   Admin / Manager Teknik / Supervisor (both)  → all menus (Supervisor is MT-equivalent)
+//   General Manager                              → Dashboard + WO + Reporting + Logbook (read-only)
+//   Teknisi CNSD                                 → Dashboard + WO + CNSD + Ground Check + Reporting + Logbook
+//   Teknisi TFP                                  → Dashboard + WO + TFP + Grounding + Reporting + Logbook
+// Note: Ground Check is a CNSD-side module; Grounding is a TFP-side module.
+// Previous nav showed both to both teknisi roles — fixed.
 const navItems: NavItem[] = [
-  { name: 'Dashboard',    path: '/dashboard',    icon: LayoutDashboard, roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-  { name: 'Work Order',   path: '/work-orders',  icon: FileText,        roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-  { name: 'CNSD',         path: '/cnsd',         icon: CheckSquare,     roles: ['Manager Teknik', 'Supervisor CNSD', 'Teknisi CNSD'] },
-  { name: 'TFP',          path: '/tfp',          icon: Activity,        roles: ['Manager Teknik', 'Supervisor TFP', 'Teknisi TFP'] },
-  { name: 'Ground Check', path: '/ground-check', icon: Plane,           roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-  { name: 'Grounding',    path: '/grounding',    icon: Zap,             roles: ['Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-  { name: 'Reporting',    path: '/reporting',    icon: ClipboardList,   roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
-  { name: 'Logbook',      path: '/logbooks',     icon: BookOpen,        roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
+  { name: 'Dashboard',    path: '/dashboard',    icon: LayoutDashboard, roles: ['Admin', 'General Manager', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
+  { name: 'Work Order',   path: '/work-orders',  icon: FileText,        roles: ['General Manager', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
+  { name: 'CNSD',         path: '/cnsd',         icon: CheckSquare,     roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD'] },
+  { name: 'TFP',          path: '/tfp',          icon: Activity,        roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi TFP'] },
+  { name: 'Ground Check', path: '/ground-check', icon: Plane,           roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD'] },
+  { name: 'Grounding',    path: '/grounding',    icon: Zap,             roles: ['Admin', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi TFP'] },
+  { name: 'Reporting',    path: '/reporting',    icon: ClipboardList,   roles: ['Admin', 'General Manager', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
+  { name: 'Logbook',      path: '/logbooks',     icon: BookOpen,        roles: ['Admin', 'General Manager', 'Manager Teknik', 'Supervisor CNSD', 'Supervisor TFP', 'Teknisi CNSD', 'Teknisi TFP'] },
   { name: 'User Mgmt',    path: '/admin/users',  icon: Users,           roles: ['Admin'] },
 ];
 
@@ -47,6 +65,24 @@ export const Topbar: React.FC = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [showMonitorSettings, setShowMonitorSettings] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close the account dropdown when clicking outside.
+  useEffect(() => {
+    if (!showAccountMenu) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!accountMenuRef.current) return;
+      if (!accountMenuRef.current.contains(e.target as Node)) {
+        setShowAccountMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [showAccountMenu]);
+
+  const canOpenMonitorSettings = !!user?.role && MONITOR_SETTINGS_ROLES.includes(user.role);
 
   const unread = unreadCount;
 
@@ -241,36 +277,80 @@ export const Topbar: React.FC = () => {
             )}
           </div>
 
-          {/* ── User info + logout ── */}
-          <div className="flex items-center gap-1 pl-1.5 border-l border-white/15 shrink-0">
-            {/* Name + role — only on medium+ screens */}
-            <div className="hidden md:block text-right">
-              <p className="text-[12px] font-semibold leading-tight text-white truncate max-w-[100px]">
-                {user?.name || 'User'}
-              </p>
-              <p className="text-[10px] text-white/45 leading-tight truncate max-w-[100px]">
-                {user?.role || 'Guest'}
-              </p>
-            </div>
-            {/* Avatar */}
-            <div
-              className="h-7 w-7 rounded-full bg-white/20 ring-2 ring-white/10 text-white flex items-center justify-center text-xs font-bold shrink-0"
-              aria-hidden="true"
-            >
-              {userInitial}
-            </div>
-            {/* Logout */}
+          {/* ── Account dropdown (avatar + name → menu with Monitor Settings + Logout) ── */}
+          <div className="relative shrink-0 pl-1.5 border-l border-white/15" ref={accountMenuRef}>
             <button
-              onClick={logout}
-              className="p-1.5 rounded-lg text-white/55 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-              title="Keluar"
-              aria-label="Keluar dari aplikasi"
+              onClick={() => { setShowAccountMenu((v) => !v); setShowNotif(false); }}
+              className="flex items-center gap-1.5 px-1 py-1 rounded-lg hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+              aria-label="Menu akun"
+              aria-expanded={showAccountMenu}
+              aria-haspopup="menu"
             >
-              <LogOut size={16} aria-hidden="true" />
+              <div className="hidden md:block text-right">
+                <p className="text-[12px] font-semibold leading-tight text-white truncate max-w-[100px]">
+                  {user?.name || 'User'}
+                </p>
+                <p className="text-[10px] text-white/45 leading-tight truncate max-w-[100px]">
+                  {user?.role || 'Guest'}
+                </p>
+              </div>
+              <div
+                className="h-7 w-7 rounded-full bg-white/20 ring-2 ring-white/10 text-white flex items-center justify-center text-xs font-bold shrink-0"
+                aria-hidden="true"
+              >
+                {userInitial}
+              </div>
+              <ChevronDown size={13} className={cn(
+                'text-white/55 transition-transform hidden md:block',
+                showAccountMenu && 'rotate-180'
+              )} aria-hidden="true" />
             </button>
+
+            {showAccountMenu && (
+              <div
+                className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden"
+                role="menu"
+                aria-label="Menu akun"
+              >
+                {/* User identity (mirror of the trigger, with full text) */}
+                <div className="px-4 py-3 border-b border-gray-100 bg-slate-50/60">
+                  <p className="text-sm font-semibold text-slate-900 truncate">
+                    {user?.name || 'User'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    {user?.role || 'Guest'}
+                  </p>
+                </div>
+
+                {canOpenMonitorSettings && (
+                  <button
+                    onClick={() => { setShowAccountMenu(false); setShowMonitorSettings(true); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:bg-slate-50"
+                    role="menuitem"
+                  >
+                    <MonitorIcon size={15} className="text-slate-400" />
+                    Monitor Settings
+                  </button>
+                )}
+
+                <button
+                  onClick={() => { setShowAccountMenu(false); logout(); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-100 focus-visible:outline-none focus-visible:bg-red-50"
+                  role="menuitem"
+                >
+                  <LogOut size={15} />
+                  Keluar
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
+
+      <MonitorSettingsModal
+        isOpen={showMonitorSettings}
+        onClose={() => setShowMonitorSettings(false)}
+      />
 
       {/* ═══════════════════════════════════════════════════════ */}
       {/* Mobile nav drawer                                      */}

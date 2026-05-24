@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/common/Button';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
+import { useAuth } from '@/hooks/useAuth';
 import { reportingDamageReportService } from '@/services/reportingDamageReportService';
 import {
   DAMAGE_CATEGORY_LABELS,
@@ -109,7 +110,11 @@ const fromDateTimeLocal = (v: string): string | null => {
 export const ReportingDamageFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isEdit = !!id;
+  // General Manager has READ-ONLY access for oversight — they can open the
+  // detail page but cannot edit, sign, or delete.
+  const isGmReadOnly = user?.role === 'General Manager';
 
   const [form, setForm] = useState<FormState>(defaultFormState());
   const [record, setRecord] = useState<ReportingDamageReportDetail | null>(null);
@@ -201,7 +206,12 @@ export const ReportingDamageFormPage: React.FC = () => {
     }
   }, [form.damage_started_at, form.repair_finished_at]);
 
-  const isCompleted = record?.status === 'completed';
+  // `isCompleted` keeps the original "form locked because the report is finalized"
+  // semantics. We OR it with `isGmReadOnly` so a GM viewing an in-progress
+  // report sees the same disabled state — without leaking GM into other gates
+  // that depend on completion (e.g. signature panel completion message).
+  const recordIsCompleted = record?.status === 'completed';
+  const isCompleted = recordIsCompleted || isGmReadOnly;
 
   const usedPersonIds = useMemo(
     () => new Set(form.repairers.map((r) => r.person_id).filter((v): v is number => !!v)),

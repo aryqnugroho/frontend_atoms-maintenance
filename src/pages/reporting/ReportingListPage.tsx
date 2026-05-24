@@ -82,7 +82,12 @@ const formatTanggalLong = (dateStr?: string | null): string => {
 export const ReportingListPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canDelete = user?.role === 'Admin' || user?.role === 'Manager Teknik';
+  // Supervisor is MT-equivalent (lintas divisi) → can delete reports.
+  const canDelete =
+    user?.role === 'Admin' ||
+    user?.role === 'Manager Teknik' ||
+    user?.role === 'Supervisor CNSD' ||
+    user?.role === 'Supervisor TFP';
   const canCreate =
     user?.role === 'Admin' ||
     user?.role === 'Manager Teknik' ||

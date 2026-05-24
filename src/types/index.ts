@@ -1,6 +1,7 @@
 // ─── Auth & User ───────────────────────────────────────────
 export type UserRole =
   | 'Admin'
+  | 'General Manager'
   | 'Manager Teknik'
   | 'Supervisor CNSD'
   | 'Supervisor TFP'
@@ -155,7 +156,10 @@ export interface TroubleEquipment {
 
 // ─── Work Order ────────────────────────────────────────────
 export type WOStatus = 'completed' | 'on_hold' | 'ongoing';
-export type WOType = 'shift' | 'personal'; // shift = all personnel, personal = specific technician
+// shift = all personnel on duty, personal = specific technician,
+// gm_directive = directive issued by General Manager to a Manager Teknik
+// (optionally with a Supervisor), no technicians assigned.
+export type WOType = 'shift' | 'personal' | 'gm_directive';
 export type OutputType = 'meter_reading' | 'status_peralatan' | 'logbook' | 'other';
 export type CompletionStatus = 'selesai' | 'belum_selesai_dilanjut' | 'tidak_bisa';
 
@@ -212,7 +216,7 @@ export interface WorkOrder {
   closed_at?: string | null;
   manager?: { id: number; name: string };
   supervisor?: { id: number; name: string } | null;
-  creator?: { id: number; name: string } | null;
+  creator?: { id: number; name: string; role?: string } | null;
 }
 
 // ─── CNSD Equipment ────────────────────────────────────────

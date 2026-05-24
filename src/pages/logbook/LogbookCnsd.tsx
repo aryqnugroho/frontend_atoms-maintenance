@@ -159,13 +159,20 @@ export const LogbookCnsd: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Supervisor is MT-equivalent (lintas divisi) → either supervisor can create
+  // a CNSD logbook. Teknisi TFP cannot create here.
   const canCreate =
     user?.role === 'Admin' ||
     user?.role === 'Manager Teknik' ||
     user?.role === 'Supervisor CNSD' ||
+    user?.role === 'Supervisor TFP' ||
     user?.role === 'Teknisi CNSD';
 
-  const canDelete = user?.role === 'Admin' || user?.role === 'Manager Teknik';
+  const canDelete =
+    user?.role === 'Admin' ||
+    user?.role === 'Manager Teknik' ||
+    user?.role === 'Supervisor CNSD' ||
+    user?.role === 'Supervisor TFP';
 
   const [yearFilter, setYearFilter] = useState('');
   const [signedFilter, setSignedFilter] = useState('');

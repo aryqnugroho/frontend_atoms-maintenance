@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/common/Button';
-import { mockWorkOrders } from '@/data/mockData';
 import { workOrderService } from '@/services/workOrderService';
 import { getShiftLabel } from '@/lib/shiftUtils';
 import type { WorkOrder, WorkOrderSignatureInfo, WorkOrderSignatureRole, ShiftType } from '@/types';
@@ -105,7 +104,7 @@ export const WorkOrderPrintView: React.FC = () => {
         const data = await workOrderService.getWorkOrderPrintData(Number(id));
         setWorkOrder(data.work_order);
       } catch {
-        setWorkOrder(mockWorkOrders.find((w) => w.id === Number(id)) ?? null);
+        setWorkOrder(null);
       } finally {
         setIsLoading(false);
       }
@@ -311,8 +310,16 @@ export const WorkOrderPrintView: React.FC = () => {
           <tr>
             <td className="wo-cell" colSpan={2} style={{ padding: '8px', verticalAlign: 'top' }}>
               <div style={{ fontSize: '11px', fontWeight: 600 }}>Diskripsi Perintah :</div>
-              <div style={{ marginTop: '4px', minHeight: '110px', whiteSpace: 'pre-wrap', fontSize: '12px', lineHeight: 1.5, paddingLeft: '4px' }}>
-                {workOrder.description}
+              <div style={{ marginTop: '4px', minHeight: '110px', fontSize: '12px', lineHeight: 1.5, paddingLeft: '4px' }}>
+                {workOrder.description && workOrder.description.includes('\n') ? (
+                  <ul style={{ margin: 0, paddingLeft: '16px', listStyleType: 'disc' }}>
+                    {workOrder.description.split('\n').filter(Boolean).map((item, idx) => (
+                      <li key={idx} style={{ marginBottom: '2px' }}>{item}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span style={{ whiteSpace: 'pre-wrap' }}>{workOrder.description}</span>
+                )}
               </div>
             </td>
           </tr>

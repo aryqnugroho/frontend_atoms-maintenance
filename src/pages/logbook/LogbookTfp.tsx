@@ -161,13 +161,20 @@ export const LogbookTfp: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Supervisor is MT-equivalent (lintas divisi) → either supervisor can create
+  // a TFP logbook. Teknisi CNSD cannot create here.
   const canCreate =
     user?.role === 'Admin' ||
     user?.role === 'Manager Teknik' ||
+    user?.role === 'Supervisor CNSD' ||
     user?.role === 'Supervisor TFP' ||
     user?.role === 'Teknisi TFP';
 
-  const canDelete = user?.role === 'Admin' || user?.role === 'Manager Teknik';
+  const canDelete =
+    user?.role === 'Admin' ||
+    user?.role === 'Manager Teknik' ||
+    user?.role === 'Supervisor CNSD' ||
+    user?.role === 'Supervisor TFP';
 
   // ── Filter state ───────────────────────────────────────
   const [yearFilter, setYearFilter] = useState('');

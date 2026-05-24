@@ -1,12 +1,11 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Save, RefreshCw } from 'lucide-react';
+import { Save, RefreshCw, Plus, X } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { Textarea } from '@/components/common/Textarea';
 import { Select } from '@/components/common/Select';
 import { ShiftBadge } from '@/components/common/ShiftBadge';
-import { mockShiftSchedule, mockWorkOrders } from '@/data/mockData';
 import { workOrderService } from '@/services/workOrderService';
 import { getCurrentShiftType, getCurrentShiftDate } from '@/lib/shiftUtils';
 import type { OutputType, WorkOrder, ShiftContextResponse, ShiftType } from '@/types';
@@ -53,9 +52,7 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
   const [shiftContext, setShiftContext] = useState<ShiftContextResponse | null>(null);
   const [shiftContextLoading, setShiftContextLoading] = useState(false);
 
-  // Initialize form state on open. Edit mode fetches the WO from the API
-  // (with mock fallback) instead of relying solely on mockWorkOrders, which
-  // previously caused silent failures when editing a real DB-only WO.
+  // Initialize form state on open. Edit mode fetches the WO from the API.
   useEffect(() => {
     if (!isOpen) {
       setWorkOrder(null);
@@ -111,8 +108,7 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
         const wo = await workOrderService.getWorkOrder(workOrderId);
         populateFromWo(wo);
       } catch {
-        const fallback = mockWorkOrders.find((w) => w.id === workOrderId);
-        if (fallback) populateFromWo(fallback);
+        if (!cancelled) setSubmitError('Gagal memuat data Work Order.');
       }
     })();
 
@@ -134,8 +130,7 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
     }
   };
 
-  // Resolve shift data: prefer rostering context, fall back to mock
-  const shift = mockShiftSchedule;
+  // Roster is the ONLY source of shift context — no mock fallback.
   const rosterAvailable = shiftContext?.roster_available ?? false;
 
   const toggleOutput = (val: OutputType) => {
@@ -152,19 +147,17 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
     return null;
   };
 
-  /** Available technicians in the chosen division, on this shift. */
-  const getAvailableTechnicians = (div: string) => {
+  /** Available technicians in the chosen division, on this shift.
+   *  When roster is unavailable, returns empty — backend will auto-fill from
+   *  rostering when the WO is created (see WorkOrderService autoFillShift...). */
+  const getAvailableTechnicians = (div: string): Array<{ id: number; name: string; role: string }> => {
     if (rosterAvailable && shiftContext && shiftContext.personnel.length > 0) {
       const empType = div === 'CNSD' ? 'CNS' : 'Support';
       return shiftContext.personnel
         .filter((p) => p.employee_type === empType)
         .map((p) => ({ id: p.user_id, name: p.name, role: p.employee_type }));
     }
-    return shift.personnel.filter((p) => {
-      if (div === 'CNSD') return p.role === 'Teknisi CNSD';
-      if (div === 'TFP') return p.role === 'Teknisi TFP';
-      return false;
-    });
+    return [];
   };
 
   /** Build personnel array. Shift WO = all techs in division, Personal WO = the one selected. */
@@ -207,8 +200,8 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
         focusError();
         return;
       }
-      if (description.trim().length < 10) {
-        setSubmitError('Deskripsi perintah minimal 10 karakter.');
+      if (!description.trim()) {
+        setSubmitError('Deskripsi perintah wajib diisi.');
         focusError();
         return;
       }
@@ -229,8 +222,8 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
       }
     } else {
       // Edit mode — description and outputs still required
-      if (description.trim().length < 10) {
-        setSubmitError('Deskripsi perintah minimal 10 karakter.');
+      if (!description.trim()) {
+        setSubmitError('Deskripsi perintah wajib diisi.');
         focusError();
         return;
       }
@@ -329,7 +322,7 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
   // Same predicates as the handleSubmit pre-validation — single source of truth.
   const missingFields: string[] = [];
   if (!isEdit && !division) missingFields.push('Divisi');
-  if (description.trim().length < 10) missingFields.push('Deskripsi (min 10 karakter)');
+  if (!description.trim()) missingFields.push('Deskripsi');
   if (outputs.length === 0) missingFields.push('Output');
   if (outputs.includes('other') && !outputOther.trim()) missingFields.push('Keterangan output Lainnya');
   if (!isEdit && woType === 'personal' && !selectedTechnician) missingFields.push('Teknisi');
@@ -527,19 +520,73 @@ export const WorkOrderFormModal: React.FC<WorkOrderFormModalProps> = ({
           )}
 
           <div>
-            <Textarea
-              label="Deskripsi Perintah"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Tuliskan perintah kerja yang harus dilaksanakan (minimal 10 karakter)..."
-              rows={3}
-              required
-            />
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Deskripsi Perintah <span className="text-red-500">*</span>
+            </label>
+            <p className="text-xs text-slate-500 mb-2">Tambahkan perintah kerja satu per satu (format bullet list)</p>
+            {/* Existing items */}
+            {description.split('\n').filter(Boolean).length > 0 && (
+              <ul className="space-y-1.5 mb-3">
+                {description.split('\n').filter(Boolean).map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-2 group">
+                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-brand-primary shrink-0" />
+                    <span className="flex-1 text-sm text-slate-700">{item}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lines = description.split('\n').filter(Boolean);
+                        lines.splice(idx, 1);
+                        setDescription(lines.join('\n'));
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-red-500 transition-all"
+                      title="Hapus item"
+                    >
+                      <X size={14} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {/* Add new item input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Ketik perintah baru, lalu tekan Enter atau klik +"
+                className="flex-1 h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const input = e.currentTarget;
+                    const val = input.value.trim();
+                    if (val) {
+                      setDescription((prev) => prev ? prev + '\n' + val : val);
+                      input.value = '';
+                    }
+                  }
+                }}
+                id="wo-desc-input"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const input = document.getElementById('wo-desc-input') as HTMLInputElement;
+                  const val = input?.value?.trim();
+                  if (val) {
+                    setDescription((prev) => prev ? prev + '\n' + val : val);
+                    input.value = '';
+                    input.focus();
+                  }
+                }}
+                className="h-10 w-10 flex items-center justify-center rounded-xl border border-gray-300 bg-white text-slate-600 hover:bg-brand-primary hover:text-white hover:border-brand-primary transition-colors"
+                title="Tambah perintah"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
             <p className={`mt-1 text-xs ${
-              description.trim().length >= 10 ? 'text-emerald-600' : 'text-slate-400'
+              description.trim().length > 0 ? 'text-emerald-600' : 'text-slate-400'
             }`}>
-              {description.trim().length} / 10 karakter
-              {description.trim().length < 10 && ' minimum'}
+              {description.split('\n').filter(Boolean).length} item perintah
             </p>
           </div>
 

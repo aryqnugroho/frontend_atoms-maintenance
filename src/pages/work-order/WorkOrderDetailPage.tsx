@@ -8,7 +8,6 @@ import { ShiftBadge } from '@/components/common/ShiftBadge';
 import { Badge } from '@/components/common/Badge';
 import { Textarea } from '@/components/common/Textarea';
 import { WorkOrderSignaturePanel } from '@/components/work-orders/WorkOrderSignaturePanel';
-import { mockWorkOrders } from '@/data/mockData';
 import { workOrderService, type UpdateWorkOrderPayload } from '@/services/workOrderService';
 import { useAuth } from '@/hooks/useAuth';
 import type { WorkOrder, CompletionStatus } from '@/types';
@@ -30,15 +29,15 @@ export const WorkOrderDetailPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Reusable fetch — called on mount, on tab focus, and after mutations.
-  // Always pulls from the API to avoid stale state.
+  // Always pulls from the API to avoid stale state. The "WO not found" empty
+  // state below covers the failure case.
   const fetchWorkOrder = React.useCallback(async () => {
     if (!id) return;
     try {
       const data = await workOrderService.getWorkOrder(Number(id));
       setWo(data);
     } catch {
-      // API unreachable — fall back to mock so the page can still render.
-      setWo(mockWorkOrders.find((w) => w.id === Number(id)));
+      setWo(undefined);
     } finally {
       setIsLoading(false);
     }
@@ -58,17 +57,32 @@ export const WorkOrderDetailPage: React.FC = () => {
     return () => window.removeEventListener('focus', onFocus);
   }, [fetchWorkOrder]);
 
-  // Check if user is a technician
-  const isTechnician = user?.role === 'Teknisi CNSD' || user?.role === 'Teknisi TFP';
+  // Check if user can submit feedback (Teknisi or Supervisor)
+  const canSubmitFeedback = user?.role === 'Teknisi CNSD' || user?.role === 'Teknisi TFP' 
+    || user?.role === 'Supervisor CNSD' || user?.role === 'Supervisor TFP';
   
-  // Feedback form state (for technicians)
+  // Feedback form state
   const [completionStatus, setCompletionStatus] = useState<CompletionStatus | ''>('');
   const [notesKendala, setNotesKendala] = useState('');
   const [notesUsulan, setNotesUsulan] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Pre-fill feedback form when WO data loads
+  useEffect(() => {
+    if (wo) {
+      setCompletionStatus(wo.completion_status || '');
+      setNotesKendala(wo.notes_kendala || '');
+      setNotesUsulan(wo.notes_usulan || '');
+    }
+  }, [wo]);
+
   const handleSubmitFeedback = async () => {
     if (!wo) return;
+    // Validate: notes_kendala required if status is not "selesai"
+    if (completionStatus && completionStatus !== 'selesai' && !notesKendala.trim()) {
+      alert('Catatan/Kendala wajib diisi jika status belum selesai atau tidak dapat diselesaikan.');
+      return;
+    }
     setIsSaving(true);
     try {
       const updateData: UpdateWorkOrderPayload = {};
@@ -77,8 +91,6 @@ export const WorkOrderDetailPage: React.FC = () => {
       if (notesUsulan) updateData.notes_usulan = notesUsulan;
 
       await workOrderService.updateWorkOrder(wo.id, updateData);
-      // Always re-fetch from API to guarantee fresh state — never trust the
-      // mutation response alone for the page render.
       await fetchWorkOrder();
       alert('Feedback berhasil disimpan!');
     } catch {
@@ -121,12 +133,19 @@ export const WorkOrderDetailPage: React.FC = () => {
           <div>
             <h1 className="text-xl font-bold text-slate-900">{wo.wo_number}</h1>
             <div className="flex items-center gap-2 mt-0.5">
-              <Badge variant={wo.wo_type === 'shift' ? 'shift' : 'personal'}>
-                {wo.wo_type === 'shift' ? '👥 WO Shift' : '👤 WO Personal'}
-              </Badge>
+              {wo.wo_type === 'gm_directive' ? (
+                <Badge variant="gm">Directive GM</Badge>
+              ) : wo.wo_type === 'shift' ? (
+                <Badge variant="shift">WO Shift</Badge>
+              ) : (
+                <Badge variant="personal">WO Personal</Badge>
+              )}
               <Badge variant={wo.division === 'CNSD' ? 'cnsd' : 'tfp'}>{wo.division}</Badge>
               <StatusBadge status={wo.status} variant="pill" />
               <ShiftBadge shift={wo.shift_type} />
+              {wo.creator?.role === 'General Manager' && wo.wo_type !== 'gm_directive' && (
+                <Badge variant="gm" className="text-[10px]">Dari GM</Badge>
+              )}
             </div>
           </div>
         </div>
@@ -166,20 +185,33 @@ export const WorkOrderDetailPage: React.FC = () => {
 
           <div>
             <p className="text-xs text-slate-500 mb-0.5">Deskripsi Perintah</p>
-            <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 border border-slate-200 whitespace-pre-wrap">
-              {wo.description}
+            <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 border border-slate-200">
+              {wo.description && wo.description.includes('\n') ? (
+                <ul className="space-y-1 list-none">
+                  {wo.description.split('\n').filter(Boolean).map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-brand-primary shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="whitespace-pre-wrap">{wo.description}</span>
+              )}
             </div>
           </div>
 
-          <div>
-            <p className="text-xs text-slate-500 mb-1.5">Output Yang Diharapkan</p>
-            <div className="flex flex-wrap gap-2">
-              {wo.output_types.map((ot) => (
-                <Badge key={ot} variant="default">{outputLabels[ot] || ot}</Badge>
-              ))}
-              {wo.output_other && <Badge variant="warning">{wo.output_other}</Badge>}
+          {wo.output_types.length > 0 && (
+            <div>
+              <p className="text-xs text-slate-500 mb-1.5">Output Yang Diharapkan</p>
+              <div className="flex flex-wrap gap-2">
+                {wo.output_types.map((ot) => (
+                  <Badge key={ot} variant="default">{outputLabels[ot] || ot}</Badge>
+                ))}
+                {wo.output_other && <Badge variant="warning">{wo.output_other}</Badge>}
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -257,13 +289,15 @@ export const WorkOrderDetailPage: React.FC = () => {
         </Card>
       )}
 
-      {/* Section 2.5: Technician Feedback Form (only for technicians) */}
-      {isTechnician && wo.status !== 'completed' && (
+      {/* Section 2.5: Feedback Form (Teknisi & Supervisor) */}
+      {canSubmitFeedback && wo.status !== 'completed' && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base text-brand-primary">Form Feedback Teknisi</CardTitle>
+            <CardTitle className="text-base text-brand-primary">Form Feedback Pelaksana</CardTitle>
             <p className="text-xs text-slate-500 mt-1">
-              Isi form ini untuk memberikan feedback tentang pelaksanaan work order
+              {wo.status === 'on_hold' 
+                ? 'WO ini berstatus On Hold. Ubah status ke "Selesai" jika kendala sudah teratasi, lalu pastikan semua TTD terisi untuk menyelesaikan WO.'
+                : 'Isi form ini untuk memberikan feedback tentang pelaksanaan work order'}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">

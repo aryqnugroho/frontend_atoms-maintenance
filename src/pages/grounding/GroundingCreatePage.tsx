@@ -73,12 +73,8 @@ export const GroundingCreatePage: React.FC = () => {
   };
 
   const handleSave = () => {
-    const report = {
-      kantorUnitKerja, namaPeralatan, lokasiPeralatan,
-      tanggal, dibuatOleh, disetujuiOleh,
-      visualItems, measurementItems,
-    };
-    console.log('Saving grounding report:', report);
+    // Mock-only handler — real persistence flow lives at
+    // GroundingReportDetailPage. This page is unrouted scaffolding.
     alert('Laporan berhasil disimpan (mock)');
     navigate('/grounding');
   };

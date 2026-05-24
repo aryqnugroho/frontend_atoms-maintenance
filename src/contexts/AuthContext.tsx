@@ -155,6 +155,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // ── /monitor bypass ──────────────────────────────────────────────────────
+    // The workshop TV kiosk lives at /monitor and intentionally does NOT use
+    // the SSO flow — it has its own password gate. Skip ALL auth init here,
+    // including the redirect-to-rostering on no-auth, so the kiosk page can
+    // render directly. We also pick up SSO tokens that may have been parked
+    // by the module-load `?token` capture by clearing them, since this tab is
+    // committed to kiosk mode.
+    if (window.location.pathname.startsWith('/monitor')) {
+      sessionStorage.removeItem(SESSION_PENDING_KEY);
+      setIsLoading(false);
+      return;
+    }
+
     let cancelled = false;
     ensureInitialized().then((result) => {
       if (cancelled) return;

@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'default' | 'cnsd' | 'tfp' | 'success' | 'warning' | 'danger' | 'muted' | 'shift' | 'personal';
+  variant?: 'default' | 'cnsd' | 'tfp' | 'success' | 'warning' | 'danger' | 'muted' | 'shift' | 'personal' | 'gm';
   className?: string;
 }
 
@@ -17,6 +17,7 @@ const variantStyles: Record<string, string> = {
   muted:   'bg-gray-100 text-gray-500 ring-gray-300/20',
   shift:   'bg-blue-100 text-blue-700 ring-blue-600/20',
   personal: 'bg-purple-100 text-purple-700 ring-purple-600/20',
+  gm:      'bg-rose-100 text-rose-700 ring-rose-600/20',
 };
 
 export const Badge: React.FC<BadgeProps> = ({ children, variant = 'default', className }) => {

@@ -46,6 +46,10 @@ export interface PersonnelItem {
 
 /**
  * Payload for creating a work order via API.
+ *
+ * For wo_type='gm_directive' the General Manager picks division + MT (required)
+ * + Supervisor (optional). personnel + output_types are omitted (sent empty),
+ * since GM directives are top-down assignments with no technician list.
  */
 export interface CreateWorkOrderPayload {
   wo_type: WOType;
@@ -55,9 +59,10 @@ export interface CreateWorkOrderPayload {
   description: string;
   manager_id?: number;
   supervisor_id?: number;
+  has_supervisor?: boolean;
   assigned_technician_id?: number;
-  personnel: { user_id: number; role_label: string }[];
-  output_types: string[];
+  personnel?: { user_id: number; role_label: string }[];
+  output_types?: string[];
   output_other?: string;
   notes_kendala?: string;
   notes_usulan?: string;

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Topbar } from './Topbar';
+import { WelcomeModal } from './WelcomeModal';
 
 export const AppShell: React.FC = () => {
   return (
@@ -20,6 +21,9 @@ export const AppShell: React.FC = () => {
       <main id="main-content" className="main-content-bg flex-1 p-4 md:p-6 lg:p-8">
         <Outlet />
       </main>
+
+      {/* Welcome modal — shows on every page load */}
+      <WelcomeModal />
     </div>
   );
 };
